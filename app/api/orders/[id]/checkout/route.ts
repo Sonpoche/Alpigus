@@ -12,6 +12,8 @@ export const POST = apiAuthMiddleware(
   ) => {
     try {
       const orderId = context.params.id;
+      const body = await req.json();
+      const { deliveryType, deliveryAddress, deliveryNotes, paymentMethod } = body;
       
       // Vérifier que la commande existe et appartient à l'utilisateur
       const order = await prisma.order.findUnique({
@@ -35,7 +37,16 @@ export const POST = apiAuthMiddleware(
         // 1. Mettre à jour le statut de la commande
         await tx.order.update({
           where: { id: orderId },
-          data: { status: "CONFIRMED" }
+          data: { 
+            status: "CONFIRMED",
+            // Ajouter les informations additionnelles
+            metadata: JSON.stringify({
+              deliveryType,
+              deliveryAddress,
+              deliveryNotes,
+              paymentMethod
+            })
+          }
         });
         
         // 2. Mettre à jour toutes les réservations de TEMPORARY à CONFIRMED
@@ -50,7 +61,7 @@ export const POST = apiAuthMiddleware(
           }
         });
         
-        // 3. Logique supplémentaire de confirmation (envoi d'emails, etc.)
+        // 3. On pourrait ajouter d'autres étapes ici, comme l'envoi d'emails, etc.
         
         return true;
       });
