@@ -1,0 +1,173 @@
+// prisma/schema.prisma
+generator client {
+ provider = "prisma-client-js"
+}
+
+datasource db {
+ provider = "postgresql"
+ url      = env("DATABASE_URL")
+}
+
+model User {
+ id               String         @id @default(cuid())
+ name             String?
+ email            String         @unique
+ emailVerified    DateTime?
+ phone            String        
+ image            String?
+ password         String?
+ role             UserRole       @default(CLIENT)
+ resetToken       String?        // Ajout pour la réinitialisation du mot de passe
+ resetTokenExpiry DateTime?      // Ajout pour la réinitialisation du mot de passe
+ createdAt        DateTime       @default(now())
+ updatedAt        DateTime       @updatedAt
+ producer         Producer?
+ orders           Order[]
+ accounts         Account[]
+ sessions         Session[]
+}
+
+model Account {
+ id                String   @id @default(cuid())
+ userId            String
+ type              String
+ provider          String
+ providerAccountId String
+ refresh_token     String?  @db.Text
+ access_token      String?  @db.Text
+ expires_at        Int?
+ token_type        String?
+ scope             String?
+ id_token          String?  @db.Text
+ session_state     String?
+ user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+ @@unique([provider, providerAccountId])
+}
+
+model Session {
+ id           String   @id @default(cuid())
+ sessionToken String   @unique
+ userId       String
+ expires      DateTime
+ user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Producer {
+ id          String    @id @default(cuid())
+ userId      String    @unique
+ companyName String?   
+ address     String?   
+ description String?   @db.Text
+ products    Product[]
+ user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Product {
+ id            String        @id @default(cuid())
+ name          String
+ description   String?       @db.Text
+ price         Float
+ type          ProductType
+ image         String?
+ unit          String        // kg, g, pièce, etc.
+ producerId    String
+ producer      Producer      @relation(fields: [producerId], references: [id], onDelete: Cascade)
+ stock         Stock?
+ orderItems    OrderItem[]
+ categories    Category[]
+ available     Boolean       @default(true)
+ createdAt     DateTime      @default(now())
+ updatedAt     DateTime      @updatedAt
+ deliverySlots DeliverySlot[]
+}
+
+model Stock {
+ id        String   @id @default(cuid())
+ productId String   @unique
+ quantity  Float
+ product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+ updatedAt DateTime @updatedAt
+}
+
+model Category {
+ id       String    @id @default(cuid())
+ name     String    @unique
+ products Product[]
+}
+
+model Order {
+ id        String      @id @default(cuid())
+ userId    String
+ status    OrderStatus @default(PENDING)
+ items     OrderItem[]
+ total     Float
+ createdAt DateTime    @default(now())
+ updatedAt DateTime    @updatedAt
+ user      User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+ bookings  Booking[]
+}
+
+model OrderItem {
+ id        String  @id @default(cuid())
+ orderId   String
+ productId String
+ quantity  Float
+ price     Float
+ order     Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+ product   Product @relation(fields: [productId], references: [id])
+}
+
+model DeliverySlot {
+ id          String       @id @default(cuid())
+ productId   String
+ product     Product      @relation(fields: [productId], references: [id], onDelete: Cascade)
+ date        DateTime
+ maxCapacity Float        // Capacité maximale en kg
+ reserved    Float        // Quantité déjà réservée
+ isAvailable Boolean      @default(true)
+ createdAt   DateTime     @default(now())
+ updatedAt   DateTime     @updatedAt
+ bookings    Booking[]
+}
+
+model Booking {
+  id            String       @id @default(cuid())
+  deliverySlot  DeliverySlot @relation(fields: [slotId], references: [id], onDelete: Cascade)
+  slotId        String
+  orderId       String
+  order         Order        @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  quantity      Float
+  status        BookingStatus @default(TEMPORARY)  // Maintenant TEMPORARY
+  expiresAt     DateTime?
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+}
+
+enum UserRole {
+ ADMIN
+ PRODUCER
+ CLIENT
+}
+
+enum ProductType {
+ FRESH
+ DRIED
+ SUBSTRATE
+ WELLNESS
+}
+
+enum OrderStatus {
+ PENDING
+ CONFIRMED
+ SHIPPED
+ DELIVERED
+ CANCELLED
+}
+
+enum BookingStatus {
+  TEMPORARY     // Réordonnée en premier
+  PENDING
+  CONFIRMED
+  CANCELLED
+}

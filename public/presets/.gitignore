@@ -1,0 +1,17 @@
+# Ignorer les fichiers temporaires
+*.tmp
+*.temp
+
+# Ignorer les dossiers temporaires
+.DS_Store
+.thumbs
+__tmp__
+
+# Ne pas ignorer les images
+!*.jpg
+!*.jpeg
+!*.png
+!*.webp
+
+# Ignorer le dossier des images optimisées (on préfère les régénérer)
+optimized/
