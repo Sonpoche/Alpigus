@@ -139,6 +139,7 @@ model Booking {
   orderId       String
   order         Order        @relation(fields: [orderId], references: [id], onDelete: Cascade)
   quantity      Float
+  price         Float?       // Ajoutez ce champ s'il n'existe pas
   status        BookingStatus @default(TEMPORARY)  // Maintenant TEMPORARY
   expiresAt     DateTime?
   createdAt     DateTime     @default(now())

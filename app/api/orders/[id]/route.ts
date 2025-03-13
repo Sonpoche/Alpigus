@@ -12,7 +12,7 @@ export const GET = apiAuthMiddleware(async (
   try {
     const orderId = context.params.id;
     
-    // Vérifier si la commande existe
+    // Vérifier si la commande existe avec toutes les relations nécessaires
     const order = await prisma.order.findUnique({
       where: { id: orderId },
       include: {
@@ -21,7 +21,15 @@ export const GET = apiAuthMiddleware(async (
             product: true
           }
         },
-        bookings: true
+        bookings: {
+          include: {
+            deliverySlot: {
+              include: {
+                product: true
+              }
+            }
+          }
+        }
       }
     });
 

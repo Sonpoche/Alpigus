@@ -1,3 +1,4 @@
+// app/(protected)/cart/page.tsx
 'use client'
 
 import { useState, useEffect } from 'react'
@@ -22,21 +23,25 @@ interface CartItem {
   }
 }
 
+interface DeliverySlot {
+  id: string
+  date: string
+  product: {
+    id: string
+    name: string
+    price: number
+    unit: string
+    image: string | null
+  }
+}
+
 interface Booking {
   id: string
   quantity: number
+  price?: number
   status: 'TEMPORARY' | 'PENDING' | 'CONFIRMED' | 'CANCELLED'
   expiresAt: string | null
-  deliverySlot: {
-    id: string
-    date: string
-    product: {
-      id: string
-      name: string
-      unit: string
-      image: string | null
-    }
-  }
+  deliverySlot: DeliverySlot
 }
 
 interface Order {
@@ -55,6 +60,7 @@ export default function CartPage() {
   const [isUpdating, setIsUpdating] = useState(false)
   const [isCheckingOut, setIsCheckingOut] = useState(false)
   const [updatingItemId, setUpdatingItemId] = useState<string | null>(null)
+  const [debug, setDebug] = useState<any>(null)
 
   // Récupérer l'ID de la commande actuelle depuis le localStorage
   useEffect(() => {
@@ -83,6 +89,9 @@ export default function CartPage() {
       }
       
       const data = await response.json()
+      console.log("Ordre récupéré:", data)
+      console.log("Bookings dans l'ordre:", data.bookings)
+      setDebug(data) // Stocker pour le débogage
       setOrder(data)
     } catch (error) {
       console.error('Erreur:', error)
@@ -220,23 +229,39 @@ export default function CartPage() {
     }
   }
 
+  // Helper function pour gérer les dates et les états de réservation en toute sécurité
+  const getExpiryInfo = (booking: Booking | undefined) => {
+    if (!booking || !booking.expiresAt) {
+      return { isExpiring: false, timeRemaining: null };
+    }
+    const expiryDate = new Date(booking.expiresAt);
+    const timeRemaining = Math.max(0, Math.floor((expiryDate.getTime() - new Date().getTime()) / (1000 * 60)));
+    return {
+      isExpiring: booking.status === 'TEMPORARY' && booking.expiresAt,
+      timeRemaining
+    };
+  };
+
   // Calcul du total pour les produits standards (non-frais)
   const regularItemsTotal = order?.items.reduce((sum, item) => {
     return sum + (item.price * item.quantity)
   }, 0) || 0
 
-  // Calcul du total pour les réservations
+  // Calcul du total pour les réservations avec le prix du produit
   const bookingsTotal = order?.bookings.reduce((sum, booking) => {
-    // Supposons que le prix est stocké dans le produit de la réservation
-    // Vous devrez peut-être adapter cette logique selon votre modèle de données
-    return sum + (booking.quantity * 0) // À adapter si nécessaire
-  }, 0) || 0
+    // Utiliser le prix de la réservation ou le prix du produit associé
+    const price = booking.price || booking.deliverySlot.product.price || 0;
+    return sum + (price * booking.quantity);
+  }, 0) || 0;
 
   // Total général
   const grandTotal = regularItemsTotal + bookingsTotal
 
   // Vérifier si le panier est vide
-  const isCartEmpty = !order || (order.items.length === 0 && order.bookings.length === 0)
+  const isCartEmpty = !order || (
+    (!order.items || order.items.length === 0) && 
+    (!order.bookings || order.bookings.length === 0)
+  )
 
   if (isLoading) {
     return (
@@ -270,7 +295,7 @@ export default function CartPage() {
           {/* Colonne principale avec les produits et réservations */}
           <div className="lg:col-span-2 space-y-6">
             {/* Produits standards */}
-            {order?.items.length > 0 && (
+            {order?.items && order.items.length > 0 && (
               <div className="bg-background border border-foreground/10 rounded-lg overflow-hidden">
                 <div className="p-4 border-b border-foreground/10">
                   <h2 className="font-semibold">Produits</h2>
@@ -362,7 +387,7 @@ export default function CartPage() {
             )}
             
             {/* Réservations */}
-            {order?.bookings.length > 0 && (
+            {order?.bookings && Array.isArray(order.bookings) && order.bookings.length > 0 && (
               <div className="bg-background border border-foreground/10 rounded-lg overflow-hidden">
                 <div className="p-4 border-b border-foreground/10">
                   <h2 className="font-semibold">Réservations de Livraison</h2>
@@ -370,10 +395,26 @@ export default function CartPage() {
                 
                 <div className="divide-y divide-foreground/10">
                   {order.bookings.map((booking) => {
-                    const deliveryDate = new Date(booking.deliverySlot.date);
-                    const isExpiring = booking.status === 'TEMPORARY' && booking.expiresAt;
-                    const expiryDate = booking.expiresAt ? new Date(booking.expiresAt) : null;
-                    const timeRemaining = expiryDate ? Math.max(0, Math.floor((expiryDate.getTime() - new Date().getTime()) / (1000 * 60))) : null;
+                    console.log("Traitement d'une réservation:", booking);
+                    
+                    // Vérifier si booking et deliverySlot sont définis
+                    if (!booking || !booking.deliverySlot) {
+                      console.log("Booking ou deliverySlot manquant:", booking);
+                      return null;
+                    }
+                    
+                    // Créer une date à partir de la chaîne
+                    const deliveryDate = booking.deliverySlot.date ? new Date(booking.deliverySlot.date) : null;
+                    if (!deliveryDate) {
+                      console.log("Date de livraison invalide:", booking.deliverySlot.date);
+                      return null;
+                    }
+                    
+                    const { isExpiring, timeRemaining } = getExpiryInfo(booking);
+                    
+                    // Calculer le prix de la réservation
+                    const bookingPrice = booking.price || booking.deliverySlot.product.price || 0;
+                    const bookingTotal = bookingPrice * booking.quantity;
                     
                     return (
                       <div key={booking.id} className="p-4">
@@ -393,6 +434,9 @@ export default function CartPage() {
                             </div>
                             <div className="text-sm">
                               Quantité: {booking.quantity} {booking.deliverySlot.product.unit}
+                              <span className="ml-1 font-medium">
+                                ({bookingTotal.toFixed(2)} CHF)
+                              </span>
                             </div>
                             
                             {/* Notification d'expiration pour les réservations temporaires */}
@@ -423,6 +467,16 @@ export default function CartPage() {
                 </div>
               </div>
             )}
+            
+            {/* Section de débogage (en mode développement uniquement) */}
+            {process.env.NODE_ENV === 'development' && debug && (
+              <div className="bg-slate-100 dark:bg-slate-800 p-4 rounded-lg mt-8">
+                <h3 className="font-bold mb-2">Débogage</h3>
+                <div className="overflow-auto max-h-96">
+                  <pre className="text-xs">{JSON.stringify(debug, null, 2)}</pre>
+                </div>
+              </div>
+            )}
           </div>
           
           {/* Résumé de la commande */}
@@ -433,7 +487,7 @@ export default function CartPage() {
               <div className="space-y-2 mb-4">
                 <div className="flex justify-between">
                   <span>Sous-total</span>
-                  <span>{regularItemsTotal.toFixed(2)} CHF</span>
+                  <span>{(regularItemsTotal + bookingsTotal).toFixed(2)} CHF</span>
                 </div>
                 {/* Vous pouvez ajouter d'autres éléments comme les frais de livraison, taxes, etc. */}
               </div>

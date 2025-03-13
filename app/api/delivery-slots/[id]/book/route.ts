@@ -76,12 +76,13 @@ export const POST = apiAuthMiddleware(
           throw new Error("Cette commande ne vous appartient pas")
         }
 
-        // 4. Créer la réservation avec statut TEMPORARY et date d'expiration
+        // 4. Créer la réservation avec statut TEMPORARY, date d'expiration et prix du produit
         const newBooking = await tx.booking.create({
           data: {
             slotId: slot.id,
             orderId,
             quantity,
+            price: slot.product.price, // Ajout du prix du produit
             status: "TEMPORARY",
             expiresAt // Ajout de la date d'expiration
           }
@@ -102,6 +103,34 @@ export const POST = apiAuthMiddleware(
             quantity: slot.product.stock!.quantity - quantity
           }
         })
+
+        // 7. Mettre à jour le total de la commande
+        const orderItems = await tx.orderItem.findMany({
+          where: { orderId },
+          include: { product: true }
+        });
+
+        const bookings = await tx.booking.findMany({
+          where: { orderId },
+          include: { 
+            deliverySlot: {
+              include: { product: true }
+            }
+          }
+        });
+
+        const itemsTotal = orderItems.reduce((sum, item) => 
+          sum + (item.price * item.quantity), 0
+        );
+
+        const bookingsTotal = bookings.reduce((sum, booking) => 
+          sum + (booking.price || booking.deliverySlot.product.price) * booking.quantity, 0
+        );
+
+        await tx.order.update({
+          where: { id: orderId },
+          data: { total: itemsTotal + bookingsTotal }
+        });
 
         return newBooking
       })
