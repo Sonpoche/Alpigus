@@ -113,6 +113,21 @@ export default function CartPage() {
       setUpdatingItemId(itemId)
       setIsUpdating(true)
       
+      // Mise à jour optimiste de l'interface
+      if (order.items) {
+        const updatedItems = order.items.map(item => {
+          if (item.id === itemId) {
+            return { ...item, quantity: newQuantity };
+          }
+          return item;
+        });
+        
+        setOrder({
+          ...order,
+          items: updatedItems
+        });
+      }
+      
       const response = await fetch(`/api/orders/items/${itemId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
@@ -121,8 +136,10 @@ export default function CartPage() {
       
       if (!response.ok) throw new Error('Erreur lors de la mise à jour de la quantité')
       
-      // Recharger la commande pour avoir les données à jour
-      fetchOrder(order.id)
+      // Recharger la commande après un court délai pour s'assurer que les changements sont pris en compte
+      setTimeout(() => {
+        fetchOrder(order.id)
+      }, 300)
       
       toast({
         title: 'Quantité mise à jour',
@@ -135,6 +152,9 @@ export default function CartPage() {
         description: 'Impossible de mettre à jour la quantité',
         variant: 'destructive'
       })
+      
+      // En cas d'erreur, recharger pour restaurer l'état correct
+      fetchOrder(order.id)
     } finally {
       setIsUpdating(false)
       setUpdatingItemId(null)
@@ -149,14 +169,25 @@ export default function CartPage() {
       setUpdatingItemId(itemId)
       setIsUpdating(true)
       
+      // Mise à jour optimiste de l'interface
+      if (order.items) {
+        const updatedItems = order.items.filter(item => item.id !== itemId);
+        setOrder({
+          ...order,
+          items: updatedItems
+        });
+      }
+      
       const response = await fetch(`/api/orders/items/${itemId}`, {
         method: 'DELETE'
       })
       
       if (!response.ok) throw new Error('Erreur lors de la suppression de l\'article')
       
-      // Recharger la commande pour avoir les données à jour
-      fetchOrder(order.id)
+      // Recharger la commande après un court délai pour s'assurer que les changements sont pris en compte
+      setTimeout(() => {
+        fetchOrder(order.id)
+      }, 300)
       
       toast({
         title: 'Article supprimé',
@@ -169,6 +200,9 @@ export default function CartPage() {
         description: 'Impossible de supprimer l\'article',
         variant: 'destructive'
       })
+      
+      // En cas d'erreur, recharger pour restaurer l'état correct
+      fetchOrder(order.id)
     } finally {
       setIsUpdating(false)
       setUpdatingItemId(null)
@@ -183,14 +217,37 @@ export default function CartPage() {
       setUpdatingItemId(bookingId)
       setIsUpdating(true)
       
+      // Mise à jour optimiste de l'interface
+      if (order.bookings) {
+        const updatedBookings = order.bookings.filter(booking => booking.id !== bookingId);
+        setOrder({
+          ...order,
+          bookings: updatedBookings
+        });
+      }
+      
       const response = await fetch(`/api/bookings/${bookingId}`, {
         method: 'DELETE'
       })
       
       if (!response.ok) throw new Error('Erreur lors de l\'annulation de la réservation')
       
-      // Recharger la commande pour avoir les données à jour
-      fetchOrder(order.id)
+      // Recharger complètement la commande pour assurer la cohérence
+      const orderResponse = await fetch(`/api/orders/${order.id}`);
+      if (orderResponse.ok) {
+        const updatedOrder = await orderResponse.json();
+        
+        // Si la commande est vide (plus d'articles ni de réservations), supprimer l'ID du localStorage
+        if ((!updatedOrder.items || updatedOrder.items.length === 0) && 
+            (!updatedOrder.bookings || updatedOrder.bookings.length === 0)) {
+          localStorage.removeItem('currentOrderId');
+          // Rediriger vers la page du panier vide
+          router.refresh();
+        } else {
+          // Sinon, mettre à jour l'état local
+          setOrder(updatedOrder);
+        }
+      }
       
       toast({
         title: 'Réservation annulée',
@@ -203,6 +260,9 @@ export default function CartPage() {
         description: 'Impossible d\'annuler la réservation',
         variant: 'destructive'
       })
+      
+      // En cas d'erreur, recharger pour restaurer l'état correct
+      fetchOrder(order.id)
     } finally {
       setIsUpdating(false)
       setUpdatingItemId(null)
@@ -419,9 +479,19 @@ export default function CartPage() {
                     return (
                       <div key={booking.id} className="p-4">
                         <div className="flex items-start gap-4">
-                          {/* Icône calendrier */}
-                          <div className="w-10 h-10 bg-blue-50 dark:bg-blue-900/20 rounded-md flex items-center justify-center flex-shrink-0">
-                            <Calendar className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+                          {/* Image du produit */}
+                          <div className="w-16 h-16 bg-foreground/5 rounded-md overflow-hidden flex-shrink-0 mr-4">
+                            {booking.deliverySlot.product.image ? (
+                              <img
+                                src={booking.deliverySlot.product.image}
+                                alt={booking.deliverySlot.product.name}
+                                className="w-full h-full object-cover"
+                              />
+                            ) : (
+                              <div className="w-full h-full flex items-center justify-center text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20">
+                                <Calendar className="h-8 w-8" />
+                              </div>
+                            )}
                           </div>
                           
                           {/* Informations de réservation */}

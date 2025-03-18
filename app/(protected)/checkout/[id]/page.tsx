@@ -9,11 +9,12 @@ import { formatDateToFrench } from '@/lib/date-utils'
 import { 
   CreditCard, 
   CheckCircle, 
-  ShoppingBag, 
+  ShoppingCart, 
   Building, 
   Truck, 
   CalendarDays,
-  ArrowLeft
+  ArrowLeft,
+  Calendar
 } from 'lucide-react'
 import Link from 'next/link'
 
@@ -38,11 +39,14 @@ interface CartItem {
 interface Booking {
   id: string
   quantity: number
+  price?: number
   deliverySlot: {
     date: string
     product: {
       name: string
       unit: string
+      price: number
+      image: string | null
     }
   }
 }
@@ -156,8 +160,16 @@ export default function CheckoutPage({ params }: CheckoutProps) {
   
   // Calcul des totaux
   const subtotal = order?.items.reduce((sum, item) => sum + (item.price * item.quantity), 0) || 0
+  
+  // Calcul du total des réservations
+  const bookingsTotal = order?.bookings.reduce((sum, booking) => {
+    // Utiliser le prix stocké dans la réservation ou le prix du produit associé
+    const price = booking.price || booking.deliverySlot.product.price || 0;
+    return sum + (price * booking.quantity);
+  }, 0) || 0;
+  
   const deliveryFee = deliveryType === 'delivery' ? 15 : 0
-  const total = subtotal + deliveryFee
+  const total = subtotal + bookingsTotal + deliveryFee
   
   // Formater les dates de livraison
   const getDeliveryDates = () => {
@@ -369,20 +381,52 @@ export default function CheckoutPage({ params }: CheckoutProps) {
             {/* Articles */}
             <div className="mb-4 space-y-3">
               {order?.items.map((item) => (
-                <div key={item.id} className="flex justify-between text-sm">
-                  <span>
-                    {item.quantity} × {item.product.name}
-                  </span>
+                <div key={item.id} className="flex items-center justify-between text-sm">
+                  <div className="flex items-center gap-2">
+                    {/* Miniature du produit */}
+                    <div className="w-8 h-8 bg-foreground/5 rounded-md overflow-hidden flex-shrink-0">
+                      {item.product.image ? (
+                        <img
+                          src={item.product.image}
+                          alt={item.product.name}
+                          className="w-full h-full object-cover"
+                        />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center text-foreground/30">
+                          <ShoppingCart className="h-4 w-4" />
+                        </div>
+                      )}
+                    </div>
+                    <span>
+                      {item.quantity} × {item.product.name}
+                    </span>
+                  </div>
                   <span>{(item.price * item.quantity).toFixed(2)} CHF</span>
                 </div>
               ))}
               
               {order?.bookings.map((booking) => (
-                <div key={booking.id} className="flex justify-between text-sm">
-                  <span>
-                    {booking.quantity} × {booking.deliverySlot.product.name} (livraison)
-                  </span>
-                  <span>Inclus</span>
+                <div key={booking.id} className="flex items-center justify-between text-sm">
+                  <div className="flex items-center gap-2">
+                    {/* Miniature du produit de réservation */}
+                    <div className="w-8 h-8 bg-foreground/5 rounded-md overflow-hidden flex-shrink-0">
+                      {booking.deliverySlot.product.image ? (
+                        <img
+                          src={booking.deliverySlot.product.image}
+                          alt={booking.deliverySlot.product.name}
+                          className="w-full h-full object-cover"
+                        />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20">
+                          <Calendar className="h-4 w-4" />
+                        </div>
+                      )}
+                    </div>
+                    <span>
+                      {booking.quantity} × {booking.deliverySlot.product.name} (livraison)
+                    </span>
+                  </div>
+                  <span>{((booking.price || booking.deliverySlot.product.price) * booking.quantity).toFixed(2)} CHF</span>
                 </div>
               ))}
             </div>
@@ -391,7 +435,7 @@ export default function CheckoutPage({ params }: CheckoutProps) {
             <div className="space-y-2 mb-4 pt-3 border-t border-foreground/10">
               <div className="flex justify-between">
                 <span>Sous-total</span>
-                <span>{subtotal.toFixed(2)} CHF</span>
+                <span>{(subtotal + bookingsTotal).toFixed(2)} CHF</span>
               </div>
               
               <div className="flex justify-between">
