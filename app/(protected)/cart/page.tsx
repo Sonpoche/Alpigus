@@ -72,10 +72,25 @@ export default function CartPage() {
     }
   }, [])
 
+  // Rafraîchir périodiquement pour éliminer les réservations expirées
+  useEffect(() => {
+    if (!order?.id) return;
+    
+    const interval = setInterval(() => {
+      fetchOrder(order.id);
+    }, 30000); // Rafraîchir toutes les 30 secondes
+    
+    return () => clearInterval(interval);
+  }, [order?.id]);
+
   // Charger les détails de la commande
   const fetchOrder = async (orderId: string) => {
     try {
       setIsLoading(true)
+      
+      // Avant de récupérer la commande, lancer le nettoyage des réservations expirées
+      await fetch('/api/bookings/cleanup', { method: 'POST' });
+      
       const response = await fetch(`/api/orders/${orderId}`)
       
       if (!response.ok) {
@@ -302,13 +317,27 @@ export default function CartPage() {
     };
   };
 
+  // Filtrer les réservations non annulées et non expirées
+  const validBookings = order?.bookings?.filter(booking => {
+    // Ne pas afficher les réservations déjà annulées
+    if (booking.status === 'CANCELLED') return false;
+    
+    // Vérifier si la réservation est temporaire et expirée
+    if (booking.status === 'TEMPORARY' && booking.expiresAt) {
+      const expiryDate = new Date(booking.expiresAt);
+      return expiryDate > new Date(); // Garder seulement les non-expirées
+    }
+    
+    return true;
+  }) || [];
+
   // Calcul du total pour les produits standards (non-frais)
   const regularItemsTotal = order?.items.reduce((sum, item) => {
     return sum + (item.price * item.quantity)
   }, 0) || 0
 
   // Calcul du total pour les réservations avec le prix du produit
-  const bookingsTotal = order?.bookings.reduce((sum, booking) => {
+  const bookingsTotal = validBookings.reduce((sum, booking) => {
     // Utiliser le prix de la réservation ou le prix du produit associé
     const price = booking.price || booking.deliverySlot.product.price || 0;
     return sum + (price * booking.quantity);
@@ -320,7 +349,7 @@ export default function CartPage() {
   // Vérifier si le panier est vide
   const isCartEmpty = !order || (
     (!order.items || order.items.length === 0) && 
-    (!order.bookings || order.bookings.length === 0)
+    (validBookings.length === 0)
   )
 
   if (isLoading) {
@@ -447,14 +476,14 @@ export default function CartPage() {
             )}
             
             {/* Réservations */}
-            {order?.bookings && Array.isArray(order.bookings) && order.bookings.length > 0 && (
+            {validBookings.length > 0 && (
               <div className="bg-background border border-foreground/10 rounded-lg overflow-hidden">
                 <div className="p-4 border-b border-foreground/10">
                   <h2 className="font-semibold">Réservations de Livraison</h2>
                 </div>
                 
                 <div className="divide-y divide-foreground/10">
-                  {order.bookings.map((booking) => {
+                  {validBookings.map((booking) => {
                     console.log("Traitement d'une réservation:", booking);
                     
                     // Vérifier si booking et deliverySlot sont définis
@@ -543,6 +572,18 @@ export default function CartPage() {
               <div className="bg-slate-100 dark:bg-slate-800 p-4 rounded-lg mt-8">
                 <h3 className="font-bold mb-2">Débogage</h3>
                 <div className="overflow-auto max-h-96">
+                  <div className="mb-2">
+                    <p className="font-medium">État des réservations:</p>
+                    <ul className="list-disc list-inside">
+                      {order?.bookings?.map(booking => (
+                        <li key={booking.id}>
+                          ID: {booking.id.substring(0, 8)} | 
+                          Status: {booking.status} | 
+                          Expire: {booking.expiresAt ? new Date(booking.expiresAt).toLocaleString() : 'N/A'}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
                   <pre className="text-xs">{JSON.stringify(debug, null, 2)}</pre>
                 </div>
               </div>
