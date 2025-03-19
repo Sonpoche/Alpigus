@@ -4,10 +4,11 @@
 import Link from 'next/link'
 import { useSession } from 'next-auth/react'
 import { usePathname } from 'next/navigation'
-import { Store, ShoppingCart, Bell, Menu, X, Home } from 'lucide-react'
+import { Store, Bell, Menu, X, Home } from 'lucide-react'
 import { useState } from 'react'
 import { UserMenu } from './user-menu'
 import { ThemeToggle } from './theme-toggle'
+import { CartButton } from '../cart/cart-button'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -55,6 +56,7 @@ export function Header() {
 
   const navItems = getNavItems()
   const isActiveLink = (href: string) => pathname === href
+  const isClient = session?.user?.role === 'CLIENT' || !session?.user?.role
 
   return (
     <header className="sticky top-0 z-50 w-full border-b border-foreground/10 bg-background">
@@ -92,10 +94,8 @@ export function Header() {
               </Link>
             )}
             
-            {session?.user?.role === 'CLIENT' && (
-              <Link href="/cart" className="text-custom-text hover:text-custom-accent">
-                <ShoppingCart className="h-5 w-5" />
-              </Link>
+            {isClient && (
+              <CartButton />
             )}
             
             <DropdownMenu>
@@ -115,6 +115,9 @@ export function Header() {
 
           {/* Menu Mobile */}
           <div className="flex md:hidden items-center gap-4">
+            {isClient && (
+              <CartButton />
+            )}
             <ThemeToggle />
             <button
               onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}

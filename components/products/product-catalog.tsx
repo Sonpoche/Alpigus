@@ -3,10 +3,9 @@
 
 import { useState, useEffect } from 'react'
 import { ProductType } from '@prisma/client'
-import { Search, Filter, SlidersHorizontal, ShoppingCart, Info, Truck } from 'lucide-react'
-import Link from 'next/link'
+import { Search, Filter, SlidersHorizontal } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
-import { LoadingButton } from '@/components/ui/loading-button'
+import { ProductCard } from './product-card'
 
 interface Category {
   id: string
@@ -55,7 +54,6 @@ export default function ProductCatalog() {
   const [filters, setFilters] = useState<FilterState>(initialFilters)
   const [isLoading, setIsLoading] = useState(true)
   const [showFilters, setShowFilters] = useState(false)
-  const [loadingProductId, setLoadingProductId] = useState<string | null>(null)
   const { toast } = useToast()
 
   // Charger les données initiales
@@ -87,67 +85,6 @@ export default function ProductCatalog() {
 
     fetchData()
   }, [toast])
-
-  // Fonction pour ajouter rapidement au panier
-  const handleQuickAddToCart = async (productId: string) => {
-    setLoadingProductId(productId)
-    try {
-      const product = products.find(p => p.id === productId)
-      if (!product) throw new Error("Produit non trouvé")
-      
-      if (product.type === ProductType.FRESH) {
-        // Rediriger vers la page de détail pour les produits frais
-        window.location.href = `/products/${productId}`
-        return
-      }
-      
-      // Vérifier si une commande en cours existe
-      const storedOrderId = localStorage.getItem('currentOrderId')
-      let finalOrderId: string;
-      
-      if (!storedOrderId) {
-        const orderResponse = await fetch('/api/orders', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ items: [] })
-        })
-        
-        if (!orderResponse.ok) throw new Error("Erreur lors de la création de la commande")
-        
-        const orderData = await orderResponse.json()
-        finalOrderId = orderData.id
-        localStorage.setItem('currentOrderId', finalOrderId)
-      } else {
-        finalOrderId = storedOrderId
-      }
-      
-      // Ajouter l'article au panier (quantité par défaut = 1)
-      const response = await fetch('/api/orders/items', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          orderId: finalOrderId,
-          productId: productId,
-          quantity: 1
-        })
-      })
-      
-      if (!response.ok) throw new Error('Erreur lors de l\'ajout au panier')
-      
-      toast({
-        title: "Produit ajouté",
-        description: `1 ${product.unit} de ${product.name} ajouté au panier`
-      })
-    } catch (error: any) {
-      toast({
-        title: "Erreur",
-        description: error.message || "Impossible d'ajouter au panier",
-        variant: "destructive"
-      })
-    } finally {
-      setLoadingProductId(null)
-    }
-  }
 
   // Appliquer les filtres
   const filteredProducts = products.filter(product => {
@@ -352,93 +289,8 @@ export default function ProductCatalog() {
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {filteredProducts.map(product => (
-              <div
-                key={product.id}
-                className="bg-background border border-foreground/10 rounded-lg overflow-hidden hover:shadow-md transition-shadow"
-              >
-                {/* Image avec lien vers détail */}
-                <Link href={`/products/${product.id}`}>
-                  <div className="aspect-square bg-foreground/5">
-                    {product.image ? (
-                      <img
-                        src={product.image}
-                        alt={product.name}
-                        className="w-full h-full object-cover"
-                      />
-                    ) : (
-                      <div className="w-full h-full flex items-center justify-center">
-                        <span className="text-4xl">🍄</span>
-                      </div>
-                    )}
-                  </div>
-                </Link>
-
-                {/* Infos */}
-                <div className="p-4">
-                  <Link href={`/products/${product.id}`}>
-                    <h3 className="font-semibold text-custom-title mb-1 hover:text-custom-accent">
-                      {product.name}
-                    </h3>
-                  </Link>
-                  <p className="text-sm text-muted-foreground mb-2 line-clamp-2">{product.description}</p>
-                  
-                  {/* Prix et disponibilité */}
-                  <div className="flex justify-between items-center">
-                    <span className="font-medium text-lg">{product.price.toFixed(2)} CHF</span>
-                    <span className={`text-sm ${product.available ? 'text-green-600' : 'text-red-600'}`}>
-                      {product.available ? 'Disponible' : 'Indisponible'}
-                    </span>
-                  </div>
-
-                  {/* Tags */}
-                  <div className="mt-2 flex flex-wrap gap-1 mb-3">
-                    <span className="text-xs px-2 py-1 bg-foreground/5 rounded-full">
-                      {product.type}
-                    </span>
-                    {product.categories.map(cat => (
-                      <span
-                        key={cat.id}
-                        className="text-xs px-2 py-1 bg-custom-accent/10 text-custom-accent rounded-full"
-                      >
-                        {cat.name}
-                      </span>
-                    ))}
-                  </div>
-                  
-                  {/* Boutons d'action */}
-                  {product.available && (
-                    <div className="flex gap-2 mt-3">
-                      <Link 
-                        href={`/products/${product.id}`}
-                        className="flex-1 flex items-center justify-center gap-2 py-2 border border-foreground/10 rounded-md hover:bg-foreground/5 transition-colors text-sm font-medium"
-                      >
-                        <Info className="h-4 w-4" />
-                        Détails
-                      </Link>
-                      
-                      {product.type === ProductType.FRESH ? (
-                        <Link 
-                          href={`/products/${product.id}`}
-                          className="flex-1 flex items-center justify-center gap-2 py-2 bg-custom-accent text-white rounded-md hover:opacity-90 transition-opacity text-sm font-medium"
-                        >
-                          <Truck className="h-4 w-4" />
-                          Réserver
-                        </Link>
-                      ) : (
-                        <LoadingButton
-                          onClick={() => handleQuickAddToCart(product.id)}
-                          isLoading={loadingProductId === product.id}
-                          className="flex-1 flex items-center justify-center gap-2 py-2 text-sm font-medium"
-                        >
-                          <ShoppingCart className="h-4 w-4" />
-                          Ajouter
-                        </LoadingButton>
-                      )}
-                    </div>
-                  )}
-                </div>
-              </div>
+            {filteredProducts.map((product) => (
+              <ProductCard key={product.id} product={product} />
             ))}
           </div>
         )}
