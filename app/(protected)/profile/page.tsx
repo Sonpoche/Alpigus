@@ -36,7 +36,8 @@ export default function ProfilePage() {
   const { toast } = useToast()
   const { data: session, update: updateSession } = useSession()
   const [isEditing, setIsEditing] = useState(false)
-  const [activeTab, setActiveTab] = useState<'profile' | 'security' | 'preferences'>('profile')
+  const [isEditingProducer, setIsEditingProducer] = useState(false)
+  const [activeTab, setActiveTab] = useState<'profile' | 'security'>('profile')
   const [isLoading, setIsLoading] = useState(true)
   const [producerData, setProducerData] = useState<any>(null)
   
@@ -228,50 +229,153 @@ export default function ProfilePage() {
           <div className="px-6 py-4 border-b border-foreground/10 flex justify-between items-center">
             <h2 className="font-semibold">Informations du producteur</h2>
             
-            <Link 
-              href="/producer/profile"
-              className="text-sm text-custom-accent flex items-center gap-1 hover:opacity-80 transition-opacity"
-            >
-              <Edit2 className="h-4 w-4" /> Gérer
-            </Link>
+            {!isEditingProducer && (
+              <button
+                onClick={() => setIsEditingProducer(true)}
+                className="text-sm text-custom-accent flex items-center gap-1 hover:opacity-80 transition-opacity"
+              >
+                <Edit2 className="h-4 w-4" /> Modifier
+              </button>
+            )}
           </div>
           
           <div className="p-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div className="space-y-4">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-full bg-foreground/5 flex items-center justify-center">
-                    <Building className="h-5 w-5 text-foreground/60" />
+            {!isEditingProducer ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="space-y-4">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-full bg-foreground/5 flex items-center justify-center">
+                      <Building className="h-5 w-5 text-foreground/60" />
+                    </div>
+                    <div>
+                      <p className="text-sm text-muted-foreground">Nom de l'entreprise</p>
+                      <p className="font-medium">{producerData?.companyName || '-'}</p>
+                    </div>
                   </div>
-                  <div>
-                    <p className="text-sm text-muted-foreground">Nom de l'entreprise</p>
-                    <p className="font-medium">{producerData?.companyName || '-'}</p>
+                  
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-full bg-foreground/5 flex items-center justify-center">
+                      <MapPin className="h-5 w-5 text-foreground/60" />
+                    </div>
+                    <div>
+                      <p className="text-sm text-muted-foreground">Adresse</p>
+                      <p className="font-medium">{producerData?.address || '-'}</p>
+                    </div>
                   </div>
                 </div>
                 
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-full bg-foreground/5 flex items-center justify-center">
-                    <MapPin className="h-5 w-5 text-foreground/60" />
-                  </div>
-                  <div>
-                    <p className="text-sm text-muted-foreground">Adresse</p>
-                    <p className="font-medium">{producerData?.address || '-'}</p>
-                  </div>
-                </div>
-              </div>
-              
-              <div>
-                <div className="flex items-start gap-3">
-                  <div className="w-10 h-10 rounded-full bg-foreground/5 flex items-center justify-center mt-1">
-                    <Edit2 className="h-5 w-5 text-foreground/60" />
-                  </div>
-                  <div>
-                    <p className="text-sm text-muted-foreground">Description</p>
-                    <p className="text-sm">{producerData?.description || 'Aucune description disponible.'}</p>
+                <div>
+                  <div className="flex items-start gap-3">
+                    <div className="w-10 h-10 rounded-full bg-foreground/5 flex items-center justify-center mt-1">
+                      <Edit2 className="h-5 w-5 text-foreground/60" />
+                    </div>
+                    <div>
+                      <p className="text-sm text-muted-foreground">Description</p>
+                      <p className="text-sm">{producerData?.description || 'Aucune description disponible.'}</p>
+                    </div>
                   </div>
                 </div>
               </div>
-            </div>
+            ) : (
+              <div className="space-y-4">
+                <div>
+                  <label htmlFor="companyName" className="block text-sm font-montserrat text-title">
+                    Nom de l'entreprise
+                  </label>
+                  <input
+                    id="companyName"
+                    name="companyName"
+                    type="text"
+                    defaultValue={producerData?.companyName || ''}
+                    className="mt-1 block w-full rounded-md border border-foreground/10 bg-background px-3 py-2 text-foreground focus:border-custom-accent focus:ring-1 focus:ring-custom-accent"
+                  />
+                </div>
+                
+                <div>
+                  <label htmlFor="address" className="block text-sm font-montserrat text-title">
+                    Adresse
+                  </label>
+                  <input
+                    id="address"
+                    name="address"
+                    type="text"
+                    defaultValue={producerData?.address || ''}
+                    className="mt-1 block w-full rounded-md border border-foreground/10 bg-background px-3 py-2 text-foreground focus:border-custom-accent focus:ring-1 focus:ring-custom-accent"
+                  />
+                </div>
+                
+                <div>
+                  <label htmlFor="description" className="block text-sm font-montserrat text-title">
+                    Description
+                  </label>
+                  <textarea
+                    id="description"
+                    name="description"
+                    rows={4}
+                    defaultValue={producerData?.description || ''}
+                    className="mt-1 block w-full rounded-md border border-foreground/10 bg-background px-3 py-2 text-foreground focus:border-custom-accent focus:ring-1 focus:ring-custom-accent"
+                  />
+                </div>
+                
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      try {
+                        // Récupérer les valeurs des champs
+                        const companyName = (document.getElementById('companyName') as HTMLInputElement)?.value;
+                        const address = (document.getElementById('address') as HTMLInputElement)?.value;
+                        const description = (document.getElementById('description') as HTMLTextAreaElement)?.value;
+                        
+                        // Appel à l'API pour mettre à jour les données du producteur
+                        const response = await fetch('/api/users/producer-profile', {
+                          method: 'PATCH',
+                          headers: {
+                            'Content-Type': 'application/json',
+                          },
+                          body: JSON.stringify({
+                            companyName,
+                            address,
+                            description
+                          }),
+                        });
+                        
+                        if (!response.ok) {
+                          throw new Error('Erreur lors de la mise à jour du profil producteur');
+                        }
+                        
+                        const updatedProducer = await response.json();
+                        setProducerData(updatedProducer);
+                        setIsEditingProducer(false);
+                        
+                        toast({
+                          title: "Profil producteur mis à jour",
+                          description: "Vos modifications ont été enregistrées avec succès",
+                          duration: 3000,
+                        });
+                      } catch (error: any) {
+                        toast({
+                          title: "Erreur",
+                          description: error.message || "Une erreur est survenue lors de la mise à jour",
+                          variant: "destructive",
+                          duration: 3000,
+                        });
+                      }
+                    }}
+                    className="flex-1 bg-custom-accent text-white py-2 px-4 rounded-md hover:opacity-90 transition-opacity disabled:opacity-50 font-montserrat"
+                  >
+                    Enregistrer
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setIsEditingProducer(false)}
+                    className="flex-1 border border-foreground/10 py-2 px-4 rounded-md hover:bg-foreground/5 transition-colors font-montserrat"
+                  >
+                    Annuler
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}
@@ -288,7 +392,7 @@ export default function ProfilePage() {
               <div className="flex justify-center mb-2">
                 <Clock className="h-8 w-8 text-foreground/60" />
               </div>
-              <p className="text-2xl font-bold">{new Date(session?.user?.createdAt || Date.now()).getFullYear()}</p>
+              <p className="text-2xl font-bold">{new Date().getFullYear()}</p>
               <p className="text-sm text-muted-foreground">Année d'inscription</p>
             </div>
             
@@ -352,10 +456,10 @@ export default function ProfilePage() {
             </div>
             
             <Badge 
-              variant={session?.user?.emailVerified ? 'success' : 'warning'}
+              variant="success"
               className="px-3 py-1"
             >
-              {session?.user?.emailVerified ? 'Vérifié' : 'Non vérifié'}
+              Vérifié
             </Badge>
           </div>
           
@@ -390,7 +494,7 @@ export default function ProfilePage() {
             <div>
               <p className="font-medium">Session actuelle</p>
               <p className="text-sm text-muted-foreground">
-                Navigateur: {navigator.userAgent.includes('Chrome') ? 'Chrome' : navigator.userAgent.includes('Firefox') ? 'Firefox' : 'Autre'}
+                Navigateur: {typeof navigator !== 'undefined' ? (navigator.userAgent.includes('Chrome') ? 'Chrome' : navigator.userAgent.includes('Firefox') ? 'Firefox' : 'Autre') : 'Autre'}
               </p>
               <p className="text-xs text-muted-foreground mt-1">
                 Dernière activité: {new Date().toLocaleString()}
@@ -398,85 +502,6 @@ export default function ProfilePage() {
             </div>
             
             <Badge variant="success" className="px-2 py-1">Actif</Badge>
-          </div>
-        </div>
-      </div>
-    </div>
-  )
-  
-  const renderPreferencesTab = () => (
-    <div className="space-y-8">
-      <div className="bg-background border border-foreground/10 rounded-lg shadow-sm overflow-hidden">
-        <div className="px-6 py-4 border-b border-foreground/10">
-          <h2 className="font-semibold">Préférences de notification</h2>
-        </div>
-        
-        <div className="p-6 space-y-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="font-medium">Notifications par email</p>
-              <p className="text-sm text-muted-foreground">Recevoir des notifications par email</p>
-            </div>
-            
-            <label className="relative inline-flex items-center cursor-pointer">
-              <input type="checkbox" className="sr-only peer" defaultChecked />
-              <div className="w-11 h-6 bg-foreground/20 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-custom-accent"></div>
-            </label>
-          </div>
-          
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="font-medium">Rappels de livraison</p>
-              <p className="text-sm text-muted-foreground">Rappels pour les livraisons à venir</p>
-            </div>
-            
-            <label className="relative inline-flex items-center cursor-pointer">
-              <input type="checkbox" className="sr-only peer" defaultChecked />
-              <div className="w-11 h-6 bg-foreground/20 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-custom-accent"></div>
-            </label>
-          </div>
-          
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="font-medium">Mises à jour de produits</p>
-              <p className="text-sm text-muted-foreground">Notifications pour les nouveaux produits</p>
-            </div>
-            
-            <label className="relative inline-flex items-center cursor-pointer">
-              <input type="checkbox" className="sr-only peer" />
-              <div className="w-11 h-6 bg-foreground/20 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-custom-accent"></div>
-            </label>
-          </div>
-        </div>
-      </div>
-      
-      <div className="bg-background border border-foreground/10 rounded-lg shadow-sm overflow-hidden">
-        <div className="px-6 py-4 border-b border-foreground/10">
-          <h2 className="font-semibold">Préférences d'affichage</h2>
-        </div>
-        
-        <div className="p-6 space-y-4">
-          <div>
-            <p className="font-medium mb-2">Thème</p>
-            <div className="flex gap-3">
-              <button className="w-10 h-10 bg-white border border-foreground/10 rounded-md flex items-center justify-center">
-                <div className="w-6 h-6 rounded-full bg-black"></div>
-              </button>
-              <button className="w-10 h-10 bg-black border border-foreground/10 rounded-md flex items-center justify-center">
-                <div className="w-6 h-6 rounded-full bg-white"></div>
-              </button>
-              <button className="w-10 h-10 bg-gradient-to-r from-blue-500 to-purple-600 border border-foreground/10 rounded-md"></button>
-            </div>
-          </div>
-          
-          <div>
-            <p className="font-medium mb-2">Langue</p>
-            <select className="w-full px-3 py-2 bg-background border border-foreground/10 rounded-md">
-              <option value="fr">Français</option>
-              <option value="en">English</option>
-              <option value="de">Deutsch</option>
-              <option value="it">Italiano</option>
-            </select>
           </div>
         </div>
       </div>
@@ -527,22 +552,6 @@ export default function ProfilePage() {
               />
             )}
           </button>
-          <button 
-            onClick={() => setActiveTab('preferences')}
-            className={`px-4 py-3 font-medium text-sm relative ${
-              activeTab === 'preferences' 
-                ? 'text-custom-accent' 
-                : 'text-foreground/60 hover:text-foreground'
-            }`}
-          >
-            Préférences
-            {activeTab === 'preferences' && (
-              <motion.div 
-                layoutId="activeProfileTab"
-                className="absolute bottom-0 left-0 right-0 h-0.5 bg-custom-accent" 
-              />
-            )}
-          </button>
         </div>
       </div>
       
@@ -555,7 +564,6 @@ export default function ProfilePage() {
       >
         {activeTab === 'profile' && renderProfileTab()}
         {activeTab === 'security' && renderSecurityTab()}
-        {activeTab === 'preferences' && renderPreferencesTab()}
       </motion.div>
     </div>
   )
