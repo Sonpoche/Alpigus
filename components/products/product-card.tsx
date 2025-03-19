@@ -3,11 +3,13 @@
 
 import { useState } from 'react'
 import { ProductType } from '@prisma/client'
-import { ShoppingCart, Info, Truck } from 'lucide-react'
+import { ShoppingCart, Info, Truck, Star } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
 import { useCart } from '@/hooks/use-cart'
+import { Badge } from '@/components/ui/badge'
 import { LoadingButton } from '@/components/ui/loading-button'
 import { AddToCartAnimation } from '@/components/cart/add-to-cart-animation'
+import { motion } from 'framer-motion'
 import Link from 'next/link'
 
 interface Product {
@@ -34,6 +36,7 @@ export function ProductCard({ product }: ProductCardProps) {
   const { addToCart } = useCart()
   const [isAddingToCart, setIsAddingToCart] = useState(false)
   const [showAnimation, setShowAnimation] = useState(false)
+  const [isHovered, setIsHovered] = useState(false)
   
   const handleAddToCart = async () => {
     // Pour les produits frais, on utilise le calendrier de livraison
@@ -68,61 +71,127 @@ export function ProductCard({ product }: ProductCardProps) {
     }
   }
   
+  const productTypeColor = () => {
+    switch (product.type) {
+      case ProductType.FRESH:
+        return 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300'
+      case ProductType.DRIED:
+        return 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300'
+      case ProductType.SUBSTRATE:
+        return 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-300'
+      case ProductType.WELLNESS:
+        return 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300'
+      default:
+        return 'bg-foreground/5 text-foreground/70'
+    }
+  }
+  
   return (
     <>
-      <div className="bg-background border border-foreground/10 rounded-lg overflow-hidden hover:shadow-md transition-shadow">
+      <div 
+        className="card overflow-hidden transition-all duration-300"
+        onMouseEnter={() => setIsHovered(true)}
+        onMouseLeave={() => setIsHovered(false)}
+      >
         {/* Image avec lien vers détail */}
         <Link href={`/products/${product.id}`}>
-          <div className="aspect-square bg-foreground/5">
+          <div className="aspect-square bg-foreground/5 relative overflow-hidden">
             {product.image ? (
               <img
                 src={product.image}
                 alt={product.name}
-                className="w-full h-full object-cover"
+                className="w-full h-full object-cover transition-transform duration-500"
+                style={{ 
+                  transform: isHovered ? 'scale(1.05)' : 'scale(1)',
+                }}
               />
             ) : (
               <div className="w-full h-full flex items-center justify-center">
                 <span className="text-4xl">🍄</span>
               </div>
             )}
+            
+            {/* Badges de coin */}
+            <div className="absolute top-2 left-2 flex flex-col gap-2">
+              {product.type === ProductType.FRESH && (
+                <Badge variant="info" className="bg-blue-500/90 text-white shadow-md">Frais</Badge>
+              )}
+              
+              {/* Ajoutez ici d'autres badges comme "Nouveau", "Populaire", etc. */}
+            </div>
+            
+            {/* Type */}
+            <div className="absolute top-2 right-2">
+              <Badge className={`${productTypeColor()} shadow-md`}>
+                {product.type}
+              </Badge>
+            </div>
+            
+            {/* Disponibilité */}
+            <div className="absolute bottom-0 inset-x-0 p-2 text-center text-sm font-medium backdrop-blur-sm">
+              {product.available ? (
+                <div className="bg-green-500/90 text-white py-1 px-2 rounded-md">
+                  Disponible
+                </div>
+              ) : (
+                <div className="bg-red-500/90 text-white py-1 px-2 rounded-md">
+                  Indisponible
+                </div>
+              )}
+            </div>
           </div>
         </Link>
 
         {/* Infos */}
         <div className="p-4">
           <Link href={`/products/${product.id}`}>
-            <h3 className="font-semibold text-custom-title mb-1 hover:text-custom-accent">
+            <h3 className="font-semibold text-custom-title mb-1 hover:text-custom-accent truncate">
               {product.name}
             </h3>
           </Link>
-          <p className="text-sm text-muted-foreground mb-2 line-clamp-2">{product.description}</p>
           
-          {/* Prix et disponibilité */}
-          <div className="flex justify-between items-center">
+          <div className="flex items-center text-amber-500 mb-2">
+            <Star className="h-4 w-4 fill-amber-500" />
+            <Star className="h-4 w-4 fill-amber-500" />
+            <Star className="h-4 w-4 fill-amber-500" />
+            <Star className="h-4 w-4 fill-amber-500" />
+            <Star className="h-4 w-4" />
+            <span className="text-xs text-muted-foreground ml-1">(16)</span>
+          </div>
+          
+          <p className="text-sm text-muted-foreground mb-3 line-clamp-2">{product.description}</p>
+          
+          {/* Prix et stock */}
+          <div className="flex justify-between items-center mb-3">
             <span className="font-medium text-lg">{product.price.toFixed(2)} CHF</span>
-            <span className={`text-sm ${product.available ? 'text-green-600' : 'text-red-600'}`}>
-              {product.available ? 'Disponible' : 'Indisponible'}
-            </span>
+            {product.stock && (
+              <span className="text-xs text-muted-foreground">
+                Stock: {product.stock.quantity} {product.unit}
+              </span>
+            )}
           </div>
 
           {/* Tags */}
           <div className="mt-2 flex flex-wrap gap-1 mb-3">
-            <span className="text-xs px-2 py-1 bg-foreground/5 rounded-full">
-              {product.type}
-            </span>
             {product.categories.map(cat => (
-              <span
+              <Badge
                 key={cat.id}
-                className="text-xs px-2 py-1 bg-custom-accent/10 text-custom-accent rounded-full"
+                variant="secondary"
+                className="text-xs"
               >
                 {cat.name}
-              </span>
+              </Badge>
             ))}
           </div>
           
           {/* Boutons d'action */}
           {product.available && (
-            <div className="flex gap-2 mt-3">
+            <motion.div 
+              className="flex gap-2 mt-3"
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.1 }}
+            >
               <Link 
                 href={`/products/${product.id}`}
                 className="flex-1 flex items-center justify-center gap-2 py-2 border border-foreground/10 rounded-md hover:bg-foreground/5 transition-colors text-sm font-medium"
@@ -134,7 +203,7 @@ export function ProductCard({ product }: ProductCardProps) {
               {product.type === ProductType.FRESH ? (
                 <Link 
                   href={`/products/${product.id}`}
-                  className="flex-1 flex items-center justify-center gap-2 py-2 bg-custom-accent text-white rounded-md hover:opacity-90 transition-opacity text-sm font-medium"
+                  className="flex-1 flex items-center justify-center gap-2 py-2 bg-custom-accent text-white rounded-md hover:bg-custom-accentHover transition-colors text-sm font-medium"
                 >
                   <Truck className="h-4 w-4" />
                   Réserver
@@ -143,13 +212,14 @@ export function ProductCard({ product }: ProductCardProps) {
                 <LoadingButton
                   onClick={handleAddToCart}
                   isLoading={isAddingToCart}
-                  className="flex-1 flex items-center justify-center gap-2 py-2 text-sm font-medium"
+                  size="sm"
+                  width="full"
+                  icon={<ShoppingCart className="h-4 w-4" />}
                 >
-                  <ShoppingCart className="h-4 w-4" />
                   Ajouter
                 </LoadingButton>
               )}
-            </div>
+            </motion.div>
           )}
         </div>
       </div>

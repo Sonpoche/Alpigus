@@ -20,6 +20,12 @@
     --accent-foreground: 222.2 47.4% 11.2%;
     --destructive: 0 84.2% 60.2%;
     --destructive-foreground: 210 40% 98%;
+    --success: 142.1 76.2% 36.3%;
+    --success-foreground: 355.7 100% 97.3%;
+    --warning: 38 92% 50%;
+    --warning-foreground: 48 96% 89%;
+    --info: 221.2 83.2% 53.3%;
+    --info-foreground: 210 40% 98%;
     --border: 214.3 31.8% 91.4%;
     --input: 214.3 31.8% 91.4%;
     --ring: 222.2 84% 4.9%;
@@ -34,14 +40,16 @@
     --title-color: #1a1a1a;
     --text-color: #333333;
     --accent-color: #FF5A5F;
+    --accent-hover-color: #FF4046;
+    --accent-light-color: rgba(255, 90, 95, 0.1);
   }
 
   .dark {
-    --background: 0 0% 20%;
+    --background: 0 0% 12%;
     --foreground: 210 40% 98%;
     --card: 222.2 84% 4.9%;
     --card-foreground: 210 40% 98%;
-    --popover: 0 0% 20%;
+    --popover: 0 0% 12%;
     --popover-foreground: 210 40% 98%;
     --primary: 210 40% 98%;
     --primary-foreground: 222.2 47.4% 11.2%;
@@ -53,6 +61,12 @@
     --accent-foreground: 210 40% 98%;
     --destructive: 0 62.8% 30.6%;
     --destructive-foreground: 210 40% 98%;
+    --success: 142.1 70.6% 28.1%;
+    --success-foreground: 144.9 80.4% 90%;
+    --warning: 35 92% 33%;
+    --warning-foreground: 48 96% 89%;
+    --info: 217.2 91.2% 59.8%;
+    --info-foreground: 210 40% 98%;
     --border: 0 0% 24%;
     --input: 217.2 32.6% 17.5%;
     --ring: 212.7 26.8% 83.9%;
@@ -66,6 +80,8 @@
     --title-color: #ffffff;
     --text-color: #f2f2f2;
     --accent-color: #FF5A5F;
+    --accent-hover-color: #FF4046;
+    --accent-light-color: rgba(255, 90, 95, 0.2);
   }
 
   * {
@@ -94,6 +110,105 @@
   }
 
   .btn-accent:hover {
-    opacity: 0.9;
+    background-color: var(--accent-hover-color);
   }
+}
+
+@layer components {
+  /* Badges */
+  .badge {
+    @apply px-2 py-1 text-xs font-medium rounded-full;
+  }
+  
+  .badge-primary {
+    @apply bg-custom-accent text-white;
+  }
+  
+  .badge-secondary {
+    @apply bg-custom-accentLight text-custom-accent;
+  }
+  
+  .badge-outline {
+    @apply border border-foreground/10 bg-background text-foreground/60;
+  }
+  
+  /* Cards */
+  .card {
+    @apply bg-background border border-foreground/10 rounded-lg shadow-card hover:shadow-hover transition-shadow duration-300 overflow-hidden;
+  }
+  
+  .card-body {
+    @apply p-6;
+  }
+  
+  .card-header {
+    @apply mb-4;
+  }
+  
+  .card-title {
+    @apply font-montserrat font-semibold text-custom-title text-lg;
+  }
+  
+  .card-subtitle {
+    @apply text-sm text-muted-foreground;
+  }
+  
+  /* Animations */
+  .animate-hover {
+    @apply transition-all duration-200;
+  }
+  
+  .animate-scale {
+    @apply hover:scale-105;
+  }
+  
+  /* Hover effects */
+  .hover-lift {
+    @apply transition-transform duration-300 hover:-translate-y-1;
+  }
+  
+  .hover-shadow {
+    @apply transition-shadow duration-300 hover:shadow-lg;
+  }
+}
+
+/* Styles pour les skeletons */
+.skeleton {
+  @apply relative overflow-hidden bg-muted/20 rounded;
+}
+
+.skeleton::after {
+  @apply absolute top-0 right-0 bottom-0 left-0 -translate-x-full;
+  background: linear-gradient(90deg, rgba(255, 255, 255, 0), rgba(255, 255, 255, 0.2), rgba(255, 255, 255, 0));
+  animation: shimmer 2s infinite;
+  content: '';
+}
+
+@keyframes shimmer {
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+/* Styles pour les transitions de page */
+.page-transition {
+  animation-fill-mode: both;
+}
+
+.page-enter {
+  opacity: 0;
+}
+
+.page-enter-active {
+  opacity: 1;
+  transition: opacity 200ms ease-in;
+}
+
+.page-exit {
+  opacity: 1;
+}
+
+.page-exit-active {
+  opacity: 0;
+  transition: opacity 200ms ease-out;
 }
