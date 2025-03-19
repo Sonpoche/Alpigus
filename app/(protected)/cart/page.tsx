@@ -60,7 +60,6 @@ export default function CartPage() {
   const [isUpdating, setIsUpdating] = useState(false)
   const [isCheckingOut, setIsCheckingOut] = useState(false)
   const [updatingItemId, setUpdatingItemId] = useState<string | null>(null)
-  const [debug, setDebug] = useState<any>(null)
 
   // Récupérer l'ID de la commande actuelle depuis le localStorage
   useEffect(() => {
@@ -91,7 +90,13 @@ export default function CartPage() {
       // Avant de récupérer la commande, lancer le nettoyage des réservations expirées
       await fetch('/api/bookings/cleanup', { method: 'POST' });
       
-      const response = await fetch(`/api/orders/${orderId}`)
+      const response = await fetch(`/api/orders/${orderId}`, {
+        cache: 'no-store',
+        headers: {
+          'pragma': 'no-cache',
+          'cache-control': 'no-cache'
+        }
+      })
       
       if (!response.ok) {
         if (response.status === 404) {
@@ -104,9 +109,6 @@ export default function CartPage() {
       }
       
       const data = await response.json()
-      console.log("Ordre récupéré:", data)
-      console.log("Bookings dans l'ordre:", data.bookings)
-      setDebug(data) // Stocker pour le débogage
       setOrder(data)
     } catch (error) {
       console.error('Erreur:', error)
@@ -484,18 +486,14 @@ export default function CartPage() {
                 
                 <div className="divide-y divide-foreground/10">
                   {validBookings.map((booking) => {
-                    console.log("Traitement d'une réservation:", booking);
-                    
                     // Vérifier si booking et deliverySlot sont définis
                     if (!booking || !booking.deliverySlot) {
-                      console.log("Booking ou deliverySlot manquant:", booking);
                       return null;
                     }
                     
                     // Créer une date à partir de la chaîne
                     const deliveryDate = booking.deliverySlot.date ? new Date(booking.deliverySlot.date) : null;
                     if (!deliveryDate) {
-                      console.log("Date de livraison invalide:", booking.deliverySlot.date);
                       return null;
                     }
                     
@@ -563,28 +561,6 @@ export default function CartPage() {
                       </div>
                     );
                   })}
-                </div>
-              </div>
-            )}
-            
-            {/* Section de débogage (en mode développement uniquement) */}
-            {process.env.NODE_ENV === 'development' && debug && (
-              <div className="bg-slate-100 dark:bg-slate-800 p-4 rounded-lg mt-8">
-                <h3 className="font-bold mb-2">Débogage</h3>
-                <div className="overflow-auto max-h-96">
-                  <div className="mb-2">
-                    <p className="font-medium">État des réservations:</p>
-                    <ul className="list-disc list-inside">
-                      {order?.bookings?.map(booking => (
-                        <li key={booking.id}>
-                          ID: {booking.id.substring(0, 8)} | 
-                          Status: {booking.status} | 
-                          Expire: {booking.expiresAt ? new Date(booking.expiresAt).toLocaleString() : 'N/A'}
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                  <pre className="text-xs">{JSON.stringify(debug, null, 2)}</pre>
                 </div>
               </div>
             )}

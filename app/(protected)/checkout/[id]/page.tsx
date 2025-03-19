@@ -14,7 +14,9 @@ import {
   Truck, 
   CalendarDays,
   ArrowLeft,
-  Calendar
+  Calendar,
+  Trash2,
+  Loader2
 } from 'lucide-react'
 import Link from 'next/link'
 
@@ -69,6 +71,8 @@ export default function CheckoutPage({ params }: CheckoutProps) {
   const [deliveryAddress, setDeliveryAddress] = useState('')
   const [deliveryNotes, setDeliveryNotes] = useState('')
   const [paymentMethod, setPaymentMethod] = useState<'invoice' | 'card'>('invoice')
+  const [updatingItemId, setUpdatingItemId] = useState<string | null>(null)
+  const [isUpdating, setIsUpdating] = useState(false)
   
   useEffect(() => {
     if (params.id) {
@@ -76,10 +80,32 @@ export default function CheckoutPage({ params }: CheckoutProps) {
     }
   }, [params.id])
   
+  // Rafraîchir périodiquement pour capturer les changements du panier
+  useEffect(() => {
+    if (!order?.id) return;
+    
+    const interval = setInterval(() => {
+      fetchOrder(order.id);
+    }, 5000); // Rafraîchir toutes les 5 secondes
+    
+    return () => clearInterval(interval);
+  }, [order?.id]);
+  
   const fetchOrder = async (orderId: string) => {
     try {
       setIsLoading(true)
-      const response = await fetch(`/api/orders/${orderId}`)
+      
+      // Nettoyer les réservations expirées
+      await fetch('/api/bookings/cleanup', { method: 'POST' });
+      
+      const response = await fetch(`/api/orders/${orderId}`, {
+        // Éviter la mise en cache du navigateur
+        cache: 'no-store',
+        headers: {
+          'pragma': 'no-cache',
+          'cache-control': 'no-cache'
+        }
+      })
       
       if (!response.ok) {
         if (response.status === 404) {
@@ -92,7 +118,7 @@ export default function CheckoutPage({ params }: CheckoutProps) {
       const data = await response.json()
       
       // Vérifier si la commande n'est pas vide
-      if (data.items.length === 0 && data.bookings.length === 0) {
+      if (!data.items?.length && !data.bookings?.length) {
         toast({
           title: "Panier vide",
           description: "Votre panier est vide. Ajoutez des produits avant de passer commande.",
@@ -113,6 +139,98 @@ export default function CheckoutPage({ params }: CheckoutProps) {
       router.push('/cart')
     } finally {
       setIsLoading(false)
+    }
+  }
+  
+  // Supprimer un article du panier
+  const removeItem = async (itemId: string) => {
+    if (!order) return
+    
+    try {
+      setUpdatingItemId(itemId)
+      setIsUpdating(true)
+      
+      // Mise à jour optimiste de l'interface
+      if (order.items) {
+        const updatedItems = order.items.filter(item => item.id !== itemId);
+        setOrder({
+          ...order,
+          items: updatedItems
+        });
+      }
+      
+      const response = await fetch(`/api/orders/items/${itemId}`, {
+        method: 'DELETE'
+      })
+      
+      if (!response.ok) throw new Error('Erreur lors de la suppression de l\'article')
+      
+      // Recharger la commande 
+      fetchOrder(order.id)
+      
+      toast({
+        title: 'Article supprimé',
+        description: 'L\'article a été supprimé de votre panier'
+      })
+    } catch (error) {
+      console.error('Erreur:', error)
+      toast({
+        title: 'Erreur',
+        description: 'Impossible de supprimer l\'article',
+        variant: 'destructive'
+      })
+      
+      // En cas d'erreur, recharger pour restaurer l'état correct
+      fetchOrder(order.id)
+    } finally {
+      setIsUpdating(false)
+      setUpdatingItemId(null)
+    }
+  }
+  
+  // Annuler une réservation
+  const cancelBooking = async (bookingId: string) => {
+    if (!order) return
+    
+    try {
+      setUpdatingItemId(bookingId)
+      setIsUpdating(true)
+      
+      // Mise à jour optimiste de l'interface
+      if (order.bookings) {
+        const updatedBookings = order.bookings.filter(booking => booking.id !== bookingId);
+        setOrder({
+          ...order,
+          bookings: updatedBookings
+        });
+      }
+      
+      const response = await fetch(`/api/bookings/${bookingId}`, {
+        method: 'DELETE'
+      })
+      
+      if (!response.ok) throw new Error('Erreur lors de l\'annulation de la réservation')
+      
+      // Recharger la commande
+      fetchOrder(order.id)
+      
+      toast({
+        title: 'Réservation annulée',
+        description: 'La réservation a été annulée avec succès'
+      })
+    } catch (error) {
+      console.error('Erreur:', error)
+      toast({
+        title: 'Erreur',
+        description: 'Impossible d\'annuler la réservation',
+        variant: 'destructive'
+      })
+      
+      // En cas d'erreur, recharger pour restaurer l'état correct
+      fetchOrder(order.id)
+    } finally {
+      setIsUpdating(false)
+      setUpdatingItemId(null)
     }
   }
   
@@ -159,10 +277,10 @@ export default function CheckoutPage({ params }: CheckoutProps) {
   }
   
   // Calcul des totaux
-  const subtotal = order?.items.reduce((sum, item) => sum + (item.price * item.quantity), 0) || 0
+  const subtotal = order?.items?.reduce((sum, item) => sum + (item.price * item.quantity), 0) || 0
   
   // Calcul du total des réservations
-  const bookingsTotal = order?.bookings.reduce((sum, booking) => {
+  const bookingsTotal = order?.bookings?.reduce((sum, booking) => {
     // Utiliser le prix stocké dans la réservation ou le prix du produit associé
     const price = booking.price || booking.deliverySlot.product.price || 0;
     return sum + (price * booking.quantity);
@@ -173,7 +291,7 @@ export default function CheckoutPage({ params }: CheckoutProps) {
   
   // Formater les dates de livraison
   const getDeliveryDates = () => {
-    if (!order?.bookings.length) return null
+    if (!order?.bookings?.length) return null
     
     const dates = order.bookings.map(booking => {
       const date = new Date(booking.deliverySlot.date)
@@ -294,7 +412,7 @@ export default function CheckoutPage({ params }: CheckoutProps) {
           </div>
           
           {/* Dates de livraison */}
-          {deliveryDates && deliveryDates.length > 0 && (
+          {order?.bookings && order.bookings.length > 0 && (
             <div className="bg-background border border-foreground/10 rounded-lg p-6">
               <h2 className="text-lg font-semibold mb-4 flex items-center">
                 <CalendarDays className="h-5 w-5 mr-2" />
@@ -302,15 +420,35 @@ export default function CheckoutPage({ params }: CheckoutProps) {
               </h2>
               
               <div className="space-y-3">
-                {deliveryDates.map((item, index) => (
-                  <div key={index} className="flex items-center p-3 bg-foreground/5 rounded-lg">
-                    <div className="w-10 h-10 rounded-full bg-custom-accent/10 flex items-center justify-center mr-3">
-                      <CalendarDays className="h-5 w-5 text-custom-accent" />
+                {order?.bookings?.map((booking) => (
+                  <div key={booking.id} className="flex items-center justify-between p-3 bg-foreground/5 rounded-lg">
+                    <div className="flex items-center">
+                      <div className="w-10 h-10 rounded-full bg-custom-accent/10 flex items-center justify-center mr-3">
+                        <Calendar className="h-5 w-5 text-custom-accent" />
+                      </div>
+                      <div>
+                        <p className="font-medium">
+                          {formatDateToFrench(new Date(booking.deliverySlot.date))}
+                        </p>
+                        <p className="text-sm text-muted-foreground">
+                          {booking.quantity} {booking.deliverySlot.product.unit} de {booking.deliverySlot.product.name}
+                        </p>
+                      </div>
                     </div>
-                    <div>
-                      <p className="font-medium">{item.formattedDate}</p>
-                      <p className="text-sm text-muted-foreground">{item.product}</p>
-                    </div>
+                    
+                    {/* Bouton supprimer */}
+                    <button
+                      onClick={() => cancelBooking(booking.id)}
+                      disabled={isUpdating}
+                      className="text-muted-foreground hover:text-destructive transition-colors p-2"
+                      aria-label="Annuler la réservation"
+                    >
+                      {updatingItemId === booking.id && isUpdating ? (
+                        <Loader2 className="h-5 w-5 animate-spin" />
+                      ) : (
+                        <Trash2 className="h-5 w-5" />
+                      )}
+                    </button>
                   </div>
                 ))}
               </div>
@@ -380,7 +518,7 @@ export default function CheckoutPage({ params }: CheckoutProps) {
             
             {/* Articles */}
             <div className="mb-4 space-y-3">
-              {order?.items.map((item) => (
+              {order?.items?.map((item) => (
                 <div key={item.id} className="flex items-center justify-between text-sm">
                   <div className="flex items-center gap-2">
                     {/* Miniature du produit */}
@@ -401,11 +539,25 @@ export default function CheckoutPage({ params }: CheckoutProps) {
                       {item.quantity} × {item.product.name}
                     </span>
                   </div>
-                  <span>{(item.price * item.quantity).toFixed(2)} CHF</span>
+                  <div className="flex items-center">
+                    <span className="mr-2">{(item.price * item.quantity).toFixed(2)} CHF</span>
+                    <button
+                      onClick={() => removeItem(item.id)}
+                      disabled={isUpdating}
+                      className="text-muted-foreground hover:text-destructive transition-colors p-1"
+                      aria-label="Supprimer l'article"
+                    >
+                      {updatingItemId === item.id && isUpdating ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <Trash2 className="h-4 w-4" />
+                      )}
+                    </button>
+                  </div>
                 </div>
               ))}
               
-              {order?.bookings.map((booking) => (
+              {order?.bookings?.map((booking) => (
                 <div key={booking.id} className="flex items-center justify-between text-sm">
                   <div className="flex items-center gap-2">
                     {/* Miniature du produit de réservation */}
@@ -426,7 +578,21 @@ export default function CheckoutPage({ params }: CheckoutProps) {
                       {booking.quantity} × {booking.deliverySlot.product.name} (livraison)
                     </span>
                   </div>
-                  <span>{((booking.price || booking.deliverySlot.product.price) * booking.quantity).toFixed(2)} CHF</span>
+                  <div className="flex items-center">
+                    <span className="mr-2">{((booking.price || booking.deliverySlot.product.price) * booking.quantity).toFixed(2)} CHF</span>
+                    <button
+                      onClick={() => cancelBooking(booking.id)}
+                      disabled={isUpdating}
+                      className="text-muted-foreground hover:text-destructive transition-colors p-1"
+                      aria-label="Annuler la réservation"
+                    >
+                      {updatingItemId === booking.id && isUpdating ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <Trash2 className="h-4 w-4" />
+                      )}
+                    </button>
+                  </div>
                 </div>
               ))}
             </div>
@@ -458,7 +624,8 @@ export default function CheckoutPage({ params }: CheckoutProps) {
               isLoading={isProcessing}
               disabled={
                 (deliveryType === 'delivery' && !deliveryAddress) || 
-                isProcessing
+                isProcessing ||
+                isUpdating
               }
               className="w-full flex items-center justify-center gap-2"
             >
