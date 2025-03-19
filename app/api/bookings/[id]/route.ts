@@ -42,9 +42,8 @@ export const DELETE = apiAuthMiddleware(async (
     // Effectuer les mises à jour dans une transaction
     await prisma.$transaction(async (tx) => {
       // 1. Marquer la réservation comme annulée
-      await tx.booking.update({
-        where: { id: bookingId },
-        data: { status: "CANCELLED" }
+      await tx.booking.delete({
+        where: { id: bookingId }
       })
       
       // 2. Libérer le créneau
@@ -69,6 +68,9 @@ export const DELETE = apiAuthMiddleware(async (
         })
       }
     })
+    
+    // Important: Attendez que tout soit complété
+    await prisma.$disconnect()
     
     return new NextResponse(null, { status: 204 })
     

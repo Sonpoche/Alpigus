@@ -74,6 +74,9 @@ export const POST = apiAuthMiddleware(async (
       )
     );
 
+    // S'assurer que toutes les mises à jour sont persistées
+    await prisma.$disconnect();
+
     return NextResponse.json({
       message: `${results.length} réservations expirées ont été nettoyées`,
       cleaned: results.length,
@@ -81,6 +84,14 @@ export const POST = apiAuthMiddleware(async (
     });
   } catch (error) {
     console.error("Erreur lors du nettoyage des réservations:", error);
+    
+    // Essayer de se déconnecter proprement en cas d'erreur
+    try {
+      await prisma.$disconnect();
+    } catch (disconnectError) {
+      console.error("Erreur lors de la déconnexion de Prisma:", disconnectError);
+    }
+    
     return new NextResponse(
       "Erreur lors du nettoyage des réservations expirées", 
       { status: 500 }

@@ -80,17 +80,6 @@ export default function CheckoutPage({ params }: CheckoutProps) {
     }
   }, [params.id])
   
-  // Rafraîchir périodiquement pour capturer les changements du panier
-  useEffect(() => {
-    if (!order?.id) return;
-    
-    const interval = setInterval(() => {
-      fetchOrder(order.id);
-    }, 5000); // Rafraîchir toutes les 5 secondes
-    
-    return () => clearInterval(interval);
-  }, [order?.id]);
-  
   const fetchOrder = async (orderId: string) => {
     try {
       setIsLoading(true)
@@ -118,7 +107,7 @@ export default function CheckoutPage({ params }: CheckoutProps) {
       const data = await response.json()
       
       // Vérifier si la commande n'est pas vide
-      if (!data.items?.length && !data.bookings?.length) {
+      if ((!data.items || data.items.length === 0) && (!data.bookings || data.bookings.length === 0)) {
         toast({
           title: "Panier vide",
           description: "Votre panier est vide. Ajoutez des produits avant de passer commande.",
@@ -150,28 +139,20 @@ export default function CheckoutPage({ params }: CheckoutProps) {
       setUpdatingItemId(itemId)
       setIsUpdating(true)
       
-      // Mise à jour optimiste de l'interface
-      if (order.items) {
-        const updatedItems = order.items.filter(item => item.id !== itemId);
-        setOrder({
-          ...order,
-          items: updatedItems
-        });
-      }
-      
       const response = await fetch(`/api/orders/items/${itemId}`, {
         method: 'DELETE'
       })
       
       if (!response.ok) throw new Error('Erreur lors de la suppression de l\'article')
       
-      // Recharger la commande 
-      fetchOrder(order.id)
-      
       toast({
         title: 'Article supprimé',
         description: 'L\'article a été supprimé de votre panier'
       })
+      
+      // Rediriger vers le panier pour une synchronisation complète
+      window.location.href = '/cart';
+      
     } catch (error) {
       console.error('Erreur:', error)
       toast({
@@ -179,9 +160,6 @@ export default function CheckoutPage({ params }: CheckoutProps) {
         description: 'Impossible de supprimer l\'article',
         variant: 'destructive'
       })
-      
-      // En cas d'erreur, recharger pour restaurer l'état correct
-      fetchOrder(order.id)
     } finally {
       setIsUpdating(false)
       setUpdatingItemId(null)
@@ -196,28 +174,20 @@ export default function CheckoutPage({ params }: CheckoutProps) {
       setUpdatingItemId(bookingId)
       setIsUpdating(true)
       
-      // Mise à jour optimiste de l'interface
-      if (order.bookings) {
-        const updatedBookings = order.bookings.filter(booking => booking.id !== bookingId);
-        setOrder({
-          ...order,
-          bookings: updatedBookings
-        });
-      }
-      
       const response = await fetch(`/api/bookings/${bookingId}`, {
         method: 'DELETE'
       })
       
       if (!response.ok) throw new Error('Erreur lors de l\'annulation de la réservation')
       
-      // Recharger la commande
-      fetchOrder(order.id)
-      
       toast({
         title: 'Réservation annulée',
         description: 'La réservation a été annulée avec succès'
       })
+      
+      // Rediriger vers le panier pour une synchronisation complète
+      window.location.href = '/cart';
+      
     } catch (error) {
       console.error('Erreur:', error)
       toast({
@@ -225,9 +195,6 @@ export default function CheckoutPage({ params }: CheckoutProps) {
         description: 'Impossible d\'annuler la réservation',
         variant: 'destructive'
       })
-      
-      // En cas d'erreur, recharger pour restaurer l'état correct
-      fetchOrder(order.id)
     } finally {
       setIsUpdating(false)
       setUpdatingItemId(null)
@@ -575,7 +542,7 @@ export default function CheckoutPage({ params }: CheckoutProps) {
                       )}
                     </div>
                     <span>
-                      {booking.quantity} × {booking.deliverySlot.product.name} (livraison)
+                      {booking.quantity} kg × {booking.deliverySlot.product.name} (livraison)
                     </span>
                   </div>
                   <div className="flex items-center">
