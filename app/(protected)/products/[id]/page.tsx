@@ -21,7 +21,6 @@ export default function ProductDetailPage() {
   const { toast } = useToast()
   const { addToCart } = useCart()
   const [product, setProduct] = useState<any>(null)
-  const [producer, setProducer] = useState<any>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [quantity, setQuantity] = useState<string>("1")
   const [isAddingToCart, setIsAddingToCart] = useState(false)
@@ -39,7 +38,6 @@ export default function ProductDetailPage() {
         
         const data = await response.json()
         setProduct(data)
-        setProducer(data.producer)
         
         // Montrer automatiquement le calendrier pour les produits frais
         if (data.type === ProductType.FRESH) {
@@ -157,12 +155,12 @@ export default function ProductDetailPage() {
         
         <div className="bg-background border border-foreground/10 rounded-lg overflow-hidden shadow-sm">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8 p-6">
-            {/* Image du produit */}
+            {/* Image du produit (réduite) */}
             <motion.div 
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.5 }}
-              className="aspect-square bg-foreground/5 rounded-lg overflow-hidden"
+              className="md:w-4/5 mx-auto aspect-square bg-foreground/5 rounded-lg overflow-hidden"
             >
               {product.image ? (
                 <img
@@ -234,22 +232,6 @@ export default function ProductDetailPage() {
                 </div>
               )}
               
-              {/* Informations producteur */}
-              {producer && (
-                <div className="bg-foreground/5 p-4 rounded-lg">
-                  <h3 className="font-medium mb-2">Producteur</h3>
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 bg-custom-accentLight rounded-full flex items-center justify-center text-custom-accent font-bold">
-                      {producer.companyName ? producer.companyName.charAt(0) : 'P'}
-                    </div>
-                    <div>
-                      <p className="font-medium">{producer.companyName || producer.user?.name}</p>
-                      <p className="text-xs text-muted-foreground">{producer.address}</p>
-                    </div>
-                  </div>
-                </div>
-              )}
-              
               {/* Stock */}
               {product.stock && (
                 <div className="bg-foreground/5 p-4 rounded-lg">
@@ -262,6 +244,29 @@ export default function ProductDetailPage() {
                       className="h-full bg-custom-accent"
                       style={{ width: `${Math.min(100, (product.stock.quantity / 100) * 100)}%` }}
                     ></div>
+                  </div>
+                </div>
+              )}
+              
+              {/* Message pour les produits frais (déplacé plus haut) */}
+              {product.type === ProductType.FRESH && (
+                <div className="bg-blue-50 dark:bg-blue-900/20 p-4 rounded-lg flex items-start gap-3">
+                  <Truck className="h-5 w-5 text-blue-500 mt-0.5 flex-shrink-0" />
+                  <div>
+                    <p className="text-sm font-medium text-blue-800 dark:text-blue-300">
+                      Produit frais avec livraison
+                    </p>
+                    <p className="text-xs text-blue-700 dark:text-blue-300 mt-1">
+                      Ce produit nécessite de réserver un créneau de livraison.
+                    </p>
+                    {!showDeliveryCalendar && (
+                      <button
+                        onClick={() => setShowDeliveryCalendar(true)}
+                        className="mt-2 text-xs font-medium text-blue-600 dark:text-blue-300 hover:underline"
+                      >
+                        Réserver maintenant
+                      </button>
+                    )}
                   </div>
                 </div>
               )}
@@ -311,28 +316,6 @@ export default function ProductDetailPage() {
                       </LoadingButton>
                     </div>
                   )}
-                  
-                  {product.type === ProductType.FRESH && (
-                    <div className="bg-blue-50 dark:bg-blue-900/20 p-4 rounded-lg flex items-start gap-3">
-                      <Truck className="h-5 w-5 text-blue-500 mt-0.5 flex-shrink-0" />
-                      <div>
-                        <p className="text-sm font-medium text-blue-800 dark:text-blue-300">
-                          Produit frais avec livraison
-                        </p>
-                        <p className="text-xs text-blue-700 dark:text-blue-300 mt-1">
-                          Ce produit nécessite de réserver un créneau de livraison.
-                        </p>
-                        {!showDeliveryCalendar && (
-                          <button
-                            onClick={() => setShowDeliveryCalendar(true)}
-                            className="mt-2 text-xs font-medium text-blue-600 dark:text-blue-300 hover:underline"
-                          >
-                            Réserver maintenant
-                          </button>
-                        )}
-                      </div>
-                    </div>
-                  )}
                 </div>
               )}
               
@@ -355,6 +338,21 @@ export default function ProductDetailPage() {
               </div>
             </motion.div>
           </div>
+          
+          {/* Calendrier de réservation pour les produits frais (déplacé ici) */}
+          {showDeliveryCalendar && product.type === ProductType.FRESH && (
+            <motion.div 
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="mx-6 mb-6 bg-background border border-foreground/10 rounded-lg p-6 shadow-sm"
+            >
+              <h2 className="text-xl font-semibold mb-6">Réservation de livraison</h2>
+              <ProductDeliveryCalendar 
+                productId={productId} 
+                onReservationComplete={handleReservationComplete}
+              />
+            </motion.div>
+          )}
           
           {/* Onglets */}
           <div className="px-6 border-t border-foreground/10 mt-6">
@@ -447,48 +445,45 @@ export default function ProductDetailPage() {
                       </ul>
                     </div>
                     
+                    {/* Catégories détaillées (remplace les informations du producteur) */}
                     <div className="bg-foreground/5 p-4 rounded-lg">
-                      <h3 className="font-medium mb-2">Informations producteur</h3>
-                      {producer ? (
-                        <ul className="space-y-2">
-                          <li className="flex justify-between">
-                            <span className="text-sm text-muted-foreground">Nom:</span>
-                            <span className="text-sm font-medium">{producer.companyName || producer.user?.name}</span>
-                          </li>
-                          {producer.address && (
-                            <li className="flex justify-between">
-                              <span className="text-sm text-muted-foreground">Localisation:</span>
-                              <span className="text-sm font-medium">{producer.address}</span>
-                            </li>
-                          )}
-                          <li className="flex justify-between">
-                            <span className="text-sm text-muted-foreground">Contact:</span>
-                            <span className="text-sm font-medium">{producer.user?.email}</span>
-                          </li>
-                        </ul>
+                      <h3 className="font-medium mb-2">Catégories</h3>
+                      {product.categories && product.categories.length > 0 ? (
+                        <div className="space-y-2">
+                          <div className="flex flex-wrap gap-2">
+                            {product.categories.map((category: any) => (
+                              <Badge 
+                                key={category.id} 
+                                variant="secondary"
+                                className="py-1.5"
+                              >
+                                {category.name}
+                              </Badge>
+                            ))}
+                          </div>
+                          <div className="mt-4">
+                            <p className="text-sm text-muted-foreground">Origine:</p>
+                            <p className="text-sm font-medium">Suisse</p>
+                          </div>
+                          <div>
+                            <p className="text-sm text-muted-foreground">Certification:</p>
+                            <p className="text-sm font-medium">Bio</p>
+                          </div>
+                        </div>
                       ) : (
-                        <p className="text-muted-foreground italic">Informations non disponibles</p>
+                        <p className="text-muted-foreground italic">Aucune catégorie définie</p>
                       )}
                     </div>
                   </div>
                   
-                  {/* Catégories détaillées */}
-                  {product.categories && product.categories.length > 0 && (
-                    <div className="bg-foreground/5 p-4 rounded-lg">
-                      <h3 className="font-medium mb-2">Catégories</h3>
-                      <div className="flex flex-wrap gap-2">
-                        {product.categories.map((category: any) => (
-                          <Badge 
-                            key={category.id} 
-                            variant="secondary"
-                            className="py-1.5"
-                          >
-                            {category.name}
-                          </Badge>
-                        ))}
-                      </div>
-                    </div>
-                  )}
+                  {/* Informations complémentaires */}
+                  <div className="bg-foreground/5 p-4 rounded-lg">
+                    <h3 className="font-medium mb-2">Informations complémentaires</h3>
+                    <p className="text-sm text-muted-foreground">
+                      Tous nos produits sont soigneusement sélectionnés et proviennent de producteurs respectant 
+                      les normes de qualité suisses. Nous garantissons la fraîcheur et la qualité de nos champignons.
+                    </p>
+                  </div>
                 </div>
               )}
               
@@ -512,21 +507,6 @@ export default function ProductDetailPage() {
             </div>
           </div>
         </div>
-        
-        {/* Calendrier de réservation pour les produits frais */}
-        {showDeliveryCalendar && product.type === ProductType.FRESH && (
-          <motion.div 
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="mt-8 bg-background border border-foreground/10 rounded-lg p-6 shadow-sm"
-          >
-            <h2 className="text-xl font-semibold mb-6">Réservation de livraison</h2>
-            <ProductDeliveryCalendar 
-              productId={productId} 
-              onReservationComplete={handleReservationComplete}
-            />
-          </motion.div>
-        )}
         
         {/* Produits apparentés */}
         <div className="mt-12">

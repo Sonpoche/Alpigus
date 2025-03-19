@@ -15,7 +15,7 @@ export default function FeaturedProducts() {
     const fetchProducts = async () => {
       try {
         setIsLoading(true)
-        const response = await fetch('/api/products?limit=6&featured=true')
+        const response = await fetch('/api/products/featured?limit=6')
         if (!response.ok) throw new Error('Erreur lors du chargement des produits')
         
         const data = await response.json()
