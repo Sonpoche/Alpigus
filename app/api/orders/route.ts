@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { apiAuthMiddleware } from "@/lib/api-middleware"
 import { Session } from "next-auth"
-import { ProductType, Prisma } from "@prisma/client"
+import { OrderStatus, ProductType, Prisma } from "@prisma/client"
 
 interface OrderItem {
  productId: string
@@ -26,30 +26,64 @@ interface CreateOrderBody {
 
 export const GET = apiAuthMiddleware(async (req: NextRequest, session: Session) => {
  try {
-   const orders = await prisma.order.findMany({
-     where: {
-       ...(session.user.role === 'CLIENT' && {
-         userId: session.user.id
-       })
-     },
-     include: {
-       user: {
-         select: {
-           name: true,
-           email: true,
-           phone: true,
+   const { searchParams } = new URL(req.url)
+   const statusParam = searchParams.get('status') as OrderStatus | null
+   const page = parseInt(searchParams.get('page') ?? '1')
+   const limit = parseInt(searchParams.get('limit') ?? '10')
+
+   // Base de la requête
+   const baseWhere: any = {
+     ...(session.user.role === 'CLIENT' && {
+       userId: session.user.id
+     })
+   }
+
+   // Ajouter le filtre de statut s'il est spécifié
+   if (statusParam) {
+     baseWhere.status = statusParam
+   }
+
+   // Récupérer les commandes avec pagination
+   const [orders, total] = await Promise.all([
+     prisma.order.findMany({
+       where: baseWhere,
+       include: {
+         user: {
+           select: {
+             name: true,
+             email: true,
+             phone: true,
+           }
+         },
+         items: {
+           include: {
+             product: true
+           }
+         },
+         bookings: {
+           include: {
+             deliverySlot: {
+               include: {
+                 product: true
+               }
+             }
+           }
          }
        },
-       items: {
-         include: {
-           product: true
-         }
-       }
-     }
-   })
+       orderBy: {
+         createdAt: 'desc'
+       },
+       skip: (page - 1) * limit,
+       take: limit
+     }),
+     prisma.order.count({
+       where: baseWhere
+     })
+   ])
 
    return NextResponse.json(orders)
  } catch (error) {
+   console.error("Erreur lors de la récupération des commandes:", error)
    return new NextResponse("Erreur lors de la récupération des commandes", { status: 500 })
  }
 })

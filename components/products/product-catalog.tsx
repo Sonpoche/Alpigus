@@ -11,7 +11,9 @@ import {
   SlidersHorizontal, 
   X, 
   ChevronDown, 
-  Tag 
+  Tag, 
+  ArrowRight,
+  ArrowLeft
 } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
 import { ProductCard } from './product-card'

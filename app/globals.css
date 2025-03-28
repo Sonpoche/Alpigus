@@ -92,6 +92,23 @@
     @apply bg-background text-foreground;
   }
 
+  /* Fix pour les inputs et champs de formulaire en dark mode */
+  input, select, textarea {
+    @apply text-foreground bg-background border-input focus:border-ring focus:ring-2 focus:ring-ring/30 focus:outline-none;
+  }
+
+  /* Fix pour les placeholders */
+  input::placeholder, 
+  textarea::placeholder, 
+  select::placeholder {
+    @apply text-muted-foreground/70;
+  }
+
+  /* Fix pour les options dans les select */
+  option {
+    @apply bg-background text-foreground;
+  }
+
   /* Styles personnalisés */
   h1, h2, h3, h4, h5, h6 {
     color: var(--title-color);
@@ -153,6 +170,27 @@
     @apply text-sm text-muted-foreground;
   }
   
+  /* Formulaires */
+  .form-input {
+    @apply block w-full rounded-md border border-input bg-background px-3 py-2 text-foreground shadow-sm focus:border-ring focus:ring-2 focus:ring-ring/30 focus:outline-none;
+  }
+
+  .form-select {
+    @apply block w-full rounded-md border border-input bg-background px-3 py-2 text-foreground shadow-sm focus:border-ring focus:ring-2 focus:ring-ring/30 focus:outline-none;
+  }
+
+  .form-textarea {
+    @apply block w-full rounded-md border border-input bg-background px-3 py-2 text-foreground shadow-sm focus:border-ring focus:ring-2 focus:ring-ring/30 focus:outline-none;
+  }
+
+  .form-label {
+    @apply block text-sm font-medium text-foreground mb-1;
+  }
+
+  .form-error {
+    @apply mt-1 text-xs text-destructive;
+  }
+  
   /* Animations */
   .animate-hover {
     @apply transition-all duration-200;
@@ -169,6 +207,27 @@
   
   .hover-shadow {
     @apply transition-shadow duration-300 hover:shadow-lg;
+  }
+
+  /* Boutons */
+  .btn {
+    @apply inline-flex items-center justify-center rounded-md px-4 py-2 text-sm font-medium transition-colors focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50;
+  }
+
+  .btn-primary {
+    @apply btn bg-custom-accent text-white hover:bg-custom-accentHover;
+  }
+
+  .btn-secondary {
+    @apply btn border border-input bg-background hover:bg-accent hover:text-accent-foreground;
+  }
+
+  .btn-destructive {
+    @apply btn bg-destructive text-destructive-foreground hover:bg-destructive/90;
+  }
+
+  .btn-outline {
+    @apply btn border border-input bg-background hover:bg-accent hover:text-accent-foreground;
   }
 }
 
@@ -211,4 +270,36 @@
 .page-exit-active {
   opacity: 0;
   transition: opacity 200ms ease-out;
+}
+
+/* Modification des styles pour les modaux */
+.dialog-content {
+  @apply bg-background text-foreground;
+}
+
+/* Fixer le problème des inputs en mode sombre dans les dialogues */
+.dialog-content input,
+.dialog-content select,
+.dialog-content textarea {
+  @apply bg-background text-foreground border-input;
+}
+
+/* Fixer le problème de contraste pour les options de menu déroulant */
+option {
+  @apply text-foreground bg-background;
+}
+/* Fix pour le champ PhoneInput en mode sombre */
+.PhoneInput input {
+  @apply text-foreground bg-background;
+}
+
+/* Style spécifique pour le champ téléphone en mode sombre */
+.dark .PhoneInput input {
+  color: white;
+}
+
+/* Style pour les boutons de PhoneInput */
+.PhoneInputCountryIcon,
+.PhoneInputCountrySelectArrow {
+  @apply text-foreground;
 }
