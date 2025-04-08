@@ -1,116 +1,123 @@
 // components/layout/sidebar.tsx
 'use client'
 
+import { useState, useEffect } from 'react'
+import { useSession } from 'next-auth/react'
 import Link from 'next/link'
+import { UserRole } from '@prisma/client'
+import { ChevronLeft, Menu, ChevronRight } from 'lucide-react'
 import { usePathname } from 'next/navigation'
-import { useSession, signOut } from 'next-auth/react'
-import { 
-  LayoutDashboard, 
-  Users, 
-  ShoppingCart, 
-  Store,
-  Settings,
-  LogOut,
-  Calendar as CalendarIcon
-} from 'lucide-react'
-
-interface NavItem {
-  href: string
-  label: string
-  icon: React.ReactNode
-  roles?: string[]
-}
-
-const navItems: NavItem[] = [
-  {
-    href: '/dashboard',
-    label: 'Dashboard',
-    icon: <LayoutDashboard className="h-5 w-5" />,
-  },
-  {
-    href: '/admin',
-    label: 'Administration',
-    icon: <Users className="h-5 w-5" />,
-    roles: ['ADMIN'],
-  },
-  {
-    href: '/products',
-    label: 'Produits',
-    icon: <ShoppingCart className="h-5 w-5" />,
-  },
-  {
-    href: '/producer',
-    label: 'Espace Producteur',
-    icon: <Store className="h-5 w-5" />,
-    roles: ['PRODUCER'],
-  },
-  {
-    href: '/producer/delivery-slots/overview',
-    label: 'Créneaux de livraison',
-    icon: <CalendarIcon className="h-5 w-5" />,
-    roles: ['PRODUCER'],
-  },
-]
+import { cn } from '@/lib/utils'
+import ClientMenu from './client-menu'
+import ProducerMenu from './producer-menu'
+import AdminMenu from './admin-menu'
 
 export function Sidebar() {
-  const pathname = usePathname()
   const { data: session } = useSession()
+  const [isOpen, setIsOpen] = useState(true)
+  const [isMobile, setIsMobile] = useState(false)
+  const pathname = usePathname()
+
+  // Détecter le mobile
+  useEffect(() => {
+    const handleResize = () => {
+      setIsMobile(window.innerWidth < 768)
+      setIsOpen(window.innerWidth >= 768)
+    }
+    
+    handleResize()
+    window.addEventListener('resize', handleResize)
+    return () => window.removeEventListener('resize', handleResize)
+  }, [])
+
+  // Fermer la sidebar sur mobile quand on change de page
+  useEffect(() => {
+    if (isMobile) {
+      setIsOpen(false)
+    }
+  }, [pathname, isMobile])
+
+  if (!session?.user) return null
   
-  const isActiveLink = (href: string) => pathname === href
-
-  const filteredNavItems = navItems.filter(item => 
-    !item.roles || item.roles.includes(session?.user?.role as string)
-  )
-
   return (
-    <div className="hidden border-r border-foreground/10 bg-background lg:block lg:w-64">
-      <div className="flex h-full flex-col justify-between">
-        <nav className="space-y-1 px-3 py-4">
-          {filteredNavItems.map((item) => {
-            const isActive = isActiveLink(item.href)
-            return (
-              <Link
-                key={item.href}
-                href={item.href}
-                className={`
-                  flex items-center space-x-3 rounded-md px-3 py-2 text-sm font-medium
-                  ${isActive 
-                    ? 'bg-custom-accent text-white [&_svg]:text-white [&_span]:text-white'
-                    : 'text-custom-text hover:bg-foreground/5'
-                  }
-                `}
-              >
-                {item.icon}
-                <span>{item.label}</span>
+    <>
+      {/* Overlay pour mobile */}
+      {isMobile && isOpen && (
+        <div 
+          className="fixed inset-0 bg-black/40 z-20"
+          onClick={() => setIsOpen(false)}
+        />
+      )}
+      
+      {/* Bouton de toggle pour mobile */}
+      {isMobile && !isOpen && (
+        <button
+          onClick={() => setIsOpen(true)}
+          className="fixed bottom-4 left-4 z-20 p-3 bg-custom-accent text-white rounded-full shadow-lg"
+          aria-label="Ouvrir le menu"
+        >
+          <Menu className="h-6 w-6" />
+        </button>
+      )}
+      
+      {/* Bouton de toggle pour desktop lorsque la sidebar est fermée */}
+      {!isMobile && !isOpen && (
+        <button
+          onClick={() => setIsOpen(true)}
+          className="fixed top-20 left-0 z-40 p-2 bg-custom-accent hover:bg-custom-accent/90 text-white rounded-r-md shadow-md transition-colors"
+          aria-label="Ouvrir la sidebar"
+        >
+          <ChevronRight className="h-5 w-5" />
+        </button>
+      )}
+      
+      {/* Sidebar container */}
+      <div 
+        className={cn(
+          "bg-background border-r border-foreground/10 h-full flex flex-col transition-all duration-300 ease-in-out",
+          isMobile ? "fixed top-0 left-0 bottom-0 z-30" : "relative",
+          isOpen ? "w-64" : "w-0"
+        )}
+      >
+        {/* Contenu de la sidebar - visible uniquement quand isOpen est true */}
+        {isOpen && (
+          <>
+            <div className="p-4 border-b border-foreground/10 flex items-center justify-between">
+              <Link href="/dashboard" className="font-montserrat font-bold text-custom-title">
+                Mushroom Market
               </Link>
-            )
-          })}
-        </nav>
-
-        {/* Menu profil en bas */}
-        <div className="border-t border-foreground/10 px-3 py-4">
-          <Link
-            href="/profile"
-            className={`
-              flex items-center space-x-3 rounded-md px-3 py-2 text-sm font-medium mb-2
-              ${isActiveLink('/profile')
-                ? 'bg-custom-accent text-white [&_svg]:text-white [&_span]:text-white'
-                : 'text-custom-text hover:bg-foreground/5'
-              }
-            `}
-          >
-            <Settings className="h-5 w-5" />
-            <span>Profil</span>
-          </Link>
-          <button
-            onClick={() => signOut({ callbackUrl: '/' })}
-            className="w-full flex items-center space-x-3 rounded-md px-3 py-2 text-sm font-medium text-custom-text hover:bg-foreground/5"
-          >
-            <LogOut className="h-5 w-5" />
-            <span>Se déconnecter</span>
-          </button>
-        </div>
+              {!isMobile && (
+                <button
+                  onClick={() => setIsOpen(false)}
+                  className="p-1 rounded-md hover:bg-foreground/5 text-foreground/60"
+                >
+                  <ChevronLeft className="h-5 w-5" />
+                </button>
+              )}
+            </div>
+            
+            <div className="flex-1 overflow-y-auto pt-2">
+              <div className="py-2">
+                {session.user.role === UserRole.CLIENT && <ClientMenu />}
+                {session.user.role === UserRole.PRODUCER && <ProducerMenu />}
+                {session.user.role === UserRole.ADMIN && <AdminMenu />}
+              </div>
+            </div>
+            
+            <div className="p-4 border-t border-foreground/10">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-full bg-custom-accentLight text-custom-accent flex items-center justify-center font-medium">
+                  {session.user.name?.[0]?.toUpperCase() || 'U'}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="font-medium truncate">{session.user.name || 'Utilisateur'}</p>
+                  <p className="text-xs text-muted-foreground truncate">{session.user.email}</p>
+                </div>
+              </div>
+            </div>
+          </>
+        )}
       </div>
-    </div>
+    </>
   )
 }
