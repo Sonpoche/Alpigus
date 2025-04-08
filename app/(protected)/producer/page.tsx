@@ -9,6 +9,7 @@ import { useToast } from "@/hooks/use-toast"
 import Link from 'next/link'
 import { cn } from '@/lib/utils'
 import { DeleteConfirmationModal } from '@/components/ui/delete-confirmation-modal'
+import { NewOrdersAlert } from '@/components/producer/new-orders-alert'
 
 interface Product {
   id: string
@@ -198,6 +199,9 @@ export default function ProducerDashboard() {
 
   return (
     <div className="p-8">
+      {/* Alerte pour les nouvelles commandes */}
+      <NewOrdersAlert />
+      
       {/* Alerte pour les produits frais sans créneaux */}
       {freshProductsWithoutSlots.length > 0 && (
         <div className="mb-6 p-4 bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-800 rounded-lg">

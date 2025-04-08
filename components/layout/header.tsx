@@ -4,7 +4,7 @@
 import Link from 'next/link'
 import { useSession } from 'next-auth/react'
 import { usePathname } from 'next/navigation'
-import { Store, Bell, Menu, X, Home, ShoppingBag, Package, Calendar, Search } from 'lucide-react'
+import { Store, Menu, X, Home, ShoppingBag, Package, Calendar, Search } from 'lucide-react'
 import { useState, useEffect } from 'react'
 import { UserMenu } from './user-menu'
 import { ThemeToggle } from './theme-toggle'
@@ -16,6 +16,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { motion, AnimatePresence } from 'framer-motion'
+import { NotificationBell } from './notification-bell'
 
 // Menus de navigation par rôle
 const clientNavItems = [
@@ -132,19 +133,24 @@ export function Header() {
                 <CartButton />
               )}
               
-              <DropdownMenu>
-                <DropdownMenuTrigger className="text-custom-text hover:text-custom-accent">
-                  <Bell className="h-5 w-5" />
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-64 p-4">
-                  <div className="flex justify-between items-center border-b border-foreground/10 pb-2 mb-2">
-                    <h3 className="font-medium">Notifications</h3>
-                  </div>
-                  <div className="py-3 text-center text-sm text-muted-foreground">
-                    Pas de nouvelles notifications
-                  </div>
-                </DropdownMenuContent>
-              </DropdownMenu>
+              {/* Remplacer la cloche de notifications par le NotificationBell pour les producteurs et admins */}
+              {session?.user && (session.user.role === 'PRODUCER' || session.user.role === 'ADMIN') ? (
+                <NotificationBell />
+              ) : (
+                <DropdownMenu>
+                  <DropdownMenuTrigger className="text-custom-text hover:text-custom-accent">
+                    <NotificationBell />
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="w-64 p-4">
+                    <div className="flex justify-between items-center border-b border-foreground/10 pb-2 mb-2">
+                      <h3 className="font-medium">Notifications</h3>
+                    </div>
+                    <div className="py-3 text-center text-sm text-muted-foreground">
+                      Pas de nouvelles notifications
+                    </div>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              )}
 
               <ThemeToggle />
               <UserMenu />
@@ -162,6 +168,11 @@ export function Header() {
               
               {isClient && (
                 <CartButton />
+              )}
+
+              {/* Notification pour mobile */}
+              {session?.user && (session.user.role === 'PRODUCER' || session.user.role === 'ADMIN') && (
+                <NotificationBell />
               )}
               
               <button

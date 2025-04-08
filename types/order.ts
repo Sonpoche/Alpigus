@@ -21,7 +21,7 @@ export interface Booking {
   status: string
   deliverySlot: {
     id: string
-    date: string
+    date: string | Date
     product: {
       id: string
       name: string
@@ -41,8 +41,8 @@ export interface Order {
     email: string
     phone: string
   }
-  createdAt: string
-  updatedAt: string
+  createdAt: string | Date
+  updatedAt: string | Date
   status: OrderStatus
   total: number
   items: OrderItem[]

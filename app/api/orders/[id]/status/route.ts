@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma"
 import { apiAuthMiddleware } from "@/lib/api-middleware"
 import { Session } from "next-auth"
 import { OrderStatus, UserRole } from "@prisma/client"
+import { NotificationService } from '@/lib/notification-service'
 
 export const PATCH = apiAuthMiddleware(async (
   req: NextRequest,
@@ -43,6 +44,13 @@ export const PATCH = apiAuthMiddleware(async (
                 }
               }
             }
+          }
+        },
+        user: {
+          select: {
+            name: true,
+            email: true,
+            phone: true
           }
         }
       }
@@ -94,11 +102,48 @@ export const PATCH = apiAuthMiddleware(async (
       return new NextResponse("Non autorisé", { status: 403 })
     }
 
+    // Conserver l'ancien statut pour les notifications
+    const oldStatus = order.status;
+
     // Mettre à jour le statut de la commande
     const updatedOrder = await prisma.order.update({
       where: { id: orderId },
-      data: { status: status as OrderStatus }
+      data: { status: status as OrderStatus },
+      include: {
+        items: {
+          include: {
+            product: {
+              include: {
+                producer: true
+              }
+            }
+          }
+        },
+        bookings: {
+          include: {
+            deliverySlot: {
+              include: {
+                product: {
+                  include: {
+                    producer: true
+                  }
+                }
+              }
+            }
+          }
+        },
+        user: {
+          select: {
+            name: true,
+            email: true,
+            phone: true
+          }
+        }
+      }
     })
+
+    // Envoyer une notification de changement de statut
+    await NotificationService.sendOrderStatusChangeNotification(updatedOrder, oldStatus);
 
     // Si la commande est annulée, mettre à jour le stock
     if (status === OrderStatus.CANCELLED && order.status !== OrderStatus.CANCELLED) {

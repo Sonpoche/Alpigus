@@ -25,6 +25,7 @@ model User {
  orders           Order[]
  accounts         Account[]
  sessions         Session[]
+ notifications Notification[]
 }
 
 model Account {
@@ -144,6 +145,22 @@ model Booking {
   expiresAt     DateTime?
   createdAt     DateTime     @default(now())
   updatedAt     DateTime     @updatedAt
+}
+
+model Notification {
+  id        String   @id @default(cuid())
+  userId    String
+  type      String   // Correspond aux valeurs de NotificationType
+  title     String
+  message   String
+  link      String?
+  data      Json?    // Données supplémentaires liées à la notification
+  read      Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  // Relations
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 enum UserRole {

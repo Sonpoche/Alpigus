@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { apiAuthMiddleware } from "@/lib/api-middleware"
 import { Session } from "next-auth"
+import { NotificationService } from '@/lib/notification-service'
 
 export const GET = apiAuthMiddleware(async (
   req: NextRequest,
@@ -59,6 +60,11 @@ export const PATCH = apiAuthMiddleware(
         return new NextResponse("Non autorisé", { status: 403 })
       }
 
+      // Récupérer l'ancien stock pour comparaison
+      const oldStock = await prisma.stock.findUnique({
+        where: { productId: context.params.id }
+      })
+
       // Mettre à jour ou créer le stock
       const stock = await prisma.stock.upsert({
         where: { productId: context.params.id },
@@ -66,11 +72,37 @@ export const PATCH = apiAuthMiddleware(
         create: {
           productId: context.params.id,
           quantity
+        },
+        include: {
+          product: true
         }
       })
 
+      // Vérifier si le stock est bas (moins de 10 unités ou 20% du stock habituel)
+      const LOW_STOCK_THRESHOLD = 10
+      const LOW_STOCK_PERCENTAGE = 0.2
+      
+      // Déterminer si nous devons envoyer une alerte
+      let shouldSendAlert = false;
+      
+      // Si le stock est tombé sous le seuil
+      if (oldStock && oldStock.quantity > LOW_STOCK_THRESHOLD && quantity <= LOW_STOCK_THRESHOLD) {
+        shouldSendAlert = true;
+      }
+      
+      // Si c'est une mise à jour de stock et que la quantité est basse
+      if (quantity <= LOW_STOCK_THRESHOLD) {
+        shouldSendAlert = true;
+      }
+      
+      // Envoyer la notification si nécessaire
+      if (shouldSendAlert) {
+        await NotificationService.sendLowStockNotification(context.params.id, quantity);
+      }
+
       return NextResponse.json(stock)
     } catch (error) {
+      console.error("Erreur stock:", error);
       return new NextResponse("Erreur lors de la mise à jour du stock", { status: 500 })
     }
   },
