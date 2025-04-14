@@ -1,4 +1,4 @@
-// app/api/orders/route.ts
+// app/api/orders/[id]/route.ts
 import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { apiAuthMiddleware } from "@/lib/api-middleware"
@@ -6,110 +6,98 @@ import { Session } from "next-auth"
 import { OrderStatus, ProductType, Prisma } from "@prisma/client"
 import { NotificationService } from '@/lib/notification-service'
 
-interface OrderItem {
- productId: string
- quantity: number
- price: number
-}
-
-interface DeliveryBooking {
- slotId: string
- quantity: number
-}
-
-interface CreateOrderBody {
- items: {
-   productId: string
-   quantity: number
-   slotId?: string
- }[]
-}
-
-export const GET = apiAuthMiddleware(async (req: NextRequest, session: Session) => {
- try {
-   const { searchParams } = new URL(req.url)
-   const statusParam = searchParams.get('status') as OrderStatus | null
-   const page = parseInt(searchParams.get('page') ?? '1')
-   const limit = parseInt(searchParams.get('limit') ?? '10')
-
-   // Base de la requête
-   const baseWhere: any = {
-     ...(session.user.role === 'CLIENT' && {
-       userId: session.user.id
-     })
-   }
-
-   // Ajouter le filtre de statut s'il est spécifié
-   if (statusParam) {
-     baseWhere.status = statusParam
-   }
-
-   // Récupérer les commandes avec pagination
-   const [orders, total] = await Promise.all([
-     prisma.order.findMany({
-       where: baseWhere,
-       include: {
-         user: {
-           select: {
-             name: true,
-             email: true,
-             phone: true,
-           }
-         },
-         items: {
-           include: {
-             product: true
-           }
-         },
-         bookings: {
-           include: {
-             deliverySlot: {
-               include: {
-                 product: true
-               }
-             }
-           }
-         }
-       },
-       orderBy: {
-         createdAt: 'desc'
-       },
-       skip: (page - 1) * limit,
-       take: limit
-     }),
-     prisma.order.count({
-       where: baseWhere
-     })
-   ])
-
-   return NextResponse.json(orders)
- } catch (error) {
-   console.error("Erreur lors de la récupération des commandes:", error)
-   return new NextResponse("Erreur lors de la récupération des commandes", { status: 500 })
- }
-})
-
-export const POST = apiAuthMiddleware(async (req: NextRequest, session: Session) => {
+export const GET = apiAuthMiddleware(async (
+  req: NextRequest,
+  session: Session,
+  context: { params: { [key: string]: string } }
+) => {
   try {
-    const body = await req.json()
-    
-    // Créer une commande vide ou avec les items fournis
-    const order = await prisma.order.create({
-      data: {
-        userId: session.user.id,
-        total: 0,
-        status: "PENDING",
-        // Si des items sont fournis, les ajouter
-        ...(body.items && body.items.length > 0 && {
-          items: {
-            create: body.items.map((item: any) => ({
-              productId: item.productId,
-              quantity: item.quantity,
-              price: item.price || 0
-            }))
+    const orderId = context.params.id;
+
+    // Vérifier que la commande existe
+    const order = await prisma.order.findUnique({
+      where: { id: orderId },
+      include: {
+        user: {
+          select: {
+            name: true,
+            email: true,
+            phone: true,
           }
-        })
-      },
+        },
+        items: {
+          include: {
+            product: true
+          }
+        },
+        bookings: {
+          include: {
+            deliverySlot: {
+              include: {
+                product: true
+              }
+            }
+          }
+        }
+      }
+    });
+
+    if (!order) {
+      return new NextResponse("Commande non trouvée", { status: 404 });
+    }
+
+    // Si c'est un client, vérifier que la commande lui appartient
+    if (session.user.role === 'CLIENT' && order.userId !== session.user.id) {
+      return new NextResponse("Non autorisé", { status: 403 });
+    }
+
+    // Si c'est un producteur, vérifier qu'il a des produits dans cette commande
+    if (session.user.role === 'PRODUCER') {
+      const producer = await prisma.producer.findUnique({
+        where: { userId: session.user.id }
+      });
+
+      if (!producer) {
+        return new NextResponse("Producteur non trouvé", { status: 404 });
+      }
+
+      const hasProducts = order.items.some(item => 
+        item.product.producerId === producer.id
+      );
+      
+      const hasBookings = order.bookings.some(booking => 
+        booking.deliverySlot.product.producerId === producer.id
+      );
+
+      if (!hasProducts && !hasBookings) {
+        return new NextResponse("Non autorisé", { status: 403 });
+      }
+    }
+
+    return NextResponse.json(order);
+  } catch (error) {
+    console.error("Erreur lors de la récupération de la commande:", error);
+    return new NextResponse("Erreur lors de la récupération de la commande", { status: 500 });
+  }
+});
+
+export const PATCH = apiAuthMiddleware(async (
+  req: NextRequest,
+  session: Session,
+  context: { params: { [key: string]: string } }
+) => {
+  try {
+    const orderId = context.params.id
+    const body = await req.json()
+    const { status } = body
+
+    if (!status || !Object.values(OrderStatus).includes(status)) {
+      return new NextResponse("Statut invalide", { status: 400 })
+    }
+
+    // Récupérer l'ordre pour vérifier les autorisations
+    const order = await prisma.order.findUnique({
+      where: { id: orderId },
       include: {
         items: {
           include: {
@@ -143,14 +131,203 @@ export const POST = apiAuthMiddleware(async (req: NextRequest, session: Session)
       }
     })
 
-    // Si la commande contient des items, envoyer une notification
-    if ((order.items && order.items.length > 0) || (order.bookings && order.bookings.length > 0)) {
-      await NotificationService.sendNewOrderNotification(order)
+    if (!order) {
+      return new NextResponse("Commande non trouvée", { status: 404 })
     }
 
-    return NextResponse.json(order)
+    // Vérifier si c'est un producteur qui a des produits dans cette commande
+    if (session.user.role === 'PRODUCER') {
+      // Récupérer l'ID du producteur
+      const producer = await prisma.producer.findUnique({
+        where: { userId: session.user.id }
+      })
+
+      if (!producer) {
+        return new NextResponse("Producteur non trouvé", { status: 404 })
+      }
+
+      // Vérifier si ce producteur a des produits dans cette commande
+      const hasProducts = order.items.some(item => 
+        item.product.producer.userId === session.user.id
+      )
+
+      const hasBookings = order.bookings.some(booking => 
+        booking.deliverySlot.product.producer.userId === session.user.id
+      )
+
+      if (!hasProducts && !hasBookings) {
+        return new NextResponse("Non autorisé - Vous n'avez pas de produits dans cette commande", { status: 403 })
+      }
+
+      // Vérifier les transitions d'état valides pour un producteur
+      const validTransitions: Record<OrderStatus, OrderStatus[]> = {
+        PENDING: ['CONFIRMED', 'CANCELLED'],
+        CONFIRMED: ['SHIPPED', 'CANCELLED'],
+        SHIPPED: ['DELIVERED', 'CANCELLED'],
+        DELIVERED: [],
+        CANCELLED: []
+      }
+
+      if (!validTransitions[order.status].includes(status as OrderStatus)) {
+        return new NextResponse(`Transition de statut invalide: ${order.status} → ${status}`, { status: 400 })
+      }
+    } 
+    // Si c'est un admin, il n'y a pas de restrictions
+    else if (session.user.role !== 'ADMIN') {
+      return new NextResponse("Non autorisé", { status: 403 })
+    }
+
+    // Conserver l'ancien statut pour les notifications
+    const oldStatus = order.status;
+
+    // Mettre à jour le statut de la commande
+    const updatedOrder = await prisma.order.update({
+      where: { id: orderId },
+      data: { status: status as OrderStatus },
+      include: {
+        items: {
+          include: {
+            product: {
+              include: {
+                producer: true
+              }
+            }
+          }
+        },
+        bookings: {
+          include: {
+            deliverySlot: {
+              include: {
+                product: {
+                  include: {
+                    producer: true
+                  }
+                }
+              }
+            }
+          }
+        },
+        user: {
+          select: {
+            name: true,
+            email: true,
+            phone: true
+          }
+        }
+      }
+    })
+
+    // Convertir les dates en chaînes pour la notification
+    const orderWithStringDates = {
+      ...updatedOrder,
+      createdAt: updatedOrder.createdAt instanceof Date ? updatedOrder.createdAt.toISOString() : updatedOrder.createdAt,
+      updatedAt: updatedOrder.updatedAt instanceof Date ? updatedOrder.updatedAt.toISOString() : updatedOrder.updatedAt,
+      bookings: updatedOrder.bookings.map(booking => ({
+        ...booking,
+        price: booking.price === null ? undefined : booking.price, // Convertir null en undefined
+        deliverySlot: {
+          ...booking.deliverySlot,
+          date: booking.deliverySlot.date instanceof Date ? booking.deliverySlot.date.toISOString() : booking.deliverySlot.date
+        }
+      }))
+    }
+
+    // Envoyer une notification de changement de statut
+    await NotificationService.sendOrderStatusChangeNotification(orderWithStringDates, oldStatus);
+
+    // Si la commande est annulée, mettre à jour le stock
+    if (status === OrderStatus.CANCELLED && order.status !== OrderStatus.CANCELLED) {
+      await handleCancellation(order)
+    }
+
+    return NextResponse.json(updatedOrder)
   } catch (error) {
-    console.error("Erreur création commande:", error)
-    return new NextResponse("Erreur lors de la création de la commande", { status: 500 })
+    console.error("Erreur lors de la mise à jour du statut de la commande:", error)
+    return new NextResponse("Erreur lors de la mise à jour du statut de la commande", { status: 500 })
   }
-})
+}, ["PRODUCER", "ADMIN"])
+
+// Fonction pour gérer la logique d'annulation
+async function handleCancellation(order: any) {
+  // 1. Retourner les articles au stock
+  for (const item of order.items) {
+    await prisma.stock.update({
+      where: { productId: item.product.id },
+      data: {
+        quantity: {
+          increment: item.quantity
+        }
+      }
+    })
+  }
+
+  // 2. Retourner les réservations au stock et libérer les créneaux
+  for (const booking of order.bookings) {
+    // Mettre à jour le statut de la réservation
+    await prisma.booking.update({
+      where: { id: booking.id },
+      data: { status: 'CANCELLED' }
+    })
+    
+    // Libérer le créneau
+    await prisma.deliverySlot.update({
+      where: { id: booking.slotId },
+      data: {
+        reserved: {
+          decrement: booking.quantity
+        }
+      }
+    })
+    
+    // Retourner au stock
+    await prisma.stock.update({
+      where: { productId: booking.deliverySlot.product.id },
+      data: {
+        quantity: {
+          increment: booking.quantity
+        }
+      }
+    })
+  }
+}
+
+export const DELETE = apiAuthMiddleware(
+  async (
+    req: NextRequest,
+    session: Session,
+    context: { params: { [key: string]: string } }
+  ) => {
+    try {
+      const orderId = context.params.id;
+
+      // Vérifier que la commande existe
+      const order = await prisma.order.findUnique({
+        where: { id: orderId },
+        include: {
+          items: true,
+          bookings: true
+        }
+      });
+
+      if (!order) {
+        return new NextResponse("Commande non trouvée", { status: 404 });
+      }
+
+      // Seul l'utilisateur qui a créé la commande ou un admin peut la supprimer
+      if (order.userId !== session.user.id && session.user.role !== 'ADMIN') {
+        return new NextResponse("Non autorisé", { status: 403 });
+      }
+
+      // Supprimer la commande et tous les éléments associés
+      await prisma.order.delete({
+        where: { id: orderId }
+      });
+
+      return new NextResponse(null, { status: 204 });
+    } catch (error) {
+      console.error("Erreur lors de la suppression de la commande:", error);
+      return new NextResponse("Erreur lors de la suppression de la commande", { status: 500 });
+    }
+  }, 
+  ["CLIENT", "ADMIN"]
+);

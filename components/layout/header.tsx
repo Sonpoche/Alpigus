@@ -133,23 +133,13 @@ export function Header() {
                 <CartButton />
               )}
               
-              {/* Remplacer la cloche de notifications par le NotificationBell pour les producteurs et admins */}
+              {/* Notifications - CORRECTION ICI */}
               {session?.user && (session.user.role === 'PRODUCER' || session.user.role === 'ADMIN') ? (
                 <NotificationBell />
               ) : (
-                <DropdownMenu>
-                  <DropdownMenuTrigger className="text-custom-text hover:text-custom-accent">
-                    <NotificationBell />
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end" className="w-64 p-4">
-                    <div className="flex justify-between items-center border-b border-foreground/10 pb-2 mb-2">
-                      <h3 className="font-medium">Notifications</h3>
-                    </div>
-                    <div className="py-3 text-center text-sm text-muted-foreground">
-                      Pas de nouvelles notifications
-                    </div>
-                  </DropdownMenuContent>
-                </DropdownMenu>
+                <Link href="/notifications" className="p-2 rounded-md hover:bg-foreground/5 text-custom-text hover:text-custom-accent transition-colors">
+                  <Store className="h-5 w-5" />
+                </Link>
               )}
 
               <ThemeToggle />

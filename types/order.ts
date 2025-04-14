@@ -17,7 +17,7 @@ export interface OrderItem {
 export interface Booking {
   id: string
   quantity: number
-  price?: number
+  price?: number | null
   status: string
   deliverySlot: {
     id: string
@@ -47,7 +47,7 @@ export interface Order {
   total: number
   items: OrderItem[]
   bookings: Booking[]
-  metadata?: string
+  metadata?: string | null  // Modifié ici pour accepter null
 }
 
 export interface DeliveryInfo {

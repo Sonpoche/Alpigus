@@ -1,0 +1,411 @@
+[2025-04-11T09:44:04.730Z] Requête de création de commande reçue {
+  "items": []
+}
+[2025-04-11T09:44:04.740Z] Commande créée {
+  "id": "cm9clo60u0003m5j99zqeehll",
+  "itemsCount": 0,
+  "bookingsCount": 0
+}
+[2025-04-11T09:44:04.741Z] Aucun item dans la commande - pas de notification à créer 
+[2025-04-11T09:58:33.808Z] [TEST] Début création commande de test 
+[2025-04-11T09:58:33.811Z] [TEST] Utilisateur client trouvé {
+  "userId": "cm87c7hvh00006aia2k26zc26"
+}
+[2025-04-11T09:58:33.813Z] [TEST] Produit trouvé {
+  "productId": "cm8fvrbh2000ym01epzrpk6i7",
+  "producerId": "cm7yn4iaf0003qxwp7jjkgdiu",
+  "producerUserId": "cm7yn45lj0000qxwps52dljee"
+}
+[2025-04-11T09:58:33.845Z] [TEST] Commande de test créée {
+  "orderId": "cm9cm6slz0009m5j9brp7aobw"
+}
+[2025-04-11T09:58:33.854Z] [TEST] Notification de test créée {
+  "notificationId": "cm9cm6smv000dm5j9mhdfo57c"
+}
+[2025-04-11T09:59:39.154Z] Requête de création de commande reçue {
+  "items": []
+}
+[2025-04-11T09:59:39.155Z] ATTENTION: Requête reçue sans items 
+[2025-04-11T09:59:39.165Z] Items trouvés dans le panier existant: [
+  {
+    "id": "cm9cm6slz000bm5j9bd7m50em",
+    "orderId": "cm9cm6slz0009m5j9brp7aobw",
+    "productId": "cm8fvrbh2000ym01epzrpk6i7",
+    "quantity": 1,
+    "price": 10,
+    "product": {
+      "id": "cm8fvrbh2000ym01epzrpk6i7",
+      "name": "Test",
+      "description": "",
+      "price": 10,
+      "type": "FRESH",
+      "image": "/presets/mushrooms/optimized/morel.jpg",
+      "unit": "kg",
+      "producerId": "cm7yn4iaf0003qxwp7jjkgdiu",
+      "available": true,
+      "createdAt": "2025-03-19T12:10:04.118Z",
+      "updatedAt": "2025-03-19T12:10:04.118Z"
+    }
+  }
+]
+[2025-04-11T09:59:39.167Z] Items qui seront utilisés pour créer la commande: [
+  {
+    "productId": "cm8fvrbh2000ym01epzrpk6i7",
+    "quantity": 1,
+    "price": 10
+  }
+]
+[2025-04-11T09:59:39.198Z] Commande créée avec ID: "cm9cm871d000fm5j984l6gbon"
+[2025-04-11T09:59:39.200Z] Contenu de l'objet order.items: [
+  {
+    "id": "cm9cm871d000hm5j9jbfphl7y",
+    "orderId": "cm9cm871d000fm5j984l6gbon",
+    "productId": "cm8fvrbh2000ym01epzrpk6i7",
+    "quantity": 1,
+    "price": 10,
+    "product": {
+      "id": "cm8fvrbh2000ym01epzrpk6i7",
+      "name": "Test",
+      "description": "",
+      "price": 10,
+      "type": "FRESH",
+      "image": "/presets/mushrooms/optimized/morel.jpg",
+      "unit": "kg",
+      "producerId": "cm7yn4iaf0003qxwp7jjkgdiu",
+      "available": true,
+      "createdAt": "2025-03-19T12:10:04.118Z",
+      "updatedAt": "2025-03-19T12:10:04.118Z",
+      "producer": {
+        "id": "cm7yn4iaf0003qxwp7jjkgdiu",
+        "userId": "cm7yn45lj0000qxwps52dljee",
+        "companyName": "webdevfred",
+        "address": "2 la placette",
+        "description": "test"
+      }
+    }
+  }
+]
+[2025-04-11T09:59:39.204Z] Vérification des items dans la base de données: [
+  {
+    "id": "cm9cm871d000hm5j9jbfphl7y",
+    "orderId": "cm9cm871d000fm5j984l6gbon",
+    "productId": "cm8fvrbh2000ym01epzrpk6i7",
+    "quantity": 1,
+    "price": 10,
+    "product": {
+      "id": "cm8fvrbh2000ym01epzrpk6i7",
+      "name": "Test",
+      "description": "",
+      "price": 10,
+      "type": "FRESH",
+      "image": "/presets/mushrooms/optimized/morel.jpg",
+      "unit": "kg",
+      "producerId": "cm7yn4iaf0003qxwp7jjkgdiu",
+      "available": true,
+      "createdAt": "2025-03-19T12:10:04.118Z",
+      "updatedAt": "2025-03-19T12:10:04.118Z"
+    }
+  }
+]
+[2025-04-11T09:59:39.204Z] Commande créée {
+  "id": "cm9cm871d000fm5j984l6gbon",
+  "itemsCount": 1,
+  "bookingsCount": 0
+}
+[2025-04-11T09:59:39.205Z] Items trouvés dans la commande 
+[2025-04-11T09:59:39.208Z] Produits avec producteurs [
+  {
+    "id": "cm8fvrbh2000ym01epzrpk6i7",
+    "name": "Test",
+    "description": "",
+    "price": 10,
+    "type": "FRESH",
+    "image": "/presets/mushrooms/optimized/morel.jpg",
+    "unit": "kg",
+    "producerId": "cm7yn4iaf0003qxwp7jjkgdiu",
+    "available": true,
+    "createdAt": "2025-03-19T12:10:04.118Z",
+    "updatedAt": "2025-03-19T12:10:04.118Z",
+    "producer": {
+      "id": "cm7yn4iaf0003qxwp7jjkgdiu",
+      "userId": "cm7yn45lj0000qxwps52dljee",
+      "companyName": "webdevfred",
+      "address": "2 la placette",
+      "description": "test"
+    }
+  }
+]
+[2025-04-11T09:59:39.209Z] Producteurs identifiés [
+  {
+    "id": "cm7yn4iaf0003qxwp7jjkgdiu",
+    "userId": "cm7yn45lj0000qxwps52dljee",
+    "companyName": "webdevfred",
+    "address": "2 la placette",
+    "description": "test"
+  }
+]
+[2025-04-11T09:59:39.210Z] Création notification pour producteur {
+  "producerId": "cm7yn4iaf0003qxwp7jjkgdiu",
+  "userId": "cm7yn45lj0000qxwps52dljee"
+}
+[2025-04-11T09:59:39.213Z] Notification créée avec succès {
+  "notificationId": "cm9cm872k000jm5j91dmblqjr"
+}
+[2025-04-11T10:01:40.575Z] Requête de création de commande reçue {
+  "items": []
+}
+[2025-04-11T10:01:40.576Z] ATTENTION: Requête reçue sans items 
+[2025-04-11T10:01:40.579Z] Items trouvés dans le panier existant: [
+  {
+    "id": "cm9cm6slz000bm5j9bd7m50em",
+    "orderId": "cm9cm6slz0009m5j9brp7aobw",
+    "productId": "cm8fvrbh2000ym01epzrpk6i7",
+    "quantity": 1,
+    "price": 10,
+    "product": {
+      "id": "cm8fvrbh2000ym01epzrpk6i7",
+      "name": "Test",
+      "description": "",
+      "price": 10,
+      "type": "FRESH",
+      "image": "/presets/mushrooms/optimized/morel.jpg",
+      "unit": "kg",
+      "producerId": "cm7yn4iaf0003qxwp7jjkgdiu",
+      "available": true,
+      "createdAt": "2025-03-19T12:10:04.118Z",
+      "updatedAt": "2025-03-19T12:10:04.118Z"
+    }
+  }
+]
+[2025-04-11T10:01:40.581Z] Items qui seront utilisés pour créer la commande: [
+  {
+    "productId": "cm8fvrbh2000ym01epzrpk6i7",
+    "quantity": 1,
+    "price": 10
+  }
+]
+[2025-04-11T10:01:40.611Z] Commande créée avec ID: "cm9cmaspy000um5j92ukd3iq6"
+[2025-04-11T10:01:40.615Z] Contenu de l'objet order.items: [
+  {
+    "id": "cm9cmaspz000wm5j9fg2gp11w",
+    "orderId": "cm9cmaspy000um5j92ukd3iq6",
+    "productId": "cm8fvrbh2000ym01epzrpk6i7",
+    "quantity": 1,
+    "price": 10,
+    "product": {
+      "id": "cm8fvrbh2000ym01epzrpk6i7",
+      "name": "Test",
+      "description": "",
+      "price": 10,
+      "type": "FRESH",
+      "image": "/presets/mushrooms/optimized/morel.jpg",
+      "unit": "kg",
+      "producerId": "cm7yn4iaf0003qxwp7jjkgdiu",
+      "available": true,
+      "createdAt": "2025-03-19T12:10:04.118Z",
+      "updatedAt": "2025-03-19T12:10:04.118Z",
+      "producer": {
+        "id": "cm7yn4iaf0003qxwp7jjkgdiu",
+        "userId": "cm7yn45lj0000qxwps52dljee",
+        "companyName": "webdevfred",
+        "address": "2 la placette",
+        "description": "test"
+      }
+    }
+  }
+]
+[2025-04-11T10:01:40.619Z] Vérification des items dans la base de données: [
+  {
+    "id": "cm9cmaspz000wm5j9fg2gp11w",
+    "orderId": "cm9cmaspy000um5j92ukd3iq6",
+    "productId": "cm8fvrbh2000ym01epzrpk6i7",
+    "quantity": 1,
+    "price": 10,
+    "product": {
+      "id": "cm8fvrbh2000ym01epzrpk6i7",
+      "name": "Test",
+      "description": "",
+      "price": 10,
+      "type": "FRESH",
+      "image": "/presets/mushrooms/optimized/morel.jpg",
+      "unit": "kg",
+      "producerId": "cm7yn4iaf0003qxwp7jjkgdiu",
+      "available": true,
+      "createdAt": "2025-03-19T12:10:04.118Z",
+      "updatedAt": "2025-03-19T12:10:04.118Z"
+    }
+  }
+]
+[2025-04-11T10:01:40.625Z] Commande créée {
+  "id": "cm9cmaspy000um5j92ukd3iq6",
+  "itemsCount": 1,
+  "bookingsCount": 0
+}
+[2025-04-11T10:01:40.626Z] Items trouvés dans la commande 
+[2025-04-11T10:01:40.631Z] Produits avec producteurs [
+  {
+    "id": "cm8fvrbh2000ym01epzrpk6i7",
+    "name": "Test",
+    "description": "",
+    "price": 10,
+    "type": "FRESH",
+    "image": "/presets/mushrooms/optimized/morel.jpg",
+    "unit": "kg",
+    "producerId": "cm7yn4iaf0003qxwp7jjkgdiu",
+    "available": true,
+    "createdAt": "2025-03-19T12:10:04.118Z",
+    "updatedAt": "2025-03-19T12:10:04.118Z",
+    "producer": {
+      "id": "cm7yn4iaf0003qxwp7jjkgdiu",
+      "userId": "cm7yn45lj0000qxwps52dljee",
+      "companyName": "webdevfred",
+      "address": "2 la placette",
+      "description": "test"
+    }
+  }
+]
+[2025-04-11T10:01:40.632Z] Producteurs identifiés [
+  {
+    "id": "cm7yn4iaf0003qxwp7jjkgdiu",
+    "userId": "cm7yn45lj0000qxwps52dljee",
+    "companyName": "webdevfred",
+    "address": "2 la placette",
+    "description": "test"
+  }
+]
+[2025-04-11T10:01:40.634Z] Création notification pour producteur {
+  "producerId": "cm7yn4iaf0003qxwp7jjkgdiu",
+  "userId": "cm7yn45lj0000qxwps52dljee"
+}
+[2025-04-11T10:01:40.638Z] Notification créée avec succès {
+  "notificationId": "cm9cmasrg000ym5j9xumgask0"
+}
+[2025-04-11T10:07:04.469Z] Requête de création de commande reçue {
+  "items": []
+}
+[2025-04-11T10:07:04.470Z] ATTENTION: Requête reçue sans items 
+[2025-04-11T10:07:04.472Z] Items trouvés dans le panier existant: [
+  {
+    "id": "cm9cm6slz000bm5j9bd7m50em",
+    "orderId": "cm9cm6slz0009m5j9brp7aobw",
+    "productId": "cm8fvrbh2000ym01epzrpk6i7",
+    "quantity": 1,
+    "price": 10,
+    "product": {
+      "id": "cm8fvrbh2000ym01epzrpk6i7",
+      "name": "Test",
+      "description": "",
+      "price": 10,
+      "type": "FRESH",
+      "image": "/presets/mushrooms/optimized/morel.jpg",
+      "unit": "kg",
+      "producerId": "cm7yn4iaf0003qxwp7jjkgdiu",
+      "available": true,
+      "createdAt": "2025-03-19T12:10:04.118Z",
+      "updatedAt": "2025-03-19T12:10:04.118Z"
+    }
+  }
+]
+[2025-04-11T10:07:04.473Z] Items qui seront utilisés pour créer la commande: [
+  {
+    "productId": "cm8fvrbh2000ym01epzrpk6i7",
+    "quantity": 1,
+    "price": 10
+  }
+]
+[2025-04-11T10:07:04.479Z] Commande créée avec ID: "cm9cmhqn00015m5j9mky3y6l1"
+[2025-04-11T10:07:04.480Z] Contenu de l'objet order.items: [
+  {
+    "id": "cm9cmhqn00017m5j9jk89mo1g",
+    "orderId": "cm9cmhqn00015m5j9mky3y6l1",
+    "productId": "cm8fvrbh2000ym01epzrpk6i7",
+    "quantity": 1,
+    "price": 10,
+    "product": {
+      "id": "cm8fvrbh2000ym01epzrpk6i7",
+      "name": "Test",
+      "description": "",
+      "price": 10,
+      "type": "FRESH",
+      "image": "/presets/mushrooms/optimized/morel.jpg",
+      "unit": "kg",
+      "producerId": "cm7yn4iaf0003qxwp7jjkgdiu",
+      "available": true,
+      "createdAt": "2025-03-19T12:10:04.118Z",
+      "updatedAt": "2025-03-19T12:10:04.118Z",
+      "producer": {
+        "id": "cm7yn4iaf0003qxwp7jjkgdiu",
+        "userId": "cm7yn45lj0000qxwps52dljee",
+        "companyName": "webdevfred",
+        "address": "2 la placette",
+        "description": "test"
+      }
+    }
+  }
+]
+[2025-04-11T10:07:04.482Z] Vérification des items dans la base de données: [
+  {
+    "id": "cm9cmhqn00017m5j9jk89mo1g",
+    "orderId": "cm9cmhqn00015m5j9mky3y6l1",
+    "productId": "cm8fvrbh2000ym01epzrpk6i7",
+    "quantity": 1,
+    "price": 10,
+    "product": {
+      "id": "cm8fvrbh2000ym01epzrpk6i7",
+      "name": "Test",
+      "description": "",
+      "price": 10,
+      "type": "FRESH",
+      "image": "/presets/mushrooms/optimized/morel.jpg",
+      "unit": "kg",
+      "producerId": "cm7yn4iaf0003qxwp7jjkgdiu",
+      "available": true,
+      "createdAt": "2025-03-19T12:10:04.118Z",
+      "updatedAt": "2025-03-19T12:10:04.118Z"
+    }
+  }
+]
+[2025-04-11T10:07:04.483Z] Commande créée {
+  "id": "cm9cmhqn00015m5j9mky3y6l1",
+  "itemsCount": 1,
+  "bookingsCount": 0
+}
+[2025-04-11T10:07:04.484Z] Items trouvés dans la commande 
+[2025-04-11T10:07:04.490Z] Produits avec producteurs [
+  {
+    "id": "cm8fvrbh2000ym01epzrpk6i7",
+    "name": "Test",
+    "description": "",
+    "price": 10,
+    "type": "FRESH",
+    "image": "/presets/mushrooms/optimized/morel.jpg",
+    "unit": "kg",
+    "producerId": "cm7yn4iaf0003qxwp7jjkgdiu",
+    "available": true,
+    "createdAt": "2025-03-19T12:10:04.118Z",
+    "updatedAt": "2025-03-19T12:10:04.118Z",
+    "producer": {
+      "id": "cm7yn4iaf0003qxwp7jjkgdiu",
+      "userId": "cm7yn45lj0000qxwps52dljee",
+      "companyName": "webdevfred",
+      "address": "2 la placette",
+      "description": "test"
+    }
+  }
+]
+[2025-04-11T10:07:04.491Z] Producteurs identifiés [
+  {
+    "id": "cm7yn4iaf0003qxwp7jjkgdiu",
+    "userId": "cm7yn45lj0000qxwps52dljee",
+    "companyName": "webdevfred",
+    "address": "2 la placette",
+    "description": "test"
+  }
+]
+[2025-04-11T10:07:04.492Z] Création notification pour producteur {
+  "producerId": "cm7yn4iaf0003qxwp7jjkgdiu",
+  "userId": "cm7yn45lj0000qxwps52dljee"
+}
+[2025-04-11T10:07:04.494Z] Notification créée avec succès {
+  "notificationId": "cm9cmhqnh0019m5j99twvqrgw"
+}
