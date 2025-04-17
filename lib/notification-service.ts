@@ -136,7 +136,7 @@ export class NotificationService {
           total
         });
         
-        // Créer la notification
+        // Créer la notification avec le format de lien corrigé
         try {
           const notification = await prisma.notification.create({
             data: {
@@ -144,7 +144,7 @@ export class NotificationService {
               type: NotificationType.NEW_ORDER,
               title: 'Nouvelle commande reçue',
               message: `Vous avez reçu une nouvelle commande (#${order.id.substring(0, 8)}) d'un montant de ${total.toFixed(2)} CHF`,
-              link: `/producer/orders/${order.id}`,
+              link: `/producer/orders?modal=${order.id}`, // Format corrigé
               data: JSON.stringify({ orderId: order.id, total })
             }
           });
@@ -221,14 +221,14 @@ export class NotificationService {
         if (!producer) continue;
         
         try {
-          // Créer la notification
+          // Créer la notification avec le format de lien corrigé
           const notification = await prisma.notification.create({
             data: {
               userId: producer.userId,
               type: NotificationType.ORDER_STATUS_CHANGED,
               title: 'Statut de commande modifié',
               message: `La commande #${order.id.substring(0, 8)} est passée de "${statusTranslations[oldStatus] || oldStatus}" à "${statusTranslations[order.status as string] || order.status}"`,
-              link: `/producer/orders/${order.id}`,
+              link: `/producer/orders?modal=${order.id}`, // Format corrigé
               data: JSON.stringify({ orderId: order.id, oldStatus, newStatus: order.status })
             }
           });
@@ -280,7 +280,7 @@ export class NotificationService {
             type: NotificationType.LOW_STOCK,
             title: 'Alerte stock bas',
             message: `Le stock de "${product.name}" est bas (${quantity} ${product.unit} restants)`,
-            link: `/producer/products/${productId}/edit`,
+            link: `/producer/${productId}/edit`,
             data: JSON.stringify({ productId, quantity })
           }
         });

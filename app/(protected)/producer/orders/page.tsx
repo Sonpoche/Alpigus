@@ -2,7 +2,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { useToast } from '@/hooks/use-toast'
 import { OrderStatus } from '@prisma/client'
 import { Order } from '@/types/order'
@@ -16,6 +16,7 @@ import EmptyOrdersView from '@/components/orders/empty-orders-view'
 
 export default function ProducerOrdersPage() {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const { toast } = useToast()
   const [orders, setOrders] = useState<Order[]>([])
   const [filteredOrders, setFilteredOrders] = useState<Order[]>([])
@@ -25,6 +26,9 @@ export default function ProducerOrdersPage() {
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null)
   const [isDetailOpen, setIsDetailOpen] = useState(false)
   const [isUpdating, setIsUpdating] = useState(false)
+  
+  // Récupérer l'ID de commande depuis les paramètres de l'URL
+  const modalOrderId = searchParams.get('modal')
 
   // Charger les commandes pour le producteur
   useEffect(() => {
@@ -53,6 +57,21 @@ export default function ProducerOrdersPage() {
         
         setOrders(sortedOrders)
         setFilteredOrders(sortedOrders)
+        
+        // Si un ID de commande est fourni dans l'URL, ouvrir la modal correspondante
+        if (modalOrderId) {
+          const orderToShow = sortedOrders.find((order: Order) => order.id === modalOrderId)
+          if (orderToShow) {
+            setSelectedOrder(orderToShow)
+            setIsDetailOpen(true)
+          } else {
+            toast({
+              title: "Commande non trouvée",
+              description: "La commande demandée n'a pas pu être trouvée",
+              variant: "destructive"
+            })
+          }
+        }
       } catch (error) {
         console.error('Erreur:', error)
         toast({
@@ -66,7 +85,7 @@ export default function ProducerOrdersPage() {
     }
     
     fetchOrders()
-  }, [activeStatus, toast])
+  }, [activeStatus, toast, modalOrderId])
 
   // Filtrer les commandes par recherche et status
   useEffect(() => {
@@ -76,13 +95,13 @@ export default function ProducerOrdersPage() {
     
     // Appliquer le filtre de statut si présent
     if (activeStatus) {
-      filtered = filtered.filter(order => order.status === activeStatus)
+      filtered = filtered.filter((order: Order) => order.status === activeStatus)
     }
     
     // Appliquer la recherche si présente
     if (searchTerm) {
       const searchLower = searchTerm.toLowerCase()
-      filtered = filtered.filter(order => {
+      filtered = filtered.filter((order: Order) => {
         // Recherche par ID de commande
         if (order.id.toLowerCase().includes(searchLower)) return true
         
@@ -166,6 +185,17 @@ export default function ProducerOrdersPage() {
     }
   };
 
+  // Fonction pour fermer la modal et nettoyer l'URL
+  const closeDetailModal = () => {
+    setIsDetailOpen(false);
+    
+    // Supprimer le paramètre modal de l'URL sans rafraîchir la page
+    if (modalOrderId) {
+      const newUrl = window.location.pathname;
+      window.history.pushState({}, '', newUrl);
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="flex justify-center items-center min-h-[400px]">
@@ -219,7 +249,7 @@ export default function ProducerOrdersPage() {
         <OrderDetailModal
           order={selectedOrder}
           isOpen={isDetailOpen}
-          onClose={() => setIsDetailOpen(false)}
+          onClose={closeDetailModal}
           onUpdateStatus={updateOrderStatus}
           isUpdating={isUpdating}
         />

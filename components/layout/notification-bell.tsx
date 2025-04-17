@@ -1,14 +1,23 @@
 // components/layout/notification-bell.tsx
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { Bell } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { formatDistanceToNow } from 'date-fns'
 import { fr } from 'date-fns/locale'
-import { Notification, NotificationType } from '@/types/notification'
 import { cn } from '@/lib/utils'
+
+interface Notification {
+  id: string
+  type: string
+  title: string
+  message: string
+  link?: string
+  read: boolean
+  createdAt: string
+}
 
 export function NotificationBell() {
   const [notifications, setNotifications] = useState<Notification[]>([])
@@ -16,10 +25,12 @@ export function NotificationBell() {
   const [isOpen, setIsOpen] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
   const router = useRouter()
+  const menuRef = useRef<HTMLDivElement>(null)
 
   // Charger les notifications
   const fetchNotifications = async () => {
     try {
+      setIsLoading(true)
       const response = await fetch('/api/notifications?limit=5')
       if (!response.ok) throw new Error('Erreur de chargement des notifications')
       
@@ -48,9 +59,9 @@ export function NotificationBell() {
     try {
       if (notification.read) {
         if (navigate && notification.link) {
-          router.push(notification.link)
+          handleNavigation(notification.link);
         }
-        return
+        return;
       }
       
       const response = await fetch(`/api/notifications/${notification.id}/read`, {
@@ -67,18 +78,36 @@ export function NotificationBell() {
       
       // Naviguer si nécessaire
       if (navigate && notification.link) {
-        router.push(notification.link)
+        handleNavigation(notification.link);
       }
     } catch (error) {
       console.error('Erreur:', error)
     }
   }
+
+  // Helper pour gérer la navigation avec param de modal
+  const handleNavigation = (link: string) => {
+    // Si le lien contient un paramètre pour ouvrir une modal
+    if (link.includes('?view=')) {
+      const orderId = link.split('?view=')[1];
+      // Stocker l'ID dans localStorage pour que la page de destination puisse l'utiliser
+      window.localStorage.setItem('openOrderModal', orderId);
+    } else if (link.includes('?edit=')) {
+      const productId = link.split('?edit=')[1];
+      // Stocker l'ID pour éditer un produit
+      window.localStorage.setItem('editProduct', productId);
+    }
+    
+    // Fermer le dropdown et naviguer
+    setIsOpen(false);
+    router.push(link);
+  };
   
   // Fermer le dropdown quand on clique ailleurs
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       const target = event.target as HTMLElement
-      if (isOpen && !target.closest('[data-notification-dropdown]')) {
+      if (isOpen && menuRef.current && !menuRef.current.contains(target)) {
         setIsOpen(false)
       }
     }
@@ -88,13 +117,13 @@ export function NotificationBell() {
   }, [isOpen])
 
   // Obtenir l'icône appropriée pour le type de notification
-  const getNotificationIcon = (type: NotificationType) => {
+  const getNotificationIcon = (type: string) => {
     switch (type) {
-      case NotificationType.NEW_ORDER:
+      case 'NEW_ORDER':
         return <div className="w-8 h-8 bg-blue-100 dark:bg-blue-900/20 rounded-full flex items-center justify-center"><Bell className="h-4 w-4 text-blue-600 dark:text-blue-400" /></div>
-      case NotificationType.ORDER_STATUS_CHANGED:
+      case 'ORDER_STATUS_CHANGED':
         return <div className="w-8 h-8 bg-purple-100 dark:bg-purple-900/20 rounded-full flex items-center justify-center"><Bell className="h-4 w-4 text-purple-600 dark:text-purple-400" /></div>
-      case NotificationType.LOW_STOCK:
+      case 'LOW_STOCK':
         return <div className="w-8 h-8 bg-amber-100 dark:bg-amber-900/20 rounded-full flex items-center justify-center"><Bell className="h-4 w-4 text-amber-600 dark:text-amber-400" /></div>
       default:
         return <div className="w-8 h-8 bg-gray-100 dark:bg-gray-800 rounded-full flex items-center justify-center"><Bell className="h-4 w-4 text-gray-600 dark:text-gray-400" /></div>
@@ -102,10 +131,11 @@ export function NotificationBell() {
   }
 
   return (
-    <div className="relative" data-notification-dropdown>
+    <div className="relative" ref={menuRef}>
       <button 
         className="relative p-2 rounded-full hover:bg-foreground/5 transition-colors"
         onClick={() => setIsOpen(!isOpen)}
+        aria-label="Notifications"
       >
         <Bell className="h-5 w-5" />
         {unreadCount > 0 && (
@@ -146,7 +176,7 @@ export function NotificationBell() {
                     onClick={() => markAsRead(notification)}
                   >
                     <div className="flex gap-3">
-                      {getNotificationIcon(notification.type as NotificationType)}
+                      {getNotificationIcon(notification.type)}
                       <div className="flex-1 min-w-0">
                         <p className={cn(
                           "text-sm font-medium truncate",

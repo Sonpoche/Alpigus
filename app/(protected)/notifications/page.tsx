@@ -42,9 +42,16 @@ export default function NotificationsPage() {
     try {
       if (notification.read) {
         if (navigate && notification.link) {
-          router.push(notification.link)
+          // Vérifier si c'est un lien de commande en ancien format
+          if (notification.link.startsWith('/producer/orders/')) {
+            // Convertir l'ancien format en nouveau format à la volée
+            const orderId = notification.link.split('/').pop();
+            router.push(`/producer/orders?modal=${orderId}`);
+          } else {
+            router.push(notification.link);
+          }
         }
-        return
+        return;
       }
       
       const response = await fetch(`/api/notifications/${notification.id}/read`, {
@@ -60,7 +67,13 @@ export default function NotificationsPage() {
       
       // Naviguer si nécessaire
       if (navigate && notification.link) {
-        router.push(notification.link)
+        // Même logique pour la conversion des liens
+        if (notification.link.startsWith('/producer/orders/')) {
+          const orderId = notification.link.split('/').pop();
+          router.push(`/producer/orders?modal=${orderId}`);
+        } else {
+          router.push(notification.link);
+        }
       }
     } catch (error) {
       console.error('Erreur:', error)
@@ -182,6 +195,11 @@ export default function NotificationsPage() {
           <div className="divide-y divide-foreground/10">
             {notifications.map(notification => {
               const { icon, bgColor, textColor } = getNotificationDetails(notification.type as NotificationType);
+              // Convertir le lien si nécessaire pour l'affichage
+              const displayLink = notification.link?.startsWith('/producer/orders/') 
+                ? `/producer/orders?modal=${notification.link.split('/').pop()}`
+                : notification.link;
+                
               return (
                 <div 
                   key={notification.id}
@@ -217,11 +235,14 @@ export default function NotificationsPage() {
                         <span className="text-xs text-muted-foreground">
                           {format(new Date(notification.createdAt), 'dd MMMM yyyy, HH:mm', { locale: fr })}
                         </span>
-                        {notification.link && (
+                        {displayLink && (
                           <Link
-                            href={notification.link}
+                            href={displayLink}
                             className={cn("text-xs hover:underline", textColor)}
-                            onClick={e => e.stopPropagation()}
+                            onClick={e => {
+                              e.stopPropagation();
+                              markAsRead(notification, true);
+                            }}
                           >
                             Voir les détails
                           </Link>
