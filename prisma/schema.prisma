@@ -65,22 +65,25 @@ model Producer {
 }
 
 model Product {
- id            String        @id @default(cuid())
- name          String
- description   String?       @db.Text
- price         Float
- type          ProductType
- image         String?
- unit          String        // kg, g, pièce, etc.
- producerId    String
- producer      Producer      @relation(fields: [producerId], references: [id], onDelete: Cascade)
- stock         Stock?
- orderItems    OrderItem[]
- categories    Category[]
- available     Boolean       @default(true)
- createdAt     DateTime      @default(now())
- updatedAt     DateTime      @updatedAt
- deliverySlots DeliverySlot[]
+  id               String               @id @default(cuid())
+  name             String
+  description      String?              @db.Text
+  price            Float
+  type             ProductType
+  image            String?
+  unit             String               // kg, g, pièce, etc.
+  producerId       String
+  producer         Producer             @relation(fields: [producerId], references: [id], onDelete: Cascade)
+  stock            Stock?
+  orderItems       OrderItem[]
+  categories       Category[]
+  available        Boolean              @default(true)
+  createdAt        DateTime             @default(now())
+  updatedAt        DateTime             @updatedAt
+  deliverySlots    DeliverySlot[]
+  stockAlerts      StockAlert?          // Relation inverse pour StockAlert
+  stockHistory     StockHistory[]       // Relation inverse pour StockHistory
+  productionSchedules ProductionSchedule[] // Relation inverse pour ProductionSchedule
 }
 
 model Stock {
@@ -189,4 +192,38 @@ enum BookingStatus {
   PENDING
   CONFIRMED
   CANCELLED
+}
+
+model StockAlert {
+  id          String   @id @default(cuid())
+  productId   String   @unique
+  product     Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  threshold   Float    // Seuil minimal en quantité
+  percentage  Boolean  @default(false) // Si true, le seuil est un pourcentage de la capacité habituelle
+  emailAlert  Boolean  @default(true)  // Envoyer une alerte par email
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model StockHistory {
+  id          String   @id @default(cuid())
+  productId   String
+  product     Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  quantity    Float    // Quantité à ce moment
+  date        DateTime @default(now())
+  type        String   // "sale", "adjustment", "refund", "initial"
+  orderId     String?  // ID de la commande liée (si applicable)
+  note        String?  // Note explicative
+}
+
+model ProductionSchedule {
+  id          String   @id @default(cuid())
+  productId   String
+  product     Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  date        DateTime // Date prévue de disponibilité
+  quantity    Float    // Quantité prévue
+  note        String?  // Notes supplémentaires
+  isPublic    Boolean  @default(true) // Visible par les clients ou non
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 }

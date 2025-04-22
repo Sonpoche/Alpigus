@@ -215,7 +215,7 @@ export default function ProductDetailPage() {
               
               <div className="flex items-baseline">
                 <span className="text-2xl font-semibold">{product.price.toFixed(2)} CHF</span>
-                <span className="text-sm text-muted-foreground ml-2">/ {product.unit}</span>
+                <span className="text-sm text-muted-foreground ml-2">par {product.unit}</span>
               </div>
               
               {/* Catégories */}

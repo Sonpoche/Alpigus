@@ -4,7 +4,7 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { ProductType } from '@prisma/client'
-import { Edit, Trash2, Plus, Package, ShoppingBag, Truck, LineChart, Calendar, AlertTriangle } from 'lucide-react'
+import { Edit, Trash2, Plus, Package, ShoppingBag, Truck, LineChart, Calendar, AlertTriangle, BarChart2 } from 'lucide-react'
 import { useToast } from "@/hooks/use-toast"
 import Link from 'next/link'
 import { cn } from '@/lib/utils'
@@ -341,6 +341,13 @@ export default function ProducerDashboard() {
                     <p className="text-sm text-muted-foreground">{product.type}</p>
                   </div>
                   <div className="flex gap-2">
+                    <Link
+                      href={`/producer/inventory/${product.id}`}
+                      className="text-custom-text hover:text-custom-accent transition-colors"
+                      aria-label="Gérer les stocks"
+                    >
+                      <BarChart2 className="h-5 w-5" />
+                    </Link>
                     <button
                       onClick={() => router.push(`/producer/${product.id}/edit`)}
                       className="text-custom-text hover:text-custom-accent transition-colors"
@@ -373,7 +380,7 @@ export default function ProducerDashboard() {
             <div className="space-y-2">
               <div className="flex justify-between">
                 <span className="text-custom-text">Prix</span>
-                <span className="font-medium">{product.price.toFixed(2)} CHF</span>
+                <span className="font-medium">{product.price.toFixed(2)} CHF/{product.unit}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-custom-text">Stock</span>

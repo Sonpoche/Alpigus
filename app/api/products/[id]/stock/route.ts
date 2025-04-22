@@ -66,17 +66,38 @@ export const PATCH = apiAuthMiddleware(
       })
 
       // Mettre à jour ou créer le stock
-      const stock = await prisma.stock.upsert({
-        where: { productId: context.params.id },
-        update: { quantity },
-        create: {
-          productId: context.params.id,
-          quantity
-        },
-        include: {
-          product: true
-        }
-      })
+      const stock = await prisma.$transaction(async (tx) => {
+        // Récupérer la quantité précédente pour calculer la différence
+        const previousStock = await tx.stock.findUnique({
+          where: { productId: context.params.id }
+        });
+
+        // Calculer la différence (quelle que soit l'opération)
+        const difference = quantity - (previousStock?.quantity || 0);
+        const operationType = difference > 0 ? 'adjustment' : 'sale';
+
+        // Créer une entrée d'historique
+        await tx.stockHistory.create({
+          data: {
+            productId: context.params.id,
+            quantity: quantity, // On enregistre la nouvelle quantité totale
+            type: operationType,
+            note: `Ajustement manuel de ${Math.abs(difference)} ${product.unit}`
+          }
+        });
+        
+        return await tx.stock.upsert({
+          where: { productId: context.params.id },
+          update: { quantity },
+          create: {
+            productId: context.params.id,
+            quantity
+          },
+          include: {
+            product: true
+          }
+        });
+      });
 
       // Vérifier si le stock est bas (moins de 10 unités ou 20% du stock habituel)
       const LOW_STOCK_THRESHOLD = 10

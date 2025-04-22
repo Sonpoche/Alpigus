@@ -298,24 +298,24 @@ export default function EditProductPage({ params }: PageProps) {
 
           {/* Prix et Unité */}
           <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label htmlFor="price" className="block text-sm font-medium text-custom-title">
-                Prix (CHF) <span className="text-custom-accent">*</span>
-              </label>
-              <input
-                type="number"
-                id="price"
-                name="price"
-                defaultValue={product.price}
-                step="0.01"
-                min="0"
-                className={cn(
-                  "mt-1 block w-full rounded-md border border-foreground/10 bg-background px-3 py-2",
-                  fieldErrors.price && "border-destructive"
-                )}
-                required
-              />
-            </div>
+          <div>
+            <label htmlFor="price" className="block text-sm font-medium text-custom-title">
+              Prix par {selectedUnit} (CHF) <span className="text-custom-accent">*</span>
+            </label>
+            <input
+              type="number"
+              id="price"
+              name="price"
+              defaultValue={product.price}
+              step="0.01"
+              min="0"
+              className={cn(
+                "mt-1 block w-full rounded-md border border-foreground/10 bg-background px-3 py-2",
+                fieldErrors.price && "border-destructive"
+              )}
+              required
+            />
+          </div>
             <div>
               <label htmlFor="unit" className="block text-sm font-medium text-custom-title">
                 Unité <span className="text-custom-accent">*</span>

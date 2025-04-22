@@ -201,25 +201,25 @@ export default function NewProductPage() {
 
           {/* Prix et Unité */}
           <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label htmlFor="price" className="block text-sm font-medium text-custom-title">
-                Prix (CHF) <span className="text-custom-accent">*</span>
-              </label>
-              <input
-                {...register('price')}
-                type="number"
-                id="price"
-                step="0.01"
-                min="0"
-                className={cn(
-                  "mt-1 block w-full rounded-md border border-foreground/10 bg-background px-3 py-2",
-                  errors.price && "border-destructive"
-                )}
-              />
-              {errors.price && (
-                <p className="mt-1 text-sm text-destructive">{errors.price.message}</p>
+          <div>
+            <label htmlFor="price" className="block text-sm font-medium text-custom-title">
+              Prix par {selectedUnit} (CHF) <span className="text-custom-accent">*</span>
+            </label>
+            <input
+              {...register('price')}
+              type="number"
+              id="price"
+              step="0.01"
+              min="0"
+              className={cn(
+                "mt-1 block w-full rounded-md border border-foreground/10 bg-background px-3 py-2",
+                errors.price && "border-destructive"
               )}
-            </div>
+            />
+            {errors.price && (
+              <p className="mt-1 text-sm text-destructive">{errors.price.message}</p>
+            )}
+          </div>
             <div>
               <label htmlFor="unit" className="block text-sm font-medium text-custom-title">
                 Unité <span className="text-custom-accent">*</span>

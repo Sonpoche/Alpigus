@@ -112,17 +112,17 @@ export function ProductListItem({ product }: ProductListItemProps) {
           
           {/* Prix et actions */}
           <div className="flex items-center justify-between mt-2">
-            <div>
-              <span className="font-medium text-lg">{product.price.toFixed(2)} CHF</span>
-              <span className={`text-sm ml-2 ${product.available ? 'text-green-600' : 'text-red-600'}`}>
-                {product.available ? 'Disponible' : 'Indisponible'}
+          <div>
+            <span className="font-medium text-lg">{product.price.toFixed(2)} CHF/{product.unit}</span>
+            <span className={`text-sm ml-2 ${product.available ? 'text-green-600' : 'text-red-600'}`}>
+              {product.available ? 'Disponible' : 'Indisponible'}
+            </span>
+            {product.stock && (
+              <span className="text-xs text-muted-foreground ml-2">
+                (Stock: {product.stock.quantity} {product.unit})
               </span>
-              {product.stock && (
-                <span className="text-xs text-muted-foreground ml-2">
-                  (Stock: {product.stock.quantity} {product.unit})
-                </span>
-              )}
-            </div>
+            )}
+          </div>
             
             {/* Boutons d'action */}
             {product.available && (

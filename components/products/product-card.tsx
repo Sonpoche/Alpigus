@@ -163,7 +163,7 @@ export function ProductCard({ product }: ProductCardProps) {
           
           {/* Prix et stock */}
           <div className="flex justify-between items-center mb-3">
-            <span className="font-medium text-lg">{product.price.toFixed(2)} CHF</span>
+            <span className="font-medium text-lg">{product.price.toFixed(2)} CHF/{product.unit}</span>
             {product.stock && (
               <span className="text-xs text-muted-foreground">
                 Stock: {product.stock.quantity} {product.unit}

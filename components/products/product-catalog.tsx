@@ -333,7 +333,7 @@ export default function ProductCatalog() {
 
                 {/* Prix */}
                 <div>
-                  <label className="block text-sm font-medium mb-2">Prix (CHF)</label>
+                  <label className="block text-sm font-medium mb-2">Prix (CHF par unité)</label>
                   <div className="grid grid-cols-2 gap-2">
                     <input
                       type="number"
@@ -605,22 +605,22 @@ export default function ProductCatalog() {
               
               {/* Tri rapide */}
               <div className="relative hidden sm:block">
-                <select
-                  value={filters.sortBy}
-                  onChange={(e) => {
-                    setFilters(prev => ({
-                      ...prev,
-                      sortBy: e.target.value as FilterState['sortBy']
-                    }))
-                    applyFilters()
-                  }}
-                  className="pl-3 pr-10 py-2 bg-background border border-foreground/10 rounded-md appearance-none"
-                >
-                  <option value="newest">Plus récents</option>
-                  <option value="price_asc">Prix croissant</option>
-                  <option value="price_desc">Prix décroissant</option>
-                  <option value="popular">Popularité</option>
-                </select>
+              <select
+                value={filters.sortBy}
+                onChange={(e) => {
+                  setFilters(prev => ({
+                    ...prev,
+                    sortBy: e.target.value as FilterState['sortBy']
+                  }))
+                  applyFilters()
+                }}
+                className="pl-3 pr-10 py-2 bg-background border border-foreground/10 rounded-md appearance-none"
+              >
+                <option value="newest">Plus récents</option>
+                <option value="price_asc">Prix (par unité) croissant</option>
+                <option value="price_desc">Prix (par unité) décroissant</option>
+                <option value="popular">Popularité</option>
+              </select>
                 <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 pointer-events-none" />
               </div>
             </div>
