@@ -409,3 +409,27 @@
 [2025-04-11T10:07:04.494Z] Notification créée avec succès {
   "notificationId": "cm9cmhqnh0019m5j99twvqrgw"
 }
+[2025-04-22T13:12:42.451Z] Début notification changement de statut {
+  "orderId": "cm9cm6slz0009m5j9brp7aobw",
+  "oldStatus": "PENDING",
+  "newStatus": "CONFIRMED"
+}
+[2025-04-22T13:12:42.456Z] Notification changement statut créée {
+  "id": "cm9siyu3b000avryrceguzlgh"
+}
+[2025-04-22T13:12:53.851Z] Début notification changement de statut {
+  "orderId": "cm9cmaspy000um5j92ukd3iq6",
+  "oldStatus": "CONFIRMED",
+  "newStatus": "SHIPPED"
+}
+[2025-04-22T13:12:53.860Z] Notification changement statut créée {
+  "id": "cm9siz2w3000cvryr5de92obz"
+}
+[2025-04-22T13:12:57.542Z] Début notification changement de statut {
+  "orderId": "cm9cmaspy000um5j92ukd3iq6",
+  "oldStatus": "SHIPPED",
+  "newStatus": "DELIVERED"
+}
+[2025-04-22T13:12:57.552Z] Notification changement statut créée {
+  "id": "cm9siz5qn000evryrqd7znwk4"
+}

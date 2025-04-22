@@ -12,7 +12,7 @@ export const GET = apiAuthMiddleware(async (
   try {
     const productId = context.params.id;
     
-    // Vérifier que le produit appartient au producteur
+    // Vérifier que le produit existe
     const product = await prisma.product.findUnique({
       where: { id: productId },
       include: { producer: true }
@@ -22,7 +22,8 @@ export const GET = apiAuthMiddleware(async (
       return new NextResponse("Produit non trouvé", { status: 404 });
     }
 
-    if (product.producer.userId !== session.user.id && session.user.role !== 'ADMIN') {
+    // Vérifier les autorisations
+    if (session.user.role !== 'ADMIN' && product.producer.userId !== session.user.id) {
       return new NextResponse("Non autorisé", { status: 403 });
     }
 
@@ -32,7 +33,7 @@ export const GET = apiAuthMiddleware(async (
       orderBy: { date: 'asc' }
     });
 
-    // Calculer les statistiques
+    // Récupérer le stock actuel
     const stock = await prisma.stock.findUnique({
       where: { productId }
     });
@@ -42,6 +43,7 @@ export const GET = apiAuthMiddleware(async (
     const oneMonthAgo = new Date();
     oneMonthAgo.setMonth(oneMonthAgo.getMonth() - 1);
     
+    // Trouver toutes les entrées de type "sale" pour calculer le taux d'écoulement
     const salesHistory = await prisma.stockHistory.findMany({
       where: { 
         productId,
@@ -53,17 +55,36 @@ export const GET = apiAuthMiddleware(async (
       }
     });
     
-    // Calculer la somme des ventes
-    const totalSales = salesHistory.reduce((sum, record) => sum + record.quantity, 0);
+    // Calculer la somme des ventes (quantités négatives représentant les ventes)
+    const totalSales = salesHistory.reduce((sum, record) => {
+      const change = record.quantity - (history.find(h => 
+        new Date(h.date) < new Date(record.date)
+      )?.quantity || 0);
+      
+      return sum + (change < 0 ? Math.abs(change) : 0);
+    }, 0);
     
     // Calcul du taux hebdomadaire (sur 4 semaines)
-    const weeklyRate = totalSales / 4;
+    const weeklyRate = totalSales / 4 || 1; // Éviter division par zéro
+    
+    // Calculer le nombre de jours avant rupture
+    const daysUntilEmpty = stock?.quantity 
+      ? Math.floor((stock.quantity / (weeklyRate / 7)))
+      : null;
+
+    // Formater les données pour correspondre à l'interface attendue
+    const formattedHistory = history.map(record => ({
+      id: record.id,
+      date: record.date.toISOString(),
+      quantity: record.quantity,
+      type: record.type
+    }));
 
     return NextResponse.json({
-      history,
+      history: formattedHistory,
       currentStock: stock?.quantity || 0,
       weeklyRate,
-      daysUntilEmpty: weeklyRate > 0 ? Math.floor((stock?.quantity || 0) / (weeklyRate / 7)) : null
+      daysUntilEmpty
     });
   } catch (error) {
     console.error("Erreur lors de la récupération de l'historique du stock:", error);
