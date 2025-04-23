@@ -133,13 +133,9 @@ export function Header() {
                 <CartButton />
               )}
               
-              {/* Notifications - CORRECTION ICI */}
-              {session?.user && (session.user.role === 'PRODUCER' || session.user.role === 'ADMIN') ? (
+              {/* Notifications pour tous les utilisateurs */}
+              {session?.user && (
                 <NotificationBell />
-              ) : (
-                <Link href="/notifications" className="p-2 rounded-md hover:bg-foreground/5 text-custom-text hover:text-custom-accent transition-colors">
-                  <Store className="h-5 w-5" />
-                </Link>
               )}
 
               <ThemeToggle />
@@ -161,7 +157,7 @@ export function Header() {
               )}
 
               {/* Notification pour mobile */}
-              {session?.user && (session.user.role === 'PRODUCER' || session.user.role === 'ADMIN') && (
+              {session?.user && (
                 <NotificationBell />
               )}
               

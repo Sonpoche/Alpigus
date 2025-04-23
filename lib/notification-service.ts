@@ -304,4 +304,108 @@ export class NotificationService {
       console.error('Erreur lors de l\'envoi de la notification de stock bas:', error);
     }
   }
+
+  // Envoyer une notification de changement de statut au client
+  static async sendOrderStatusToClientNotification(order: Order): Promise<void> {
+    try {
+      // Vérifier que l'ordre a un utilisateur associé
+      if (!order.userId) return;
+      
+      // Créer un titre et un message appropriés en fonction du statut
+      let title = '';
+      let message = '';
+      
+      switch (order.status) {
+        case 'CONFIRMED':
+          title = 'Commande confirmée';
+          message = `Votre commande #${order.id.substring(0, 8)} a été confirmée et est en cours de préparation.`;
+          break;
+        case 'SHIPPED':
+          title = 'Commande expédiée';
+          message = `Votre commande #${order.id.substring(0, 8)} a été expédiée.`;
+          break;
+        case 'DELIVERED':
+          title = 'Commande livrée';
+          message = `Votre commande #${order.id.substring(0, 8)} a été livrée.`;
+          break;
+        case 'CANCELLED':
+          title = 'Commande annulée';
+          message = `Votre commande #${order.id.substring(0, 8)} a été annulée.`;
+          break;
+        default:
+          return; // Ne pas envoyer de notification pour d'autres statuts
+      }
+      
+      // Créer la notification
+      await prisma.notification.create({
+        data: {
+          userId: order.userId,
+          type: NotificationType.ORDER_STATUS_CHANGED,
+          title,
+          message,
+          link: `/orders?view=${order.id}`,
+          data: JSON.stringify({ orderId: order.id, status: order.status })
+        }
+      });
+      
+      await logDebug("Notification de changement de statut créée pour le client:", order.userId);
+    } catch (error) {
+      const err = error as Error;
+      await logDebug('Erreur lors de l\'envoi de la notification au client:', {
+        error: err.message,
+        stack: err.stack
+      });
+      console.error('Erreur lors de l\'envoi de la notification au client:', error);
+    }
+  }
+
+  // Ajouter une méthode pour notifier les clients des réservations de produits frais
+  static async sendDeliveryBookingNotification(booking: Booking): Promise<void> {
+    try {
+      // Vérifier si la réservation a une commande et un utilisateur associés
+      if (!booking.orderId) return;
+      
+      // Récupérer la commande pour avoir l'ID utilisateur
+      const order = await prisma.order.findUnique({
+        where: { id: booking.orderId }
+      });
+      
+      if (!order || !order.userId) return;
+      
+      // Récupérer les informations du créneau et du produit
+      const deliverySlot = await prisma.deliverySlot.findUnique({
+        where: { id: booking.slotId },
+        include: {
+          product: true
+        }
+      });
+      
+      if (!deliverySlot) return;
+      
+      // Créer la notification
+      await prisma.notification.create({
+        data: {
+          userId: order.userId,
+          type: NotificationType.DELIVERY_REMINDER,
+          title: 'Livraison réservée',
+          message: `Votre réservation de ${booking.quantity} ${deliverySlot.product.unit} de ${deliverySlot.product.name} est confirmée pour le ${new Date(deliverySlot.date).toLocaleDateString()}.`,
+          link: `/orders?view=${order.id}`,
+          data: JSON.stringify({ 
+            bookingId: booking.id, 
+            productId: deliverySlot.productId,
+            date: deliverySlot.date 
+          })
+        }
+      });
+      
+      await logDebug("Notification de réservation créée pour le client:", order.userId);
+    } catch (error) {
+      const err = error as Error;
+      await logDebug('Erreur lors de l\'envoi de la notification de réservation:', {
+        error: err.message,
+        stack: err.stack
+      });
+      console.error('Erreur lors de l\'envoi de la notification de réservation:', error);
+    }
+  }
 }

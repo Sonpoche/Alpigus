@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { apiAuthMiddleware } from "@/lib/api-middleware"
 import { Session } from "next-auth"
+import { NotificationService } from "@/lib/notification-service"
 
 export const POST = apiAuthMiddleware(
   async (
@@ -134,6 +135,23 @@ export const POST = apiAuthMiddleware(
 
         return newBooking
       })
+
+      // Récupérer le booking complet avec la relation deliverySlot pour l'envoyer à la notification
+      const bookingWithSlot = await prisma.booking.findUnique({
+        where: { id: booking.id },
+        include: {
+          deliverySlot: {
+            include: {
+              product: true
+            }
+          }
+        }
+      });
+
+      if (bookingWithSlot) {
+        // Envoyer une notification au client
+        await NotificationService.sendDeliveryBookingNotification(bookingWithSlot)
+      }
 
       return NextResponse.json(booking)
     } catch (error) {

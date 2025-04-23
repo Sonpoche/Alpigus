@@ -144,6 +144,9 @@ export const PATCH = apiAuthMiddleware(async (
 
     // Envoyer une notification de changement de statut
     await NotificationService.sendOrderStatusChangeNotification(updatedOrder, oldStatus);
+    
+    // Envoyer également une notification au client
+    await NotificationService.sendOrderStatusToClientNotification(updatedOrder);
 
     // Si la commande est annulée, mettre à jour le stock
     if (status === OrderStatus.CANCELLED && order.status !== OrderStatus.CANCELLED) {

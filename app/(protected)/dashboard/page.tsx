@@ -198,8 +198,8 @@ export default function DashboardPage() {
       const ordersResponse = await fetch('/api/orders')
       const orders = await ordersResponse.json()
       
-      // Récupérer les créneaux de livraison réservés
-      const myDeliveriesResponse = await fetch('/api/delivery-slots?booked=true')
+      // Récupérer les créneaux de livraison RÉSERVÉS PAR LE CLIENT
+      const myDeliveriesResponse = await fetch('/api/delivery-slots/booked')
       let deliveries = []
       if (myDeliveriesResponse.ok) {
         const deliveriesData = await myDeliveriesResponse.json()
@@ -255,15 +255,18 @@ export default function DashboardPage() {
       })
       
       // Ajouter les produits frais réservés
-      upcomingDeliveriesData.slice(0, 3).forEach((delivery: any) => {
-        recentActivities.push({
-          id: `delivery-${delivery.id}`,
-          type: 'delivery',
-          title: `Produit frais réservé`,
-          description: `${delivery.product.name} - ${delivery.quantity} ${delivery.product.unit}`,
-          date: new Date(delivery.date),
-          status: 'pending'
-        })
+      upcomingDeliveriesData.forEach((delivery: any) => {
+        // Vérification que c'est bien une réservation du client
+        if (delivery.booking && delivery.booking.userId === session?.user?.id) {
+          recentActivities.push({
+            id: `delivery-${delivery.id}`,
+            type: 'delivery',
+            title: `Produit frais réservé`,
+            description: `${delivery.product.name} - ${delivery.booking.quantity} ${delivery.product.unit}`,
+            date: new Date(delivery.date),
+            status: 'pending'
+          })
+        }
       })
       
       // Tri par date décroissante
@@ -681,7 +684,7 @@ export default function DashboardPage() {
                   <p className="text-xs text-muted-foreground">
                     {session?.user?.role === UserRole.PRODUCER
                       ? `Produit frais: ${upcomingDeliveries[0].reserved}/${upcomingDeliveries[0].maxCapacity} ${upcomingDeliveries[0].product.unit} de ${upcomingDeliveries[0].product.name}`
-                      : `Produit frais réservé: ${upcomingDeliveries[0].quantity} ${upcomingDeliveries[0].product?.unit} de ${upcomingDeliveries[0].product?.name}`
+                      : `Produit frais réservé: ${upcomingDeliveries[0].booking?.quantity || ''} ${upcomingDeliveries[0].product?.unit || ''} de ${upcomingDeliveries[0].product?.name || ''}`
                     }
                   </p>
                 </div>

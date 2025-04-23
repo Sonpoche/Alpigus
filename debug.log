@@ -433,3 +433,18 @@
 [2025-04-22T13:12:57.552Z] Notification changement statut créée {
   "id": "cm9siz5qn000evryrqd7znwk4"
 }
+[2025-04-23T10:33:09.912Z] Requête de création de commande reçue {
+  "items": []
+}
+[2025-04-23T10:33:09.913Z] ATTENTION: Requête reçue sans items 
+[2025-04-23T10:33:09.916Z] Aucun panier existant avec des items trouvé 
+[2025-04-23T10:33:09.919Z] Items qui seront utilisés pour créer la commande: []
+[2025-04-23T10:33:09.927Z] Commande créée avec ID: "cm9tspijl0001q561zb2ja82y"
+[2025-04-23T10:33:09.928Z] Contenu de l'objet order.items: []
+[2025-04-23T10:33:09.931Z] Vérification des items dans la base de données: []
+[2025-04-23T10:33:09.933Z] Commande créée {
+  "id": "cm9tspijl0001q561zb2ja82y",
+  "itemsCount": 0,
+  "bookingsCount": 0
+}
+[2025-04-23T10:33:09.934Z] Aucun item dans la commande - pas de notification à créer 
