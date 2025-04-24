@@ -422,35 +422,35 @@ export default function CartPage() {
                       
                       {/* Contrôles de quantité */}
                       <div className="flex items-center gap-4">
-                        <div className="flex items-center">
-                          <button
-                            onClick={() => updateItemQuantity(item.id, Math.max(0.1, item.quantity - 0.1))}
-                            disabled={isUpdating}
-                            className="w-8 h-8 flex items-center justify-center border border-foreground/10 rounded-l-md hover:bg-foreground/5"
-                          >
-                            -
-                          </button>
-                          <input
-                            type="number"
-                            value={item.quantity}
-                            onChange={(e) => {
-                              const value = parseFloat(e.target.value);
-                              if (!isNaN(value) && value > 0) {
-                                updateItemQuantity(item.id, value);
-                              }
-                            }}
-                            min="0.1"
-                            step="0.1"
-                            className="w-16 h-8 border-y border-foreground/10 text-center"
-                          />
-                          <button
-                            onClick={() => updateItemQuantity(item.id, item.quantity + 0.1)}
-                            disabled={isUpdating}
-                            className="w-8 h-8 flex items-center justify-center border border-foreground/10 rounded-r-md hover:bg-foreground/5"
-                          >
-                            +
-                          </button>
-                        </div>
+                      <div className="flex items-center">
+                        <button
+                          onClick={() => updateItemQuantity(item.id, Math.max(0.1, item.quantity - 0.1))}
+                          disabled={isUpdating}
+                          className="w-8 h-8 flex items-center justify-center border border-foreground/10 rounded-l-md hover:bg-foreground/5"
+                        >
+                          -
+                        </button>
+                        <input
+                          type="number"
+                          value={item.quantity}
+                          onChange={(e) => {
+                            const value = parseFloat(e.target.value);
+                            if (!isNaN(value) && value > 0) {
+                              updateItemQuantity(item.id, value);
+                            }
+                          }}
+                          min="0.1"
+                          step="0.1"
+                          className="w-16 h-8 border-y border-foreground/10 text-center bg-background text-foreground"
+                        />
+                        <button
+                          onClick={() => updateItemQuantity(item.id, item.quantity + 0.1)}
+                          disabled={isUpdating}
+                          className="w-8 h-8 flex items-center justify-center border border-foreground/10 rounded-r-md hover:bg-foreground/5"
+                        >
+                          +
+                        </button>
+                      </div>
                         
                         {/* Sous-total */}
                         <div className="w-24 text-right">

@@ -1,7 +1,7 @@
 // lib/notification-service.ts
 import { prisma } from '@/lib/prisma'
 import { NotificationType } from '@/types/notification'
-import { Order, OrderItem, Booking } from '@/types/order'
+import { Order, OrderStatus, Booking, BookingStatus } from '@/types/order'
 import fs from 'fs/promises';
 import path from 'path';
 
@@ -55,7 +55,6 @@ export class NotificationService {
                 await logDebug("Impossible de trouver le producer pour le produit");
               }
             } catch (e) {
-              // Correction pour TypeScript: erreur de type unknown
               const err = e as Error;
               await logDebug("Erreur lors de la récupération du producer", { error: err.message });
             }
@@ -88,7 +87,6 @@ export class NotificationService {
       await logDebug("Nombre de producteurs à notifier:", producerIds.size);
       await logDebug("Liste des IDs producteurs:", Array.from(producerIds));
       
-      // Correction pour TypeScript: convertir en Array
       const producerIdsArray = Array.from(producerIds);
       
       // Pour chaque producteur, créer une notification
@@ -151,7 +149,6 @@ export class NotificationService {
           
           await logDebug("Notification créée avec ID:", notification.id);
         } catch (e) {
-          // Correction pour TypeScript: erreur de type unknown
           const createError = e as Error;
           await logDebug("ERREUR lors de la création de la notification:", {
             error: createError.message,
@@ -162,7 +159,6 @@ export class NotificationService {
       
       await logDebug("NotificationService: Fin de l'envoi de notification");
     } catch (e) {
-      // Correction pour TypeScript: erreur de type unknown
       const error = e as Error;
       await logDebug('Erreur lors de l\'envoi de la notification:', {
         error: error.message,
@@ -204,10 +200,11 @@ export class NotificationService {
         CONFIRMED: 'Confirmée',
         SHIPPED: 'Expédiée',
         DELIVERED: 'Livrée',
-        CANCELLED: 'Annulée'
+        CANCELLED: 'Annulée',
+        INVOICE_PENDING: 'Facture en attente',
+        INVOICE_PAID: 'Facture payée'
       };
       
-      // Correction pour TypeScript: convertir en Array
       const producerIdsArray = Array.from(producerIds);
       
       // Pour chaque producteur, créer une notification
@@ -235,7 +232,6 @@ export class NotificationService {
           
           await logDebug("Notification changement statut créée", { id: notification.id });
         } catch (e) {
-          // Correction pour TypeScript: erreur de type unknown
           const notifError = e as Error;
           await logDebug("Erreur création notification changement statut", {
             error: notifError.message,
@@ -244,7 +240,6 @@ export class NotificationService {
         }
       }
     } catch (e) {
-      // Correction pour TypeScript: erreur de type unknown
       const error = e as Error;
       await logDebug('Erreur lors de l\'envoi de la notification de changement de statut:', {
         error: error.message,
@@ -287,7 +282,6 @@ export class NotificationService {
         
         await logDebug("Notification stock bas créée", { id: notification.id });
       } catch (e) {
-        // Correction pour TypeScript: erreur de type unknown
         const notifError = e as Error;
         await logDebug("Erreur création notification stock bas", {
           error: notifError.message,
@@ -295,7 +289,6 @@ export class NotificationService {
         });
       }
     } catch (e) {
-      // Correction pour TypeScript: erreur de type unknown
       const error = e as Error;
       await logDebug('Erreur lors de l\'envoi de la notification de stock bas:', {
         error: error.message,
@@ -316,21 +309,25 @@ export class NotificationService {
       let message = '';
       
       switch (order.status) {
-        case 'CONFIRMED':
+        case OrderStatus.CONFIRMED:
           title = 'Commande confirmée';
           message = `Votre commande #${order.id.substring(0, 8)} a été confirmée et est en cours de préparation.`;
           break;
-        case 'SHIPPED':
+        case OrderStatus.SHIPPED:
           title = 'Commande expédiée';
           message = `Votre commande #${order.id.substring(0, 8)} a été expédiée.`;
           break;
-        case 'DELIVERED':
+        case OrderStatus.DELIVERED:
           title = 'Commande livrée';
           message = `Votre commande #${order.id.substring(0, 8)} a été livrée.`;
           break;
-        case 'CANCELLED':
+        case OrderStatus.CANCELLED:
           title = 'Commande annulée';
           message = `Votre commande #${order.id.substring(0, 8)} a été annulée.`;
+          break;
+        case OrderStatus.INVOICE_PAID:
+          title = 'Paiement de facture confirmé';
+          message = `Le paiement de votre facture pour la commande #${order.id.substring(0, 8)} a été confirmé.`;
           break;
         default:
           return; // Ne pas envoyer de notification pour d'autres statuts
@@ -356,6 +353,144 @@ export class NotificationService {
         stack: err.stack
       });
       console.error('Erreur lors de l\'envoi de la notification au client:', error);
+    }
+  }
+
+  // Envoyer une notification de création de facture
+  static async sendInvoiceCreatedNotification(order: any, invoice: any): Promise<void> {
+    try {
+      if (!order.userId) return;
+      
+      // Créer une notification pour le client
+      await prisma.notification.create({
+        data: {
+          userId: order.userId,
+          type: NotificationType.INVOICE_CREATED,
+          title: 'Nouvelle facture disponible',
+          message: `Votre facture #${invoice.id.substring(0, 8)} d'un montant de ${invoice.amount.toFixed(2)} CHF est à régler avant le ${new Date(invoice.dueDate).toLocaleDateString()}.`,
+          link: `/invoices`,
+          data: JSON.stringify({ 
+            invoiceId: invoice.id, 
+            amount: invoice.amount,
+            dueDate: invoice.dueDate
+          })
+        }
+      });
+      
+      // Enregistrer dans les logs
+      await logDebug("Notification de création de facture envoyée au client:", {
+        userId: order.userId,
+        invoiceId: invoice.id
+      });
+    } catch (error) {
+      const err = error as Error;
+      await logDebug('Erreur lors de l\'envoi de la notification de facture:', {
+        error: err.message,
+        stack: err.stack
+      });
+      console.error('Erreur lors de l\'envoi de la notification de facture:', error);
+    }
+  }
+
+  // Envoyer un rappel de paiement pour une facture proche de l'échéance
+  static async sendInvoiceReminderNotification(invoice: any): Promise<void> {
+    try {
+      if (!invoice.userId) return;
+      
+      await prisma.notification.create({
+        data: {
+          userId: invoice.userId,
+          type: NotificationType.INVOICE_REMINDER,
+          title: 'Rappel de paiement',
+          message: `Votre facture #${invoice.id.substring(0, 8)} d'un montant de ${invoice.amount.toFixed(2)} CHF arrive à échéance le ${new Date(invoice.dueDate).toLocaleDateString()}.`,
+          link: `/invoices`,
+          data: JSON.stringify({ 
+            invoiceId: invoice.id, 
+            amount: invoice.amount,
+            dueDate: invoice.dueDate
+          })
+        }
+      });
+      
+      await logDebug("Notification de rappel de facture envoyée:", {
+        userId: invoice.userId,
+        invoiceId: invoice.id
+      });
+    } catch (error) {
+      const err = error as Error;
+      await logDebug('Erreur lors de l\'envoi du rappel de facture:', {
+        error: err.message,
+        stack: err.stack
+      });
+      console.error('Erreur lors de l\'envoi du rappel de facture:', error);
+    }
+  }
+
+  // Notifier quand une facture est passée en retard
+  static async sendInvoiceOverdueNotification(invoice: any): Promise<void> {
+    try {
+      if (!invoice.userId) return;
+      
+      await prisma.notification.create({
+        data: {
+          userId: invoice.userId,
+          type: NotificationType.INVOICE_OVERDUE,
+          title: 'Facture en retard',
+          message: `Votre facture #${invoice.id.substring(0, 8)} d'un montant de ${invoice.amount.toFixed(2)} CHF est en retard de paiement. Veuillez la régler dès que possible.`,
+          link: `/invoices`,
+          data: JSON.stringify({ 
+            invoiceId: invoice.id, 
+            amount: invoice.amount,
+            dueDate: invoice.dueDate
+          })
+        }
+      });
+      
+      await logDebug("Notification de facture en retard envoyée:", {
+        userId: invoice.userId,
+        invoiceId: invoice.id
+      });
+    } catch (error) {
+      const err = error as Error;
+      await logDebug('Erreur lors de l\'envoi de la notification de facture en retard:', {
+        error: err.message,
+        stack: err.stack
+      });
+      console.error('Erreur lors de l\'envoi de la notification de facture en retard:', error);
+    }
+  }
+
+  // Notifier le producteur quand une facture est payée
+  static async sendInvoicePaidToProducerNotification(invoice: any, producer: any): Promise<void> {
+    try {
+      if (!producer?.userId) return;
+      
+      await prisma.notification.create({
+        data: {
+          userId: producer.userId,
+          type: NotificationType.INVOICE_PAID,
+          title: 'Paiement reçu',
+          message: `Le paiement de la commande #${invoice.orderId.substring(0, 8)} d'un montant de ${invoice.amount.toFixed(2)} CHF a été effectué.`,
+          link: `/producer/orders?modal=${invoice.orderId}`,
+          data: JSON.stringify({ 
+            invoiceId: invoice.id, 
+            orderId: invoice.orderId,
+            amount: invoice.amount
+          })
+        }
+      });
+      
+      await logDebug("Notification de paiement reçu envoyée au producteur:", {
+        userId: producer.userId,
+        invoiceId: invoice.id
+      });
+    } catch (error) {
+      const err = error as Error;
+      await logDebug('Erreur lors de l\'envoi de la notification de paiement au producteur:', {
+        error: err.message,
+        stack: err.stack
+      });
+      console.error('Erreur lors de l\'envoi de la notification de paiement au producteur:', error);
     }
   }
 

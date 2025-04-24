@@ -26,6 +26,7 @@ model User {
  accounts         Account[]
  sessions         Session[]
  notifications Notification[]
+ invoices         Invoice[]
 }
 
 model Account {
@@ -111,6 +112,7 @@ model Order {
  updatedAt DateTime    @updatedAt
  user      User        @relation(fields: [userId], references: [id], onDelete: Cascade)
  bookings  Booking[]
+ invoice          Invoice?
 }
 
 model OrderItem {
@@ -180,11 +182,14 @@ enum ProductType {
 }
 
 enum OrderStatus {
- PENDING
- CONFIRMED
- SHIPPED
- DELIVERED
- CANCELLED
+  PENDING
+  CONFIRMED
+  SHIPPED
+  DELIVERED
+  CANCELLED
+  // Nouveaux statuts
+  INVOICE_PENDING
+  INVOICE_PAID
 }
 
 enum BookingStatus {
@@ -226,4 +231,23 @@ model ProductionSchedule {
   isPublic    Boolean  @default(true) // Visible par les clients ou non
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+}
+
+model Invoice {
+  id               String      @id @default(cuid())
+  orderId          String      @unique  // Ajout de @unique ici pour corriger l'erreur
+  userId           String
+  amount           Float
+  status           String      // PENDING, PAID, OVERDUE, CANCELLED  
+  dueDate          DateTime
+  paidAt           DateTime?
+  paymentMethod    String?
+  createdAt        DateTime    @default(now())
+  updatedAt        DateTime    @updatedAt
+  
+  order            Order       @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  user             User        @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@index([orderId])
 }

@@ -1,9 +1,9 @@
 // components/cart/cart-button.tsx
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
-import { ShoppingCart, ClipboardCheck, Edit2, X } from 'lucide-react'
+import { ShoppingCart, ClipboardCheck, Edit2, X, Trash2, Loader2 } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
 import { useCart } from '@/hooks/use-cart'
 import Link from 'next/link'
@@ -15,9 +15,14 @@ interface CartButtonProps {
 
 export function CartButton({ className }: CartButtonProps) {
   const router = useRouter()
-  const { cartSummary, cartId, refreshCart } = useCart()
+  const { toast } = useToast()
+  const { cartSummary, cartId, refreshCart, removeFromCart } = useCart()
   const [showDropdown, setShowDropdown] = useState(false)
   const [isAnimating, setIsAnimating] = useState(false)
+  const dropdownRef = useRef<HTMLDivElement>(null)
+  const buttonRef = useRef<HTMLButtonElement>(null)
+  const [closeTimeout, setCloseTimeout] = useState<NodeJS.Timeout | null>(null)
+  const [deletingItemId, setDeletingItemId] = useState<string | null>(null)
 
   // Animation quand le panier est mis à jour
   useEffect(() => {
@@ -31,12 +36,74 @@ export function CartButton({ className }: CartButtonProps) {
     return () => window.removeEventListener('cart:updated', handleCartUpdate);
   }, [refreshCart]);
 
+  // Gestion du hover avec délai pour éviter la disparition instantanée
+  const handleMouseEnter = () => {
+    if (closeTimeout) {
+      clearTimeout(closeTimeout);
+      setCloseTimeout(null);
+    }
+    if (cartSummary && cartSummary.itemCount > 0) {
+      setShowDropdown(true);
+    }
+  };
+
+  const handleMouseLeave = () => {
+    // Délai avant de fermer le dropdown
+    const timeout = setTimeout(() => {
+      setShowDropdown(false);
+    }, 300);
+    setCloseTimeout(timeout);
+  };
+
+  // Fonction pour supprimer un élément du panier
+  const handleRemoveItem = async (itemId: string) => {
+    try {
+      setDeletingItemId(itemId);
+      const success = await removeFromCart(itemId);
+      
+      if (success) {
+        toast({
+          title: "Article supprimé",
+          description: "L'article a été retiré de votre panier",
+        });
+      } else {
+        throw new Error("Impossible de supprimer l'article");
+      }
+    } catch (error) {
+      toast({
+        title: "Erreur",
+        description: "Impossible de supprimer l'article",
+        variant: "destructive"
+      });
+    } finally {
+      setDeletingItemId(null);
+    }
+  };
+
+  // Fermer le dropdown si on clique ailleurs
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (
+        dropdownRef.current && 
+        buttonRef.current && 
+        !dropdownRef.current.contains(event.target as Node) &&
+        !buttonRef.current.contains(event.target as Node)
+      ) {
+        setShowDropdown(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
   return (
     <div className="relative">
       <button
+        ref={buttonRef}
         onClick={() => cartSummary && cartSummary.itemCount > 0 && setShowDropdown(!showDropdown)}
-        onMouseEnter={() => cartSummary && cartSummary.itemCount > 0 && setShowDropdown(true)}
-        onMouseLeave={() => setTimeout(() => setShowDropdown(false), 200)}
+        onMouseEnter={handleMouseEnter}
+        onMouseLeave={handleMouseLeave}
         className={`relative p-2 rounded-md hover:bg-foreground/5 transition-colors ${className}`}
         aria-label="Panier"
       >
@@ -67,12 +134,13 @@ export function CartButton({ className }: CartButtonProps) {
       <AnimatePresence>
         {showDropdown && cartSummary && cartSummary.itemCount > 0 && cartId && (
           <motion.div
+            ref={dropdownRef}
             initial={{ opacity: 0, y: 10, scale: 0.95 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 10, scale: 0.95 }}
             transition={{ duration: 0.2 }}
-            onMouseEnter={() => setShowDropdown(true)}
-            onMouseLeave={() => setShowDropdown(false)}
+            onMouseEnter={handleMouseEnter}
+            onMouseLeave={handleMouseLeave}
             className="absolute top-full right-0 mt-2 w-80 bg-background border border-foreground/10 rounded-lg shadow-lg z-50 p-4"
           >
             <div className="flex justify-between items-center mb-2">
@@ -85,10 +153,10 @@ export function CartButton({ className }: CartButtonProps) {
               </button>
             </div>
             
-            {/* Liste des articles (limitée à 3) */}
+            {/* Liste des articles (limitée à 4) */}
             <div className="max-h-56 overflow-auto mb-3 divide-y divide-foreground/5">
               {cartSummary.items.slice(0, 4).map((item, index) => (
-                <div key={index} className="flex items-center gap-3 py-3">
+                <div key={index} className="flex items-center gap-3 py-3 group">
                   <div className="w-12 h-12 bg-foreground/5 rounded-md overflow-hidden flex-shrink-0">
                     {item.product.image ? (
                       <img
@@ -111,6 +179,19 @@ export function CartButton({ className }: CartButtonProps) {
                       <p className="text-xs font-medium">{(item.quantity * item.price).toFixed(2)} CHF</p>
                     </div>
                   </div>
+                  
+                  {/* Bouton de suppression */}
+                  <button
+                    onClick={() => handleRemoveItem(item.id)}
+                    className="p-1 rounded-full hover:bg-red-100 hover:text-red-600 dark:hover:bg-red-900/20 dark:hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity"
+                    disabled={deletingItemId === item.id}
+                  >
+                    {deletingItemId === item.id ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <Trash2 className="h-4 w-4" />
+                    )}
+                  </button>
                 </div>
               ))}
               
@@ -133,6 +214,7 @@ export function CartButton({ className }: CartButtonProps) {
               <Link
                 href="/cart"
                 className="flex-1 py-2 px-3 text-sm text-center border border-foreground/10 rounded-md hover:bg-foreground/5 transition-colors"
+                onClick={() => setShowDropdown(false)}
               >
                 <span className="flex items-center justify-center gap-1">
                   <Edit2 className="h-4 w-4" /> Voir panier
@@ -141,6 +223,7 @@ export function CartButton({ className }: CartButtonProps) {
               <Link
                 href={`/checkout/${cartId}`}
                 className="flex-1 py-2 px-3 text-sm text-center bg-custom-accent text-white rounded-md hover:opacity-90 transition-opacity"
+                onClick={() => setShowDropdown(false)}
               >
                 <span className="flex items-center justify-center gap-1">
                   <ClipboardCheck className="h-4 w-4" /> Commander

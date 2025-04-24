@@ -63,9 +63,17 @@ export async function middleware(request: NextRequest) {
 
 export const config = {
   matcher: [
+    '/',
+    '/login',
+    '/register',
     '/dashboard/:path*',
     '/admin/:path*',
     '/producer/:path*',
     '/profile/:path*',
+    '/invoices/:path*',     // Ajout du chemin des factures
+    '/orders/:path*',       // S'assurer que les commandes sont aussi protégées
+    '/checkout/:path*',     // Protection du checkout
+    '/cart',               // Protection du panier
+    '/invoices'            // Protection de la page des factures (chemin direct)
   ]
 }

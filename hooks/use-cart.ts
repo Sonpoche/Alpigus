@@ -1,7 +1,7 @@
 // hooks/use-cart.ts
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 
 interface Product {
   id: string
@@ -39,11 +39,15 @@ export function useCart() {
   }, [])
   
   // Récupérer le résumé du panier
-  const fetchCartSummary = async (id: string) => {
+  const fetchCartSummary = useCallback(async (id: string) => {
     try {
       setIsLoading(true)
       const response = await fetch(`/api/orders/${id}/summary`, {
-        cache: 'no-store'
+        cache: 'no-store',
+        headers: {
+          'pragma': 'no-cache',
+          'cache-control': 'no-cache'
+        }
       })
       
       if (!response.ok) {
@@ -63,7 +67,7 @@ export function useCart() {
     } finally {
       setIsLoading(false)
     }
-  }
+  }, [])
   
   // Ajouter un produit au panier
   const addToCart = async (product: Product, quantity: number) => {
@@ -71,7 +75,8 @@ export function useCart() {
       setIsLoading(true)
       
       // Si pas de panier, en créer un
-      if (!cartId) {
+      let currentId = cartId
+      if (!currentId) {
         const response = await fetch('/api/orders', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -85,10 +90,10 @@ export function useCart() {
         const data = await response.json()
         localStorage.setItem('currentOrderId', data.id)
         setCartId(data.id)
+        currentId = data.id
       }
       
       // Ajouter le produit au panier
-      const currentId = cartId || localStorage.getItem('currentOrderId')
       if (!currentId) throw new Error('Erreur d\'identification du panier')
       
       const response = await fetch('/api/orders/items', {
@@ -105,8 +110,54 @@ export function useCart() {
         throw new Error('Erreur lors de l\'ajout au panier')
       }
       
-      // Mettre à jour le résumé du panier
-      await fetchCartSummary(currentId)
+      // Mettre à jour localement le panier pour une réponse immédiate
+      if (cartSummary) {
+        // Vérifier si le produit existe déjà dans le panier
+        const existingItemIndex = cartSummary.items.findIndex(item => 
+          item.product.id === product.id
+        )
+        
+        let updatedItems = [...cartSummary.items]
+        
+        if (existingItemIndex >= 0) {
+          // Mettre à jour la quantité d'un produit existant
+          updatedItems[existingItemIndex] = {
+            ...updatedItems[existingItemIndex],
+            quantity: updatedItems[existingItemIndex].quantity + quantity
+          }
+        } else {
+          // Ajouter un nouveau produit
+          // Note: on utilise un ID temporaire qui sera remplacé lors du prochain fetchCartSummary
+          updatedItems.push({
+            id: `temp-${Date.now()}`,
+            quantity,
+            price: product.price,
+            product
+          })
+        }
+        
+        // Mettre à jour le résumé du panier
+        setCartSummary({
+          itemCount: cartSummary.itemCount + 1,
+          items: updatedItems,
+          totalPrice: cartSummary.totalPrice + (product.price * quantity)
+        })
+      } else {
+        // Si c'est le premier produit, initialiser le résumé
+        setCartSummary({
+          itemCount: 1,
+          items: [{
+            id: `temp-${Date.now()}`,
+            quantity,
+            price: product.price,
+            product
+          }],
+          totalPrice: product.price * quantity
+        })
+      }
+      
+      // Puis mettre à jour les données réelles (en arrière-plan)
+      fetchCartSummary(currentId)
       
       // Déclencher l'événement de mise à jour du panier
       window.dispatchEvent(new CustomEvent('cart:updated', {
@@ -138,6 +189,18 @@ export function useCart() {
         throw new Error('Erreur lors de la suppression de l\'article');
       }
       
+      // Mettre à jour localement le panier
+      if (cartSummary) {
+        const itemToRemove = cartSummary.items.find(item => item.id === itemId);
+        if (itemToRemove) {
+          setCartSummary({
+            itemCount: Math.max(0, cartSummary.itemCount - 1),
+            items: cartSummary.items.filter(item => item.id !== itemId),
+            totalPrice: Math.max(0, cartSummary.totalPrice - (itemToRemove.price * itemToRemove.quantity))
+          });
+        }
+      }
+      
       // Mettre à jour le résumé du panier
       await fetchCartSummary(cartId);
       
@@ -153,12 +216,18 @@ export function useCart() {
     }
   };
   
+  const refreshCart = useCallback(() => {
+    if (cartId) {
+      fetchCartSummary(cartId);
+    }
+  }, [cartId, fetchCartSummary]);
+  
   return {
     cartId,
     cartSummary,
     isLoading,
     addToCart,
     removeFromCart,
-    refreshCart: () => cartId && fetchCartSummary(cartId)
+    refreshCart
   }
 }

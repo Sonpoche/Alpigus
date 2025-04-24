@@ -16,7 +16,9 @@ import {
   ArrowLeft,
   Calendar,
   Trash2,
-  Loader2
+  Loader2,
+  CreditCard as CardIcon,
+  Clock
 } from 'lucide-react'
 import Link from 'next/link'
 
@@ -61,6 +63,16 @@ interface Order {
   status: string
 }
 
+interface DeliveryFormData {
+  fullName: string
+  company: string
+  address: string
+  postalCode: string
+  city: string
+  phone: string
+  notes: string
+}
+
 export default function CheckoutPage({ params }: CheckoutProps) {
   const router = useRouter()
   const { toast } = useToast()
@@ -68,11 +80,19 @@ export default function CheckoutPage({ params }: CheckoutProps) {
   const [isLoading, setIsLoading] = useState(true)
   const [isProcessing, setIsProcessing] = useState(false)
   const [deliveryType, setDeliveryType] = useState<'pickup' | 'delivery'>('pickup')
-  const [deliveryAddress, setDeliveryAddress] = useState('')
-  const [deliveryNotes, setDeliveryNotes] = useState('')
+  const [deliveryFormData, setDeliveryFormData] = useState<DeliveryFormData>({
+    fullName: '',
+    company: '',
+    address: '',
+    postalCode: '',
+    city: '',
+    phone: '',
+    notes: ''
+  })
   const [paymentMethod, setPaymentMethod] = useState<'invoice' | 'card'>('invoice')
   const [updatingItemId, setUpdatingItemId] = useState<string | null>(null)
   const [isUpdating, setIsUpdating] = useState(false)
+  const [formErrors, setFormErrors] = useState<Record<string, string>>({})
   
   useEffect(() => {
     if (params.id) {
@@ -130,6 +150,23 @@ export default function CheckoutPage({ params }: CheckoutProps) {
       setIsLoading(false)
     }
   }
+  
+  // Gérer les changements dans le formulaire de livraison
+  const handleDeliveryFormChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    const { name, value } = e.target;
+    setDeliveryFormData(prev => ({
+      ...prev,
+      [name]: value
+    }));
+
+    // Nettoyer l'erreur si le champ est rempli
+    if (value.trim() !== '') {
+      setFormErrors(prev => ({
+        ...prev,
+        [name]: ''
+      }));
+    }
+  };
   
   // Supprimer un article du panier
   const removeItem = async (itemId: string) => {
@@ -200,9 +237,47 @@ export default function CheckoutPage({ params }: CheckoutProps) {
       setUpdatingItemId(null)
     }
   }
+
+  // Valider le formulaire de livraison
+  const validateDeliveryForm = (): boolean => {
+    const errors: Record<string, string> = {};
+    const requiredFields: (keyof DeliveryFormData)[] = ['fullName', 'address', 'postalCode', 'city', 'phone'];
+    
+    for (const field of requiredFields) {
+      if (!deliveryFormData[field] || deliveryFormData[field].trim() === '') {
+        errors[field] = 'Ce champ est obligatoire';
+      }
+    }
+
+    // Validation du code postal (format suisse)
+    if (deliveryFormData.postalCode && !/^\d{4}$/.test(deliveryFormData.postalCode)) {
+      errors.postalCode = 'Code postal invalide (format: 1234)';
+    }
+
+    // Validation du numéro de téléphone
+    if (deliveryFormData.phone && !/^(\+\d{1,3}\s?)?(\d{2,3}\s?){2,4}\d{2,3}$/.test(deliveryFormData.phone)) {
+      errors.phone = 'Numéro de téléphone invalide';
+    }
+
+    setFormErrors(errors);
+    return Object.keys(errors).length === 0;
+  }
   
   const handleCheckout = async () => {
     if (!order) return
+
+    // Si livraison à domicile, valider le formulaire
+    if (deliveryType === 'delivery') {
+      const isValid = validateDeliveryForm();
+      if (!isValid) {
+        toast({
+          title: "Formulaire incomplet",
+          description: "Veuillez remplir tous les champs obligatoires",
+          variant: "destructive"
+        });
+        return;
+      }
+    }
     
     try {
       setIsProcessing(true)
@@ -210,9 +285,9 @@ export default function CheckoutPage({ params }: CheckoutProps) {
       // Créer les données de la commande finalisée
       const checkoutData = {
         deliveryType,
-        deliveryAddress: deliveryType === 'delivery' ? deliveryAddress : null,
-        deliveryNotes,
-        paymentMethod
+        deliveryInfo: deliveryType === 'delivery' ? deliveryFormData : null,
+        paymentMethod,
+        paymentStatus: paymentMethod === 'invoice' ? 'PENDING' : 'PAID'
       }
       
       // Appeler l'API pour finaliser la commande
@@ -343,38 +418,141 @@ export default function CheckoutPage({ params }: CheckoutProps) {
                 </div>
               </div>
               
-              {/* Adresse de livraison (conditionnelle) */}
+              {/* Formulaire d'adresse de livraison (conditionnel) */}
               {deliveryType === 'delivery' && (
-                <div className="mt-4 p-4 bg-foreground/5 rounded-lg">
-                  <label htmlFor="deliveryAddress" className="block mb-2 text-sm font-medium">
-                    Adresse de livraison
-                  </label>
-                  <textarea
-                    id="deliveryAddress"
-                    rows={3}
-                    value={deliveryAddress}
-                    onChange={(e) => setDeliveryAddress(e.target.value)}
-                    placeholder="Nom, rue, numéro, code postal, ville"
-                    className="w-full p-2 border border-foreground/10 rounded-md bg-background"
-                    required={deliveryType === 'delivery'}
-                  ></textarea>
+                <div className="mt-4 p-4 bg-foreground/5 rounded-lg space-y-4">
+                  <h3 className="font-medium text-sm mb-2">Coordonnées de livraison</h3>
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {/* Nom complet */}
+                    <div>
+                      <label htmlFor="fullName" className="block mb-1 text-sm font-medium">
+                        Nom complet <span className="text-red-500">*</span>
+                      </label>
+                      <input
+                        id="fullName"
+                        name="fullName"
+                        type="text"
+                        value={deliveryFormData.fullName}
+                        onChange={handleDeliveryFormChange}
+                        className={`w-full p-2 border ${formErrors.fullName ? 'border-red-500' : 'border-foreground/10'} rounded-md bg-background`}
+                        placeholder="Jean Dupont"
+                      />
+                      {formErrors.fullName && (
+                        <p className="text-xs text-red-500 mt-1">{formErrors.fullName}</p>
+                      )}
+                    </div>
+                    
+                    {/* Entreprise (optionnelle) */}
+                    <div>
+                      <label htmlFor="company" className="block mb-1 text-sm font-medium">
+                        Entreprise <span className="text-muted-foreground">(optionnel)</span>
+                      </label>
+                      <input
+                        id="company"
+                        name="company"
+                        type="text"
+                        value={deliveryFormData.company}
+                        onChange={handleDeliveryFormChange}
+                        className="w-full p-2 border border-foreground/10 rounded-md bg-background"
+                        placeholder="Nom de l'entreprise"
+                      />
+                    </div>
+                    
+                    {/* Adresse */}
+                    <div className="md:col-span-2">
+                      <label htmlFor="address" className="block mb-1 text-sm font-medium">
+                        Adresse <span className="text-red-500">*</span>
+                      </label>
+                      <input
+                        id="address"
+                        name="address"
+                        type="text"
+                        value={deliveryFormData.address}
+                        onChange={handleDeliveryFormChange}
+                        className={`w-full p-2 border ${formErrors.address ? 'border-red-500' : 'border-foreground/10'} rounded-md bg-background`}
+                        placeholder="Rue et numéro"
+                      />
+                      {formErrors.address && (
+                        <p className="text-xs text-red-500 mt-1">{formErrors.address}</p>
+                      )}
+                    </div>
+                    
+                    {/* Code postal */}
+                    <div>
+                      <label htmlFor="postalCode" className="block mb-1 text-sm font-medium">
+                        Code postal <span className="text-red-500">*</span>
+                      </label>
+                      <input
+                        id="postalCode"
+                        name="postalCode"
+                        type="text"
+                        value={deliveryFormData.postalCode}
+                        onChange={handleDeliveryFormChange}
+                        className={`w-full p-2 border ${formErrors.postalCode ? 'border-red-500' : 'border-foreground/10'} rounded-md bg-background`}
+                        placeholder="1234"
+                      />
+                      {formErrors.postalCode && (
+                        <p className="text-xs text-red-500 mt-1">{formErrors.postalCode}</p>
+                      )}
+                    </div>
+                    
+                    {/* Ville */}
+                    <div>
+                      <label htmlFor="city" className="block mb-1 text-sm font-medium">
+                        Ville <span className="text-red-500">*</span>
+                      </label>
+                      <input
+                        id="city"
+                        name="city"
+                        type="text"
+                        value={deliveryFormData.city}
+                        onChange={handleDeliveryFormChange}
+                        className={`w-full p-2 border ${formErrors.city ? 'border-red-500' : 'border-foreground/10'} rounded-md bg-background`}
+                        placeholder="Lausanne"
+                      />
+                      {formErrors.city && (
+                        <p className="text-xs text-red-500 mt-1">{formErrors.city}</p>
+                      )}
+                    </div>
+                    
+                    {/* Téléphone */}
+                    <div className="md:col-span-2">
+                      <label htmlFor="phone" className="block mb-1 text-sm font-medium">
+                        Téléphone <span className="text-red-500">*</span>
+                      </label>
+                      <input
+                        id="phone"
+                        name="phone"
+                        type="tel"
+                        value={deliveryFormData.phone}
+                        onChange={handleDeliveryFormChange}
+                        className={`w-full p-2 border ${formErrors.phone ? 'border-red-500' : 'border-foreground/10'} rounded-md bg-background`}
+                        placeholder="+41 79 123 45 67"
+                      />
+                      {formErrors.phone && (
+                        <p className="text-xs text-red-500 mt-1">{formErrors.phone}</p>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Instructions de livraison */}
+                  <div className="mt-4">
+                    <label htmlFor="notes" className="block mb-1 text-sm font-medium">
+                      Instructions de livraison <span className="text-muted-foreground">(optionnel)</span>
+                    </label>
+                    <textarea
+                      id="notes"
+                      name="notes"
+                      rows={2}
+                      value={deliveryFormData.notes}
+                      onChange={handleDeliveryFormChange}
+                      placeholder="Instructions particulières pour la livraison"
+                      className="w-full p-2 border border-foreground/10 rounded-md bg-background"
+                    ></textarea>
+                  </div>
                 </div>
               )}
-              
-              {/* Notes de livraison */}
-              <div className="mt-4">
-                <label htmlFor="deliveryNotes" className="block mb-2 text-sm font-medium">
-                  Instructions spéciales (optionnel)
-                </label>
-                <textarea
-                  id="deliveryNotes"
-                  rows={2}
-                  value={deliveryNotes}
-                  onChange={(e) => setDeliveryNotes(e.target.value)}
-                  placeholder="Instructions particulières pour la livraison ou le retrait"
-                  className="w-full p-2 border border-foreground/10 rounded-md bg-background"
-                ></textarea>
-              </div>
             </div>
           </div>
           
@@ -441,9 +619,9 @@ export default function CheckoutPage({ params }: CheckoutProps) {
                   className="mt-1 h-4 w-4 border-foreground/10 text-custom-accent focus:ring-custom-accent"
                 />
                 <div className="flex-1">
-                  <label htmlFor="invoice" className="font-medium">Facturation</label>
+                  <label htmlFor="invoice" className="font-medium">Paiement à 30 jours</label>
                   <p className="text-sm text-muted-foreground">
-                    Recevez une facture à payer par virement bancaire sous 30 jours.
+                    Recevez une facture à régler dans un délai de 30 jours. Les factures impayées seront visibles dans votre espace client.
                   </p>
                 </div>
               </div>
@@ -461,13 +639,28 @@ export default function CheckoutPage({ params }: CheckoutProps) {
                 <div className="flex-1">
                   <label htmlFor="card" className="font-medium">Carte de crédit</label>
                   <p className="text-sm text-muted-foreground">
-                    Paiement sécurisé par carte bancaire.
+                    Paiement sécurisé par carte bancaire. Règlement immédiat.
                   </p>
                 </div>
               </div>
               
+              {paymentMethod === 'invoice' && (
+                <div className="mt-4 p-4 bg-foreground/5 rounded-lg">
+                  <div className="flex items-center gap-2">
+                    <Clock className="h-5 w-5 text-amber-600 dark:text-amber-400" />
+                    <p className="text-sm text-amber-700 dark:text-amber-500">
+                      Les factures impayées seront accessibles dans votre espace "Mes factures" et doivent être réglées dans les 30 jours.
+                    </p>
+                  </div>
+                </div>
+              )}
+              
               {paymentMethod === 'card' && (
                 <div className="mt-4 p-4 bg-foreground/5 rounded-lg">
+                  <div className="flex gap-2 items-center mb-3">
+                    <CardIcon className="h-5 w-5 text-green-600 dark:text-green-400" />
+                    <p className="text-sm font-medium">Informations de paiement</p>
+                  </div>
                   <p className="text-sm italic text-muted-foreground">
                     Note: Dans cette version de démonstration, le paiement par carte n'est pas implémenté.
                     Vous ne serez pas débité.
@@ -579,10 +772,17 @@ export default function CheckoutPage({ params }: CheckoutProps) {
             
             {/* Total */}
             <div className="border-t border-foreground/10 pt-3 mb-6">
-              <div className="flex justify-between font-semibold">
+              <div className="flex justify-between font-semibold text-lg">
                 <span>Total</span>
                 <span>{total.toFixed(2)} CHF</span>
               </div>
+              
+              {paymentMethod === 'invoice' && (
+                <div className="text-xs text-muted-foreground mt-2 flex items-center gap-1">
+                  <Clock className="h-4 w-4" />
+                  <span>À régler dans les 30 jours suivant la commande</span>
+                </div>
+              )}
             </div>
             
             {/* Bouton de commande */}
@@ -590,14 +790,16 @@ export default function CheckoutPage({ params }: CheckoutProps) {
               onClick={handleCheckout}
               isLoading={isProcessing}
               disabled={
-                (deliveryType === 'delivery' && !deliveryAddress) || 
+                (deliveryType === 'delivery' && !validateDeliveryForm()) || 
                 isProcessing ||
                 isUpdating
               }
               className="w-full flex items-center justify-center gap-2"
             >
               <CheckCircle className="h-5 w-5" />
-              Confirmer la commande
+              {paymentMethod === 'invoice' 
+                ? "Commander et payer plus tard" 
+                : "Commander et payer maintenant"}
             </LoadingButton>
           </div>
         </div>

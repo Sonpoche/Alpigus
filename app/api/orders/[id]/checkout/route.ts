@@ -3,6 +3,8 @@ import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { apiAuthMiddleware } from "@/lib/api-middleware"
 import { Session } from "next-auth"
+import { NotificationService } from '@/lib/notification-service'
+import { OrderStatus } from '@/types/order'
 
 export const POST = apiAuthMiddleware(
   async (
@@ -13,14 +15,42 @@ export const POST = apiAuthMiddleware(
     try {
       const orderId = context.params.id;
       const body = await req.json();
-      const { deliveryType, deliveryAddress, deliveryNotes, paymentMethod } = body;
+      const { 
+        deliveryType, 
+        deliveryInfo, 
+        paymentMethod, 
+        paymentStatus = "PENDING" 
+      } = body;
       
       // Vérifier que la commande existe et appartient à l'utilisateur
       const order = await prisma.order.findUnique({
-        where: { id: orderId },
+        where: { 
+          id: orderId,
+          userId: session.user.id
+        },
         include: {
-          items: true,
-          bookings: true
+          items: {
+            include: {
+              product: {
+                include: {
+                  producer: true
+                }
+              }
+            }
+          },
+          bookings: {
+            include: {
+              deliverySlot: {
+                include: {
+                  product: {
+                    include: {
+                      producer: true
+                    }
+                  }
+                }
+              }
+            }
+          }
         }
       });
 
@@ -28,23 +58,24 @@ export const POST = apiAuthMiddleware(
         return new NextResponse("Commande non trouvée", { status: 404 });
       }
 
-      if (order.userId !== session.user.id) {
-        return new NextResponse("Non autorisé", { status: 403 });
-      }
+      // Calculer les frais de livraison
+      const deliveryFee = deliveryType === 'delivery' ? 15 : 0;
+      const totalWithDelivery = order.total + deliveryFee;
 
       // Effectuer le processus de paiement/confirmation
       const result = await prisma.$transaction(async (tx) => {
         // 1. Mettre à jour le statut de la commande
-        await tx.order.update({
+        const updatedOrder = await tx.order.update({
           where: { id: orderId },
           data: { 
-            status: "CONFIRMED",
-            // Ajouter les informations additionnelles
+            status: OrderStatus.CONFIRMED,
+            total: totalWithDelivery, // Mettre à jour le total avec les frais de livraison
+            // Ajouter les informations additionnelles avec le nouveau format
             metadata: JSON.stringify({
               deliveryType,
-              deliveryAddress,
-              deliveryNotes,
-              paymentMethod
+              deliveryInfo: deliveryType === 'delivery' ? deliveryInfo : null,
+              paymentMethod,
+              paymentStatus
             })
           }
         });
@@ -61,10 +92,66 @@ export const POST = apiAuthMiddleware(
           }
         });
         
-        // 3. On pourrait ajouter d'autres étapes ici, comme l'envoi d'emails, etc.
+        // 3. Si paiement par facture, créer une entrée dans la table Invoice
+        if (paymentMethod === 'invoice') {
+          const dueDate = new Date();
+          dueDate.setDate(dueDate.getDate() + 30); // Échéance à 30 jours
+          
+          await tx.invoice.create({
+            data: {
+              orderId,
+              userId: session.user.id,
+              amount: totalWithDelivery,
+              status: 'PENDING',
+              dueDate
+            }
+          });
+        }
         
-        return true;
+        return updatedOrder;
       });
+
+      // Récupérer les informations utilisateur nécessaires pour la notification
+      const user = await prisma.user.findUnique({
+        where: { id: session.user.id },
+        select: {
+          name: true,
+          email: true,
+          phone: true
+        }
+      });
+
+      // S'assurer que user n'est pas null avant d'envoyer la notification
+      if (user) {
+        // Construire un objet complet pour les notifications
+        const completeOrderData = {
+          ...order,
+          user,
+          status: OrderStatus.CONFIRMED,
+          total: totalWithDelivery
+        };
+
+        // Envoyer des notifications
+        try {
+          // Notification pour les producteurs concernés par la commande
+          await NotificationService.sendNewOrderNotification(completeOrderData);
+          
+          // Si c'est un paiement par facture, envoyer une notification spécifique
+          if (paymentMethod === 'invoice') {
+            // Récupérer la facture créée
+            const invoice = await prisma.invoice.findFirst({
+              where: { orderId }
+            });
+            
+            if (invoice) {
+              await NotificationService.sendInvoiceCreatedNotification(completeOrderData, invoice);
+            }
+          }
+        } catch (notifError) {
+          // Log l'erreur mais continuer le processus
+          console.error("Erreur lors de l'envoi des notifications:", notifError);
+        }
+      }
 
       return NextResponse.json({
         message: "Commande confirmée avec succès",

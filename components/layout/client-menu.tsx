@@ -10,7 +10,8 @@ import {
   Settings, 
   User,
   Heart,
-  ClipboardList
+  ClipboardList,
+  FileText
 } from 'lucide-react'
 import { motion } from 'framer-motion'
 import { cn } from '@/lib/utils'
@@ -39,6 +40,11 @@ export default function ClientMenu() {
       href: '/orders',
       label: 'Mes commandes',
       icon: <ClipboardList className="h-5 w-5" />
+    },
+    {
+      href: '/invoices',
+      label: 'Mes factures',
+      icon: <FileText className="h-5 w-5" />
     },
     {
       href: '/cart',
