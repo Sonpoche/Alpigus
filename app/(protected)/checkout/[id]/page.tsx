@@ -248,28 +248,53 @@ export default function CheckoutPage({ params }: CheckoutProps) {
         errors[field] = 'Ce champ est obligatoire';
       }
     }
-
+  
     // Validation du code postal (format suisse)
     if (deliveryFormData.postalCode && !/^\d{4}$/.test(deliveryFormData.postalCode)) {
       errors.postalCode = 'Code postal invalide (format: 1234)';
     }
-
+  
     // Validation du numéro de téléphone
     if (deliveryFormData.phone && !/^(\+\d{1,3}\s?)?(\d{2,3}\s?){2,4}\d{2,3}$/.test(deliveryFormData.phone)) {
       errors.phone = 'Numéro de téléphone invalide';
     }
-
-    setFormErrors(errors);
-    return Object.keys(errors).length === 0;
+  
+    // Ne modifiez l'état que lorsque la fonction est explicitement appelée par un gestionnaire d'événements
+    if (Object.keys(errors).length > 0) {
+      return false;
+    }
+    
+    return true;
   }
   
+  // Ensuite dans handleCheckout, mettez à jour les erreurs explicitement
   const handleCheckout = async () => {
     if (!order) return
-
+  
     // Si livraison à domicile, valider le formulaire
     if (deliveryType === 'delivery') {
-      const isValid = validateDeliveryForm();
-      if (!isValid) {
+      const errors: Record<string, string> = {};
+      const requiredFields: (keyof DeliveryFormData)[] = ['fullName', 'address', 'postalCode', 'city', 'phone'];
+      
+      for (const field of requiredFields) {
+        if (!deliveryFormData[field] || deliveryFormData[field].trim() === '') {
+          errors[field] = 'Ce champ est obligatoire';
+        }
+      }
+  
+      // Validation du code postal (format suisse)
+      if (deliveryFormData.postalCode && !/^\d{4}$/.test(deliveryFormData.postalCode)) {
+        errors.postalCode = 'Code postal invalide (format: 1234)';
+      }
+  
+      // Validation du numéro de téléphone
+      if (deliveryFormData.phone && !/^(\+\d{1,3}\s?)?(\d{2,3}\s?){2,4}\d{2,3}$/.test(deliveryFormData.phone)) {
+        errors.phone = 'Numéro de téléphone invalide';
+      }
+      
+      setFormErrors(errors);
+      
+      if (Object.keys(errors).length > 0) {
         toast({
           title: "Formulaire incomplet",
           description: "Veuillez remplir tous les champs obligatoires",
@@ -790,7 +815,9 @@ export default function CheckoutPage({ params }: CheckoutProps) {
               onClick={handleCheckout}
               isLoading={isProcessing}
               disabled={
-                (deliveryType === 'delivery' && !validateDeliveryForm()) || 
+                (deliveryType === 'delivery' && 
+                 Object.values(deliveryFormData).some(value => !value && value !== '') && 
+                 Object.values(formErrors).some(error => error !== '')) || 
                 isProcessing ||
                 isUpdating
               }

@@ -250,7 +250,7 @@ export default function DashboardPage() {
           description: `Statut: ${getOrderStatusTranslation(order.status)}`,
           date: new Date(order.createdAt),
           status: getOrderStatusLabel(order.status),
-          link: `/orders?view=${order.id}`
+          link: `/orders?modal=${order.id}`
         })
       })
       

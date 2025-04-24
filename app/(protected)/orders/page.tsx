@@ -19,7 +19,6 @@ import {
 } from 'lucide-react'
 import Link from 'next/link'
 import { Badge } from '@/components/ui/badge'
-import { formatDateToFrench } from '@/lib/date-utils'
 import { motion } from 'framer-motion'
 import { OrderStatus } from '@prisma/client'
 
@@ -61,6 +60,11 @@ interface Order {
   items: OrderItem[]
   bookings: Booking[]
   metadata?: string
+  user?: {
+    name: string | null
+    email: string
+    phone: string
+  }
 }
 
 export default function OrdersPage() {
@@ -114,19 +118,52 @@ export default function OrdersPage() {
     fetchOrders()
   }, [activeStatus, toast])
 
+  // Vérifier les paramètres d'URL pour ouvrir automatiquement une modal
+  useEffect(() => {
+    if (!isLoading && orders.length > 0) {
+      // Vérifier si nous avons un paramètre modal dans l'URL
+      const params = new URLSearchParams(window.location.search);
+      const modalOrderId = params.get('modal');
+      
+      if (modalOrderId) {
+        // Trouver l'ordre correspondant
+        const orderToShow = orders.find(order => order.id === modalOrderId);
+        if (orderToShow) {
+          // Ouvrir la modal avec cette commande
+          setSelectedOrder(orderToShow);
+          setIsDetailOpen(true);
+        }
+      }
+    }
+  }, [orders, isLoading]);
+
   // Gestion du statut de commande avec le bon badge
   const getStatusBadge = (status: OrderStatus) => {
+    const statusLabels: Record<OrderStatus, string> = {
+      PENDING: 'En attente',
+      CONFIRMED: 'Confirmée',
+      SHIPPED: 'Expédiée',
+      DELIVERED: 'Livrée',
+      CANCELLED: 'Annulée',
+      INVOICE_PENDING: 'Facture en attente',
+      INVOICE_PAID: 'Facture payée'
+    }
+
     switch (status) {
       case 'PENDING':
-        return <Badge variant="warning" className="bg-amber-100 text-amber-800 border-amber-200 dark:bg-amber-900/20 dark:text-amber-300 dark:border-amber-800">En attente</Badge>
+        return <Badge variant="warning" className="bg-amber-100 text-amber-800 border-amber-200 dark:bg-amber-900/20 dark:text-amber-300 dark:border-amber-800">{statusLabels.PENDING}</Badge>
       case 'CONFIRMED':
-        return <Badge variant="success" className="bg-blue-100 text-blue-800 border-blue-200 dark:bg-blue-900/20 dark:text-blue-300 dark:border-blue-800">Confirmée</Badge>
+        return <Badge variant="success" className="bg-blue-100 text-blue-800 border-blue-200 dark:bg-blue-900/20 dark:text-blue-300 dark:border-blue-800">{statusLabels.CONFIRMED}</Badge>
       case 'SHIPPED':
-        return <Badge variant="info" className="bg-purple-100 text-purple-800 border-purple-200 dark:bg-purple-900/20 dark:text-purple-300 dark:border-purple-800">Expédiée</Badge>
+        return <Badge variant="info" className="bg-purple-100 text-purple-800 border-purple-200 dark:bg-purple-900/20 dark:text-purple-300 dark:border-purple-800">{statusLabels.SHIPPED}</Badge>
       case 'DELIVERED':
-        return <Badge variant="success" className="bg-green-100 text-green-800 border-green-200 dark:bg-green-900/20 dark:text-green-300 dark:border-green-800">Livrée</Badge>
+        return <Badge variant="success" className="bg-green-100 text-green-800 border-green-200 dark:bg-green-900/20 dark:text-green-300 dark:border-green-800">{statusLabels.DELIVERED}</Badge>
       case 'CANCELLED':
-        return <Badge variant="destructive" className="bg-red-100 text-red-800 border-red-200 dark:bg-red-900/20 dark:text-red-300 dark:border-red-800">Annulée</Badge>
+        return <Badge variant="destructive" className="bg-red-100 text-red-800 border-red-200 dark:bg-red-900/20 dark:text-red-300 dark:border-red-800">{statusLabels.CANCELLED}</Badge>
+      case 'INVOICE_PENDING':
+        return <Badge variant="outline" className="bg-yellow-100 text-yellow-800 border-yellow-200 dark:bg-yellow-900/20 dark:text-yellow-300 dark:border-yellow-800">{statusLabels.INVOICE_PENDING}</Badge>
+      case 'INVOICE_PAID':
+        return <Badge variant="outline" className="bg-green-100 text-green-800 border-green-200 dark:bg-green-900/20 dark:text-green-300 dark:border-green-800">{statusLabels.INVOICE_PAID}</Badge>
       default:
         return <Badge variant="outline">Inconnu</Badge>
     }
@@ -145,6 +182,10 @@ export default function OrdersPage() {
         return <Package className="h-5 w-5 text-green-500" />
       case 'CANCELLED':
         return <XCircle className="h-5 w-5 text-red-500" />
+      case 'INVOICE_PENDING':
+        return <Clock className="h-5 w-5 text-yellow-500" />
+      case 'INVOICE_PAID':
+        return <CheckCircle className="h-5 w-5 text-green-500" />
       default:
         return <AlertCircle className="h-5 w-5 text-gray-500" />
     }
@@ -172,7 +213,9 @@ export default function OrdersPage() {
       CONFIRMED: 'confirmée',
       SHIPPED: 'expédiée',
       DELIVERED: 'livrée',
-      CANCELLED: 'annulée'
+      CANCELLED: 'annulée',
+      INVOICE_PENDING: 'facture en attente',
+      INVOICE_PAID: 'facture payée'
     }
     
     const statusLabel = statusLabels[order.status]
@@ -328,7 +371,11 @@ export default function OrdersPage() {
                 
                 <div className="flex items-center gap-2">
                   <span className="text-sm text-muted-foreground hidden sm:inline">
-                    {formatDateToFrench(new Date(order.createdAt))}
+                    {new Date(order.createdAt).toLocaleDateString('fr-FR', {
+                      day: 'numeric',
+                      month: 'long',
+                      year: 'numeric'
+                    })}
                   </span>
                   {getStatusBadge(order.status)}
                 </div>
@@ -399,7 +446,11 @@ export default function OrdersPage() {
                               <div>
                                 <p className="font-medium">{booking.deliverySlot.product.name}</p>
                                 <p className="text-sm text-muted-foreground">
-                                  {formatDateToFrench(new Date(booking.deliverySlot.date))}
+                                  {new Date(booking.deliverySlot.date).toLocaleDateString('fr-FR', {
+                                    day: 'numeric',
+                                    month: 'long',
+                                    year: 'numeric'
+                                  })}
                                   {new Date(booking.deliverySlot.date) < new Date() && (
                                     <span className="ml-2 text-xs bg-gray-100 dark:bg-gray-800 px-2 py-0.5 rounded-full">
                                       Passé
@@ -489,7 +540,13 @@ export default function OrdersPage() {
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <p className="text-sm text-muted-foreground">Date de commande</p>
-                    <p className="font-medium">{formatDateToFrench(new Date(selectedOrder.createdAt))}</p>
+                    <p className="font-medium">
+                      {new Date(selectedOrder.createdAt).toLocaleDateString('fr-FR', {
+                        day: 'numeric',
+                        month: 'long',
+                        year: 'numeric'
+                      })}
+                    </p>
                   </div>
                   <div>
                     <p className="text-sm text-muted-foreground">Statut</p>
@@ -609,8 +666,12 @@ export default function OrdersPage() {
                                 )}
                               </div>
                               <p className="text-sm text-muted-foreground">
-                                {isPast ? "Livraison était prévue le " : "Livraison prévue le "} 
-                                {formatDateToFrench(new Date(booking.deliverySlot.date))}
+                              {isPast ? "Livraison était prévue le " : "Livraison prévue le "} 
+                                {new Date(booking.deliverySlot.date).toLocaleDateString('fr-FR', {
+                                  day: 'numeric',
+                                  month: 'long',
+                                  year: 'numeric'
+                                })}
                               </p>
                               <p className="text-sm mt-1">
                                 Quantité: {booking.quantity} {booking.deliverySlot.product.unit}

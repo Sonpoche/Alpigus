@@ -449,3 +449,144 @@
 }
 [2025-04-23T10:33:09.934Z] Aucun item dans la commande - pas de notification à créer 
 [2025-04-24T08:49:16.365Z] Notification de réservation créée pour le client: "cm87c7hvh00006aia2k26zc26"
+[2025-04-24T09:19:30.069Z] NotificationService: Début envoi notification commande {
+  "orderId": "cm9tspijl0001q561zb2ja82y"
+}
+[2025-04-24T09:19:30.070Z] Items dans la commande: 
+[2025-04-24T09:19:30.071Z] Aucun item dans la commande 
+[2025-04-24T09:19:30.072Z] Bookings dans la commande: 1
+[2025-04-24T09:19:30.074Z] Traitement booking: {
+  "slotId": "cm9siu6uz0008vryrr4mqijp9",
+  "productId": "cm8n4b9pl003znfyhnl5mlske"
+}
+[2025-04-24T09:19:30.075Z] Producer ID de booking ajouté: "cm7yn4iaf0003qxwp7jjkgdiu"
+[2025-04-24T09:19:30.076Z] Nombre de producteurs à notifier: 1
+[2025-04-24T09:19:30.078Z] Liste des IDs producteurs: [
+  "cm7yn4iaf0003qxwp7jjkgdiu"
+]
+[2025-04-24T09:19:30.078Z] Traitement du producteur: "cm7yn4iaf0003qxwp7jjkgdiu"
+[2025-04-24T09:19:30.081Z] Producer userId: "cm7yn45lj0000qxwps52dljee"
+[2025-04-24T09:19:30.082Z] Montant total pour ce producteur: {
+  "itemsTotal": 0,
+  "bookingsTotal": 15,
+  "total": 15
+}
+[2025-04-24T09:19:30.085Z] Notification créée avec ID: "cm9v5imuc000aa500km8rswll"
+[2025-04-24T09:19:30.086Z] NotificationService: Fin de l'envoi de notification 
+[2025-04-24T09:19:30.090Z] Notification de création de facture envoyée au client: {
+  "userId": "cm87c7hvh00006aia2k26zc26",
+  "invoiceId": "cm9v5imtp0008a500m9nfek4h"
+}
+[2025-04-24T09:19:45.758Z] Notification de changement de statut créée pour le client: "cm87c7hvh00006aia2k26zc26"
+[2025-04-24T09:20:27.967Z] NotificationService: Début envoi notification commande {
+  "orderId": "cm9tspijl0001q561zb2ja82y"
+}
+[2025-04-24T09:20:27.969Z] Items dans la commande: 
+[2025-04-24T09:20:27.970Z] Aucun item dans la commande 
+[2025-04-24T09:20:27.971Z] Bookings dans la commande: 1
+[2025-04-24T09:20:27.973Z] Traitement booking: {
+  "slotId": "cm9siu6uz0008vryrr4mqijp9",
+  "productId": "cm8n4b9pl003znfyhnl5mlske"
+}
+[2025-04-24T09:20:27.974Z] Producer ID de booking ajouté: "cm7yn4iaf0003qxwp7jjkgdiu"
+[2025-04-24T09:20:27.976Z] Nombre de producteurs à notifier: 1
+[2025-04-24T09:20:27.977Z] Liste des IDs producteurs: [
+  "cm7yn4iaf0003qxwp7jjkgdiu"
+]
+[2025-04-24T09:20:27.978Z] Traitement du producteur: "cm7yn4iaf0003qxwp7jjkgdiu"
+[2025-04-24T09:20:27.981Z] Producer userId: "cm7yn45lj0000qxwps52dljee"
+[2025-04-24T09:20:27.982Z] Montant total pour ce producteur: {
+  "itemsTotal": 0,
+  "bookingsTotal": 15,
+  "total": 15
+}
+[2025-04-24T09:20:27.986Z] Notification créée avec ID: "cm9v5jvip000ha5002s9suhhg"
+[2025-04-24T09:20:27.987Z] NotificationService: Fin de l'envoi de notification 
+[2025-04-24T09:20:51.667Z] Requête de création de commande reçue {
+  "items": []
+}
+[2025-04-24T09:20:51.668Z] ATTENTION: Requête reçue sans items 
+[2025-04-24T09:20:51.671Z] Aucun panier existant avec des items trouvé 
+[2025-04-24T09:20:51.672Z] Items qui seront utilisés pour créer la commande: []
+[2025-04-24T09:20:51.701Z] Commande créée avec ID: "cm9v5kdsr000ja500x546u7gi"
+[2025-04-24T09:20:51.703Z] Contenu de l'objet order.items: []
+[2025-04-24T09:20:51.705Z] Vérification des items dans la base de données: []
+[2025-04-24T09:20:51.706Z] Commande créée {
+  "id": "cm9v5kdsr000ja500x546u7gi",
+  "itemsCount": 0,
+  "bookingsCount": 0
+}
+[2025-04-24T09:20:51.707Z] Aucun item dans la commande - pas de notification à créer 
+[2025-04-24T09:21:07.717Z] NotificationService: Début envoi notification commande {
+  "orderId": "cm9v5kdsr000ja500x546u7gi"
+}
+[2025-04-24T09:21:07.718Z] Items dans la commande: 1
+[2025-04-24T09:21:07.719Z] Traitement item produit: {
+  "productId": "cm9bcqphb0001plhz5m8qe7cz",
+  "productName": "Elise"
+}
+[2025-04-24T09:21:07.721Z] Producer ID directement ajouté: "cm7yn4iaf0003qxwp7jjkgdiu"
+[2025-04-24T09:21:07.722Z] Bookings dans la commande: 
+[2025-04-24T09:21:07.723Z] Nombre de producteurs à notifier: 1
+[2025-04-24T09:21:07.724Z] Liste des IDs producteurs: [
+  "cm7yn4iaf0003qxwp7jjkgdiu"
+]
+[2025-04-24T09:21:07.725Z] Traitement du producteur: "cm7yn4iaf0003qxwp7jjkgdiu"
+[2025-04-24T09:21:07.728Z] Producer userId: "cm7yn45lj0000qxwps52dljee"
+[2025-04-24T09:21:07.731Z] Montant total pour ce producteur: {
+  "itemsTotal": 100,
+  "bookingsTotal": 0,
+  "total": 100
+}
+[2025-04-24T09:21:07.734Z] Notification créée avec ID: "cm9v5kq6t000ra500q60sij2w"
+[2025-04-24T09:21:07.737Z] NotificationService: Fin de l'envoi de notification 
+[2025-04-24T09:21:07.743Z] Notification de création de facture envoyée au client: {
+  "userId": "cm87c7hvh00006aia2k26zc26",
+  "invoiceId": "cm9v5kq5j000pa500sh21x1bz"
+}
+[2025-04-24T09:21:14.892Z] Notification de changement de statut créée pour le client: "cm87c7hvh00006aia2k26zc26"
+[2025-04-24T09:28:23.002Z] Requête de création de commande reçue {
+  "items": []
+}
+[2025-04-24T09:28:23.003Z] ATTENTION: Requête reçue sans items 
+[2025-04-24T09:28:23.006Z] Aucun panier existant avec des items trouvé 
+[2025-04-24T09:28:23.008Z] Items qui seront utilisés pour créer la commande: []
+[2025-04-24T09:28:23.039Z] Commande créée avec ID: "cm9v5u21u000ya500suzo4lgw"
+[2025-04-24T09:28:23.041Z] Contenu de l'objet order.items: []
+[2025-04-24T09:28:23.043Z] Vérification des items dans la base de données: []
+[2025-04-24T09:28:23.045Z] Commande créée {
+  "id": "cm9v5u21u000ya500suzo4lgw",
+  "itemsCount": 0,
+  "bookingsCount": 0
+}
+[2025-04-24T09:28:23.046Z] Aucun item dans la commande - pas de notification à créer 
+[2025-04-24T09:30:12.070Z] Notification de réservation créée pour le client: "cm87c7hvh00006aia2k26zc26"
+[2025-04-24T09:30:55.318Z] NotificationService: Début envoi notification commande {
+  "orderId": "cm9v5u21u000ya500suzo4lgw"
+}
+[2025-04-24T09:30:55.320Z] Items dans la commande: 
+[2025-04-24T09:30:55.322Z] Aucun item dans la commande 
+[2025-04-24T09:30:55.323Z] Bookings dans la commande: 1
+[2025-04-24T09:30:55.324Z] Traitement booking: {
+  "slotId": "cm9v5v7ut0011a50046nu4fh1",
+  "productId": "cm8n4b9pl003znfyhnl5mlske"
+}
+[2025-04-24T09:30:55.326Z] Producer ID de booking ajouté: "cm7yn4iaf0003qxwp7jjkgdiu"
+[2025-04-24T09:30:55.327Z] Nombre de producteurs à notifier: 1
+[2025-04-24T09:30:55.328Z] Liste des IDs producteurs: [
+  "cm7yn4iaf0003qxwp7jjkgdiu"
+]
+[2025-04-24T09:30:55.329Z] Traitement du producteur: "cm7yn4iaf0003qxwp7jjkgdiu"
+[2025-04-24T09:30:55.332Z] Producer userId: "cm7yn45lj0000qxwps52dljee"
+[2025-04-24T09:30:55.333Z] Montant total pour ce producteur: {
+  "itemsTotal": 0,
+  "bookingsTotal": 15,
+  "total": 15
+}
+[2025-04-24T09:30:55.338Z] Notification créée avec ID: "cm9v5xbl3001ba500njdfvw8b"
+[2025-04-24T09:30:55.339Z] NotificationService: Fin de l'envoi de notification 
+[2025-04-24T09:30:55.345Z] Notification de création de facture envoyée au client: {
+  "userId": "cm87c7hvh00006aia2k26zc26",
+  "invoiceId": "cm9v5xbjs0019a5006nmq0wcg"
+}
+[2025-04-24T09:31:12.230Z] Notification de changement de statut créée pour le client: "cm87c7hvh00006aia2k26zc26"

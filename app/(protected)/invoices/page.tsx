@@ -376,7 +376,7 @@ export default function InvoicesPage() {
                   </button>
                   
                   <Link
-                    href={`/orders/${invoice.orderId}`}
+                    href={`/orders?modal=${invoice.orderId}`}
                     className="flex items-center gap-1 text-sm px-3 py-1.5 border border-foreground/10 rounded-md hover:bg-foreground/5 transition-colors"
                   >
                     Voir la commande
