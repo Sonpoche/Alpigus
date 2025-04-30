@@ -18,7 +18,90 @@ async function logDebug(message: string, data?: any): Promise<void> {
   }
 }
 
+export interface CreateNotificationParams {
+  userId: string;
+  type: string | NotificationType;
+  title: string;
+  message: string;
+  link?: string;
+  data?: any;
+}
+
 export class NotificationService {
+  // Crée une notification
+  static async createNotification({
+    userId,
+    type,
+    title,
+    message,
+    link,
+    data
+  }: CreateNotificationParams): Promise<any> {
+    try {
+      const notification = await prisma.notification.create({
+        data: {
+          userId,
+          type,
+          title,
+          message,
+          link,
+          data: data ? JSON.stringify(data) : undefined
+        }
+      });
+      
+      await logDebug('Notification créée avec succès', { id: notification.id, userId, type });
+      return notification;
+    } catch (error) {
+      await logDebug('Erreur lors de la création de la notification', { error, userId, type });
+      throw error;
+    }
+  }
+  
+  // Récupère les notifications non lues d'un utilisateur
+  static async getUnreadNotifications(userId: string, limit = 10): Promise<any[]> {
+    return prisma.notification.findMany({
+      where: {
+        userId,
+        read: false
+      },
+      orderBy: {
+        createdAt: 'desc'
+      },
+      take: limit
+    });
+  }
+
+  // Récupère le nombre de notifications non lues d'un utilisateur
+  static async getUnreadCount(userId: string): Promise<number> {
+    return prisma.notification.count({
+      where: {
+        userId,
+        read: false
+      }
+    });
+  }
+
+  // Marque une notification comme lue
+  static async markAsRead(notificationId: string): Promise<any> {
+    return prisma.notification.update({
+      where: { id: notificationId },
+      data: { read: true }
+    });
+  }
+
+  // Marque toutes les notifications d'un utilisateur comme lues
+  static async markAllAsRead(userId: string): Promise<void> {
+    await prisma.notification.updateMany({
+      where: {
+        userId,
+        read: false
+      },
+      data: {
+        read: true
+      }
+    });
+  }
+
   // Envoyer une notification pour une nouvelle commande
   static async sendNewOrderNotification(order: Order): Promise<void> {
     try {
@@ -541,6 +624,65 @@ export class NotificationService {
         stack: err.stack
       });
       console.error('Erreur lors de l\'envoi de la notification de réservation:', error);
+    }
+  }
+
+  // Envoyer une notification de rappel administratif
+  static async sendAdminReminderNotification(
+    userId: string,
+    entityType: 'order' | 'invoice',
+    entityId: string,
+    reminderType: 'payment' | 'action'
+  ): Promise<void> {
+    try {
+      // Déterminer le bon message en fonction du type de rappel
+      let title = '';
+      let message = '';
+      let link = '';
+      
+      if (entityType === 'order') {
+        title = reminderType === 'action' 
+          ? 'Rappel concernant une commande' 
+          : 'Rappel de paiement';
+        
+        message = reminderType === 'action'
+          ? `Un administrateur a envoyé un rappel concernant la commande #${entityId.substring(0, 8)}.`
+          : `Un rappel de paiement a été émis pour votre commande #${entityId.substring(0, 8)}.`;
+        
+        link = `/orders?view=${entityId}`;
+      } else {
+        title = 'Rappel de paiement';
+        message = `Un rappel a été émis concernant votre facture #${entityId.substring(0, 8)}.`;
+        link = `/invoices`;
+      }
+      
+      await prisma.notification.create({
+        data: {
+          userId,
+          type: NotificationType.SYSTEM,
+          title,
+          message,
+          link,
+          data: JSON.stringify({ 
+            entityType,
+            entityId,
+            reminderType
+          })
+        }
+      });
+      
+      await logDebug("Notification de rappel administratif envoyée:", {
+        userId,
+        entityType,
+        entityId
+      });
+    } catch (error) {
+      const err = error as Error;
+      await logDebug('Erreur lors de l\'envoi de la notification de rappel administratif:', {
+        error: err.message,
+        stack: err.stack
+      });
+      console.error('Erreur lors de l\'envoi de la notification de rappel administratif:', error);
     }
   }
 }

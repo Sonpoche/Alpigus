@@ -27,6 +27,7 @@ model User {
  sessions         Session[]
  notifications Notification[]
  invoices         Invoice[]
+ adminLogs   AdminLog[]
 }
 
 model Account {
@@ -190,6 +191,7 @@ enum OrderStatus {
   // Nouveaux statuts
   INVOICE_PENDING
   INVOICE_PAID
+  INVOICE_OVERDUE
 }
 
 enum BookingStatus {
@@ -250,4 +252,20 @@ model Invoice {
 
   @@index([userId])
   @@index([orderId])
+}
+
+model AdminLog {
+  id          String   @id @default(cuid())
+  action      String
+  entityType  String
+  entityId    String
+  adminId     String
+  details     String?  @db.Text
+  createdAt   DateTime @default(now())
+  
+  admin       User     @relation(fields: [adminId], references: [id])
+  
+  @@index([adminId])
+  @@index([entityType, entityId])
+  @@index([createdAt])
 }

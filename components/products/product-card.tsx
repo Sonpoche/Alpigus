@@ -166,7 +166,7 @@ export function ProductCard({ product }: ProductCardProps) {
             <span className="font-medium text-lg">{product.price.toFixed(2)} CHF/{product.unit}</span>
             {product.stock && (
               <span className="text-xs text-muted-foreground">
-                Stock: {product.stock.quantity} {product.unit}
+                Stock: {product.stock.quantity.toFixed(2)} {product.unit}
               </span>
             )}
           </div>

@@ -14,11 +14,20 @@ export const GET = apiAuthMiddleware(async (
     const page = parseInt(searchParams.get('page') ?? '1')
     const limit = parseInt(searchParams.get('limit') ?? '10')
     const date = searchParams.get('date')
+    const productId = searchParams.get('productId')
 
-    let producerQuery = {}
+    let where: any = {}
+    
+    if (date) {
+      where.date = new Date(date)
+    }
+    
+    if (productId) {
+      where.productId = productId
+    }
 
-    // Si l'utilisateur est un producteur, filtrer sur ses produits
-    if (session.user.role === UserRole.PRODUCER) {
+    // Vérifier les autorisations avec une approche différente
+    if (typeof session.user.role === 'string' && session.user.role.includes('PRODUCER')) {
       const producer = await prisma.producer.findUnique({
         where: { userId: session.user.id }
       })
@@ -27,18 +36,29 @@ export const GET = apiAuthMiddleware(async (
         return new NextResponse("Producteur non trouvé", { status: 404 })
       }
 
-      producerQuery = {
-        product: {
+      if (!productId) {
+        where.product = {
           producer: {
             userId: session.user.id
           }
         }
+      } else {
+        // Si un productId est spécifié, vérifier qu'il appartient au producteur
+        const product = await prisma.product.findFirst({
+          where: { 
+            id: productId,
+            producer: {
+              userId: session.user.id
+            }
+          }
+        })
+        
+        // Utiliser une méthode différente pour vérifier les autorisations
+        const isAdmin = typeof session.user.role === 'string' && session.user.role.includes('ADMIN');
+        if (!product && !isAdmin) {
+          return new NextResponse("Non autorisé", { status: 403 })
+        }
       }
-    }
-
-    const where = {
-      ...(date && { date: new Date(date) }),
-      ...producerQuery
     }
 
     const [slots, total] = await Promise.all([
@@ -85,8 +105,9 @@ export const GET = apiAuthMiddleware(async (
 export const POST = apiAuthMiddleware(
   async (req: NextRequest, session: Session) => {
     try {
-      // Vérifier que c'est bien un producteur
-      if (session.user.role !== UserRole.PRODUCER) {
+      // Vérifier que c'est bien un producteur avec une approche différente
+      const isProducer = typeof session.user.role === 'string' && session.user.role.includes('PRODUCER');
+      if (!isProducer) {
         return new NextResponse("Non autorisé", { status: 403 })
       }
 

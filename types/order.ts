@@ -10,7 +10,8 @@ export enum OrderStatus {
   CANCELLED = 'CANCELLED',
   // Nouveaux statuts liés aux factures
   INVOICE_PENDING = 'INVOICE_PENDING',
-  INVOICE_PAID = 'INVOICE_PAID'
+  INVOICE_PAID = 'INVOICE_PAID',
+  INVOICE_OVERDUE = 'INVOICE_OVERDUE'
 }
 
 export enum BookingStatus {

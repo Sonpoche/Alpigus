@@ -97,6 +97,24 @@
     @apply text-foreground bg-background border-input focus:border-ring focus:ring-2 focus:ring-ring/30 focus:outline-none;
   }
 
+  /* Fix spécifique pour les inputs de recherche qui posent problème en mode sombre */
+  input[type="search"],
+  input[type="text"] {
+    color: hsl(var(--foreground)); /* Force la couleur du texte à suivre la variable foreground */
+    background-color: hsl(var(--background)); /* Force la couleur de fond à suivre la variable background */
+  }
+
+  /* Assurer que les inputs en mode sombre ont un texte visible */
+  .dark input[type="search"],
+  .dark input[type="text"],
+  .dark input[type="number"],
+  .dark input[type="email"],
+  .dark input[type="tel"],
+  .dark select,
+  .dark textarea {
+    color: white; /* Force le texte en blanc en mode sombre */
+  }
+
   /* Fix pour les placeholders */
   input::placeholder, 
   textarea::placeholder, 

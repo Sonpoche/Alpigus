@@ -24,11 +24,13 @@ interface Product {
   stock?: {
     quantity: number
   } | null
+  // Ajoutez cette propriété pour résoudre les erreurs
   producer: {
     id: string
-    companyName: string
+    userId: string
+    companyName: string | null
     user: {
-      name: string
+      name: string | null
       email: string
     }
   }
@@ -65,7 +67,7 @@ export default function AdminProductsPage() {
       const filtered = products.filter(product => 
         product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
         product.description?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        product.producer.companyName.toLowerCase().includes(searchTerm.toLowerCase())
+        (product.producer.companyName ?? '').toLowerCase().includes(searchTerm.toLowerCase())
       )
       setFilteredProducts(filtered)
     }
@@ -81,10 +83,9 @@ export default function AdminProductsPage() {
         url += `&type=${typeFilter}`
       }
       
-      // Dans la fonction fetchProducts, modifiez cette partie :
-        if (availabilityFilter !== null) {
-            url += `&available=${availabilityFilter === 'true'}`;
-        }
+      if (availabilityFilter !== null) {
+        url += `&available=${availabilityFilter === 'true'}`;
+      }
       
       const response = await fetch(url)
       
@@ -241,11 +242,10 @@ export default function AdminProductsPage() {
             
             <select
               value={availabilityFilter === null ? '' : availabilityFilter}
-              // Dans le sélecteur de disponibilité, modifiez cette ligne :
-                onChange={(e) => {
-                    const value = e.target.value;
-                    setAvailabilityFilter(value === '' ? null : value);  // Stockez la valeur comme string
-                }}
+              onChange={(e) => {
+                const value = e.target.value;
+                setAvailabilityFilter(value === '' ? null : value);
+              }}
               className="border border-foreground/10 rounded-md px-3 py-2"
             >
               <option value="">Toutes disponibilités</option>
@@ -320,7 +320,7 @@ export default function AdminProductsPage() {
                     </td>
                     <td className="py-3 px-4">
                       {product.stock ? (
-                        <span>{product.stock.quantity} {product.unit}</span>
+                        <span>{product.stock.quantity.toFixed(2)} {product.unit}</span>
                       ) : (
                         <span className="text-muted-foreground">N/A</span>
                       )}

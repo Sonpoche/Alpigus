@@ -359,27 +359,27 @@ export default function AdminEditProductPage({ params }: PageProps) {
 
           {/* Prix et Unité */}
           <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label htmlFor="price" className="block text-sm font-medium text-custom-title">
-                Prix (CHF) <span className="text-custom-accent">*</span>
-              </label>
-              <input
-                type="number"
-                id="price"
-                name="price"
-                defaultValue={product.price}
-                step="0.01"
-                min="0"
-                className={cn(
-                  "mt-1 block w-full rounded-md border border-foreground/10 bg-background px-3 py-2",
-                  fieldErrors.price && "border-destructive"
-                )}
-                required
-              />
-              {fieldErrors.price && (
-                <p className="mt-1 text-sm text-destructive">Le prix doit être supérieur à 0</p>
+          <div>
+            <label htmlFor="price" className="block text-sm font-medium text-custom-title">
+              Prix au kg (CHF) <span className="text-custom-accent">*</span>
+            </label>
+            <input
+              type="number"
+              id="price"
+              name="price"
+              defaultValue={product.price}
+              step="0.01"
+              min="0"
+              className={cn(
+                "mt-1 block w-full rounded-md border border-foreground/10 bg-background px-3 py-2",
+                fieldErrors.price && "border-destructive"
               )}
-            </div>
+              required
+            />
+            {fieldErrors.price && (
+              <p className="mt-1 text-sm text-destructive">Le prix doit être supérieur à 0</p>
+            )}
+          </div>
             <div>
               <label htmlFor="unit" className="block text-sm font-medium text-custom-title">
                 Unité <span className="text-custom-accent">*</span>

@@ -1,3 +1,4 @@
+// components/producer/delivery-slot-calendar.tsx
 import { useState, useEffect } from 'react'
 import { useToast } from "@/hooks/use-toast"
 import { Calendar } from '@/components/ui/calendar'
@@ -19,7 +20,7 @@ interface Product {
   unit: string
   stock?: {
     quantity: number
-  }
+  } | null
 }
 
 interface ValidationMessage {
@@ -57,9 +58,10 @@ export default function DeliverySlotCalendar({ productId }: { productId: string 
       // Nettoyer les créneaux expirés avant de charger les données
       await fetch('/api/delivery-slots/cleanup', { method: 'POST' })
 
+      // Charger spécifiquement les données du produit actuel
       const [productResponse, slotsResponse] = await Promise.all([
         fetch(`/api/products/${productId}`),
-        fetch(`/api/delivery-slots?productId=${productId}`)
+        fetch(`/api/delivery-slots?productId=${productId}`) // Filtrer par productId
       ])
 
       if (!productResponse.ok || !slotsResponse.ok) 
@@ -244,6 +246,14 @@ export default function DeliverySlotCalendar({ productId }: { productId: string 
 
   return (
     <div className="space-y-8">
+      {/* Ajout d'un en-tête indiquant clairement le produit concerné */}
+      <div className="bg-foreground/5 p-4 rounded-lg">
+        <h3 className="font-medium mb-2">Gestion des créneaux pour : {product.name}</h3>
+        <p className="text-sm text-muted-foreground">
+          Les créneaux de livraison affichés ci-dessous concernent uniquement ce produit.
+        </p>
+      </div>
+
       <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
         {/* Calendrier */}
         <div>

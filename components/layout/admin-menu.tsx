@@ -1,4 +1,4 @@
-// components/layout/admin-menu.tsx
+// components/layout/admin-menu.tsx (mise à jour)
 'use client'
 
 import Link from 'next/link'
@@ -12,7 +12,8 @@ import {
   Briefcase,
   BarChart4,
   ShieldAlert,
-  Tags
+  Tags,
+  Gauge
 } from 'lucide-react'
 import { motion } from 'framer-motion'
 import { cn } from '@/lib/utils'
@@ -38,19 +39,14 @@ export default function AdminMenu() {
       icon: <Users className="h-5 w-5" />
     },
     {
-      href: '/admin/producers',
-      label: 'Producteurs',
-      icon: <Briefcase className="h-5 w-5" />
-    },
-    {
       href: '/admin/products',
       label: 'Produits',
       icon: <Package className="h-5 w-5" />
     },
     {
-      href: '/admin/orders',
-      label: 'Commandes',
-      icon: <ShoppingBag className="h-5 w-5" />
+      href: '/admin/orders/supervision',
+      label: 'Supervision',
+      icon: <Gauge className="h-5 w-5" />
     },
     {
       href: '/admin/categories',
@@ -61,11 +57,6 @@ export default function AdminMenu() {
       href: '/admin/stats',
       label: 'Statistiques',
       icon: <BarChart4 className="h-5 w-5" />
-    },
-    {
-      href: '/admin/security',
-      label: 'Sécurité',
-      icon: <ShieldAlert className="h-5 w-5" />
     },
     {
       href: '/admin/settings',
