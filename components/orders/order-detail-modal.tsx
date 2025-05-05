@@ -10,10 +10,13 @@ import {
   Calendar, 
   CheckCircle,
   Truck,
-  ShoppingBag
+  ShoppingBag,
+  CreditCard,
+  FileText
 } from 'lucide-react'
 import OrderStatusBadge from './order-status-badge'
 import OrderStatusIcon from './order-status-icon'
+import PaymentStatusBadge from './payment-status-badge'
 
 interface OrderDetailModalProps {
   order: Order
@@ -43,17 +46,76 @@ export default function OrderDetailModal({
   
   const deliveryInfo = getDeliveryInfo(order);
 
+  // Extrait les informations de paiement
+  const getPaymentInfo = () => {
+    if (order.metadata) {
+      try {
+        const metadata = JSON.parse(order.metadata);
+        return {
+          paymentMethod: metadata.paymentMethod,
+          paymentStatus: metadata.paymentStatus || 'PENDING',
+          dueDate: metadata.dueDate
+        };
+      } catch (e) {
+        return null;
+      }
+    }
+    return null;
+  }
+  
+  const paymentInfo = getPaymentInfo();
+  
+  // Récupère également les informations depuis la facture si elle existe
+  const getInvoiceInfo = () => {
+    if (order.invoice) {
+      return {
+        id: order.invoice.id,
+        status: order.invoice.status,
+        amount: order.invoice.amount,
+        dueDate: order.invoice.dueDate,
+        paidAt: order.invoice.paidAt
+      };
+    }
+    return null;
+  }
+  
+  const invoiceInfo = getInvoiceInfo();
+  
+  // Déterminer le statut final du paiement
+  const finalPaymentStatus = invoiceInfo?.status || paymentInfo?.paymentStatus || null;
+  const finalDueDate = invoiceInfo?.dueDate || paymentInfo?.dueDate || null;
+
+  // Fonction pour marquer la facture comme payée
+  const handleMarkAsPaid = async () => {
+    if (!invoiceInfo?.id) return;
+    
+    try {
+      // Appel à l'API pour marquer la facture comme payée
+      const response = await fetch(`/api/invoices/${invoiceInfo.id}/mark-paid`, {
+        method: 'POST'
+      });
+      
+      if (!response.ok) throw new Error('Erreur lors du traitement');
+      
+      // Fermer le modal - la page sera rafraîchie pour voir les changements
+      onClose();
+    } catch (error) {
+      console.error('Erreur:', error);
+      // Gérer l'erreur (avec toast par exemple)
+    }
+  };
+
   return (
     <div className={`fixed inset-0 bg-black/50 z-50 transition-opacity ${isOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
       <div className="flex items-center justify-center min-h-screen p-4">
         <div className="bg-background rounded-lg shadow-lg max-w-3xl w-full max-h-[90vh] overflow-y-auto">
           <div className="p-6 border-b border-foreground/10 flex justify-between items-center sticky top-0 bg-background z-10">
             <div className="flex items-center gap-2">
-              <OrderStatusIcon status={order.status} />
+            <OrderStatusIcon status={order.status as OrderStatus} />
               <h3 className="font-medium text-lg">
                 Commande #{order.id.substring(0, 8).toUpperCase()}
               </h3>
-              <OrderStatusBadge status={order.status} />
+              <OrderStatusBadge status={order.status as OrderStatus} />
             </div>
             
             <button
@@ -141,6 +203,76 @@ export default function OrderDetailModal({
               </div>
             )}
             
+            {/* Ajout d'une section détaillée sur le paiement */}
+            <div className="border-t border-foreground/10 pt-4">
+              <h4 className="font-medium mb-3 flex items-center gap-2">
+                <CreditCard className="h-5 w-5 text-foreground/60" />
+                Informations de paiement
+              </h4>
+              
+              <div className="bg-foreground/5 rounded-lg p-4">
+                <div className="flex justify-between items-center mb-2">
+                  <div className="flex items-center gap-2">
+                    <span className="font-medium">Statut du paiement:</span>
+                    {finalPaymentStatus && (
+                      <PaymentStatusBadge 
+                        status={finalPaymentStatus}
+                        dueDate={finalDueDate}
+                      />
+                    )}
+                  </div>
+                  
+                  <div>
+                    <span className="text-sm text-muted-foreground">
+                      Méthode: {paymentInfo?.paymentMethod === 'invoice' ? 'Facture à 30 jours' : 'Carte de crédit'}
+                    </span>
+                  </div>
+                </div>
+                
+                {invoiceInfo && (
+                  <div className="mt-2 pt-2 border-t border-foreground/10">
+                    <div className="flex justify-between items-center">
+                      <p className="text-sm">
+                        <span className="font-medium">N° Facture:</span> {invoiceInfo.id.substring(0, 8).toUpperCase()}
+                      </p>
+                      
+                      <Link
+                        href={`/invoices/${invoiceInfo.id}`}
+                        className="text-sm text-custom-accent hover:underline flex items-center gap-1"
+                      >
+                        <FileText className="h-4 w-4" />
+                        Voir la facture
+                      </Link>
+                    </div>
+                    
+                    {finalDueDate && (
+                      <p className="text-sm mt-1">
+                        <span className="font-medium">Date d'échéance:</span> {new Date(finalDueDate).toLocaleDateString('fr-FR')}
+                      </p>
+                    )}
+                    
+                    {invoiceInfo.paidAt && (
+                      <p className="text-sm mt-1">
+                        <span className="font-medium">Date de paiement:</span> {new Date(invoiceInfo.paidAt).toLocaleDateString('fr-FR')}
+                      </p>
+                    )}
+                  </div>
+                )}
+                
+                {(paymentInfo?.paymentMethod === 'invoice' || invoiceInfo) && 
+                 finalPaymentStatus !== 'PAID' && finalPaymentStatus !== 'INVOICE_PAID' && (
+                  <div className="mt-3">
+                    <button
+                      className="px-3 py-1 text-sm bg-custom-accent text-white rounded-md hover:opacity-90 transition-opacity"
+                      onClick={handleMarkAsPaid}
+                    >
+                      Marquer comme payé
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
+            
             {/* Produits */}
             <div>
               <p className="font-medium mb-3">Produits commandés</p>
@@ -222,7 +354,7 @@ export default function OrderDetailModal({
                               booking.deliverySlot.product.price ? booking.deliverySlot.product.price * booking.quantity : 
                               0).toFixed(2)} CHF
                           </p>
-                        </div>
+                          </div>
                       </div>
                     );
                   })}
@@ -315,3 +447,4 @@ export default function OrderDetailModal({
     </div>
   );
 }
+                        

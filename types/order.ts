@@ -1,5 +1,6 @@
 // types/order.ts
 import { OrderStatus as PrismaOrderStatus } from '@prisma/client'
+import { Invoice } from './invoice';
 
 // Extension de l'enum OrderStatus pour inclure nos valeurs personnalisées
 export enum OrderStatus {
@@ -73,6 +74,7 @@ export interface Order {
   items: OrderItem[]
   bookings: Booking[]
   metadata?: string | null
+  invoice?: Invoice | null  // Ajout de la relation avec la facture
 }
 
 export interface DeliveryInfo {
@@ -84,4 +86,7 @@ export interface DeliveryInfo {
   city?: string
   phone?: string
   notes?: string
+  paymentMethod?: string
+  paymentStatus?: string
+  dueDate?: string | Date
 }

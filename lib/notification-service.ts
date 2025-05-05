@@ -685,4 +685,39 @@ export class NotificationService {
       console.error('Erreur lors de l\'envoi de la notification de rappel administratif:', error);
     }
   }
+  
+  // Notifier le client quand une facture est marquée comme payée
+  static async sendInvoicePaidNotification(
+    userId: string,
+    invoiceId: string,
+    orderId: string
+  ): Promise<void> {
+    try {
+      await prisma.notification.create({
+        data: {
+          userId,
+          type: NotificationType.INVOICE_PAID,
+          title: 'Paiement de facture confirmé',
+          message: `Le paiement de votre facture #${invoiceId.substring(0, 8)} a été confirmé. Merci pour votre commande !`,
+          link: `/orders?view=${orderId}`,
+          data: JSON.stringify({ 
+            invoiceId,
+            orderId
+          })
+        }
+      });
+      
+      await logDebug("Notification de paiement confirmé envoyée au client:", {
+        userId,
+        invoiceId
+      });
+    } catch (error) {
+      const err = error as Error;
+      await logDebug('Erreur lors de l\'envoi de la notification de paiement confirmé:', {
+        error: err.message,
+        stack: err.stack
+      });
+      console.error('Erreur lors de l\'envoi de la notification de paiement confirmé:', error);
+    }
+  }
 }

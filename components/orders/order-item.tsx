@@ -2,6 +2,7 @@
 import { motion } from 'framer-motion'
 import { Order, OrderItem, Booking } from '@/types/order'
 import { formatDateToFrench } from '@/lib/date-utils'
+import { OrderStatus } from '@prisma/client'
 import Link from 'next/link'
 import { 
   User, 
@@ -13,6 +14,7 @@ import {
 } from 'lucide-react'
 import OrderStatusBadge from './order-status-badge'
 import OrderStatusIcon from './order-status-icon'
+import PaymentStatusBadge from './payment-status-badge'
 
 interface OrderItemProps {
   order: Order
@@ -27,6 +29,42 @@ export default function OrderItemComponent({
   onUpdateStatus,
   isUpdating
 }: OrderItemProps) {
+  // Extraire les informations de paiement depuis metadata
+  const getPaymentInfo = () => {
+    if (order.metadata) {
+      try {
+        const metadata = JSON.parse(order.metadata);
+        return {
+          paymentMethod: metadata.paymentMethod,
+          paymentStatus: metadata.paymentStatus || 'PENDING',
+          dueDate: metadata.dueDate
+        };
+      } catch (e) {
+        return null;
+      }
+    }
+    return null;
+  }
+  
+  const paymentInfo = getPaymentInfo();
+  
+  // Également essayer de récupérer l'info depuis la facture associée si elle existe
+  const getInvoiceStatus = () => {
+    if (order.invoice) {
+      return {
+        paymentStatus: order.invoice.status,
+        dueDate: order.invoice.dueDate
+      };
+    }
+    return null;
+  }
+  
+  const invoiceInfo = getInvoiceStatus();
+  
+  // Combiner les deux sources d'information, avec priorité à la facture
+  const finalPaymentStatus = invoiceInfo?.paymentStatus || paymentInfo?.paymentStatus || null;
+  const finalDueDate = invoiceInfo?.dueDate || paymentInfo?.dueDate || null;
+  
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
@@ -36,7 +74,7 @@ export default function OrderItemComponent({
       {/* En-tête de la commande */}
       <div className="px-6 py-4 border-b border-foreground/10 flex flex-wrap justify-between items-center gap-2">
         <div className="flex items-center gap-2">
-          <OrderStatusIcon status={order.status} />
+        <OrderStatusIcon status={order.status as OrderStatus} />
           <h3 className="font-medium">
             Commande #{order.id.substring(0, 8).toUpperCase()}
           </h3>
@@ -50,7 +88,15 @@ export default function OrderItemComponent({
             <User className="h-4 w-4 text-muted-foreground" />
             <span className="text-sm font-medium">{order.user?.name || 'Client'}</span>
           </div>
-          <OrderStatusBadge status={order.status} />
+          <OrderStatusBadge status={order.status as OrderStatus} />
+          
+          {/* Ajout du badge de statut de paiement */}
+          {finalPaymentStatus && (
+            <PaymentStatusBadge 
+              status={finalPaymentStatus}
+              dueDate={finalDueDate}
+            />
+          )}
         </div>
       </div>
       
@@ -71,6 +117,13 @@ export default function OrderItemComponent({
           <div className="text-right sm:mb-4">
             <p className="text-sm text-muted-foreground">Total</p>
             <p className="font-semibold text-lg">{order.total.toFixed(2)} CHF</p>
+            
+            {/* Ajout de l'information sur la méthode de paiement */}
+            {paymentInfo?.paymentMethod && (
+              <p className="text-xs text-muted-foreground mt-1">
+                {paymentInfo.paymentMethod === 'invoice' ? 'Facture à 30 jours' : 'Carte de crédit'}
+              </p>
+            )}
           </div>
           
           <div className="flex flex-col gap-2">

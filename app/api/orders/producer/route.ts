@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { apiAuthMiddleware } from "@/lib/api-middleware"
 import { Session } from "next-auth"
-import { OrderStatus, UserRole } from "@prisma/client"
+import { OrderStatus, UserRole, Prisma } from "@prisma/client"
 
 export const GET = apiAuthMiddleware(async (req: NextRequest, session: Session) => {
   try {
@@ -96,7 +96,8 @@ export const GET = apiAuthMiddleware(async (req: NextRequest, session: Session) 
               }
             }
           }
-        }
+        },
+        invoice: true,  // Ajout pour inclure les informations de facture
       },
       orderBy: {
         createdAt: 'desc'
@@ -135,7 +136,9 @@ export const GET = apiAuthMiddleware(async (req: NextRequest, session: Session) 
         ...order,
         items: filteredItems,
         bookings: filteredBookings,
-        total: producerTotal // Remplacer le total par le sous-total des produits du producteur
+        total: producerTotal, // Remplacer le total par le sous-total des produits du producteur
+        // Conserver les informations de facturation
+        invoice: order.invoice
       }
     })
 
