@@ -4,6 +4,7 @@ import { Invoice } from './invoice';
 
 // Extension de l'enum OrderStatus pour inclure nos valeurs personnalisées
 export enum OrderStatus {
+  DRAFT = 'DRAFT',      // Nouveau statut pour les paniers non confirmés
   PENDING = 'PENDING',
   CONFIRMED = 'CONFIRMED',
   SHIPPED = 'SHIPPED',

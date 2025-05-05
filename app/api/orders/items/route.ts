@@ -35,7 +35,6 @@ export const POST = apiAuthMiddleware(async (
       if (!product.available) {
         throw new Error("Produit non disponible")
       }
-
       if (!product.stock || quantity > product.stock.quantity) {
         throw new Error("Stock insuffisant")
       }
@@ -47,6 +46,11 @@ export const POST = apiAuthMiddleware(async (
 
       if (!order || order.userId !== session.user.id) {
         throw new Error("Commande non trouvée ou non autorisée")
+      }
+
+      // Vérifier que la commande est bien un panier (DRAFT) ou en attente (PENDING)
+      if (order.status !== "DRAFT" && order.status !== "PENDING") {
+        throw new Error("Impossible de modifier cette commande car son statut est " + order.status)
       }
 
       // 3. Vérifier si l'article existe déjà dans la commande

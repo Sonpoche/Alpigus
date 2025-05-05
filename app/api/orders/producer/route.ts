@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { apiAuthMiddleware } from "@/lib/api-middleware"
 import { Session } from "next-auth"
-import { OrderStatus, UserRole, Prisma } from "@prisma/client"
+import { OrderStatus, UserRole } from "@prisma/client"
 
 export const GET = apiAuthMiddleware(async (req: NextRequest, session: Session) => {
   try {
@@ -28,17 +28,20 @@ export const GET = apiAuthMiddleware(async (req: NextRequest, session: Session) 
 
     const producerId = producer.id
 
-    // Construire la requête de base pour trouver les commandes 
-    // où au moins un produit appartient au producteur connecté
+    // Construire la requête de base
     const baseWhere: any = {}
 
-    // Ajouter le filtre de statut si spécifié
+    // Ajouter le filtre de statut s'il est spécifié
     if (statusParam) {
       baseWhere.status = statusParam
+    } else {
+      // Exclure les paniers temporaires (commandes au statut DRAFT)
+      baseWhere.status = {
+        not: 'DRAFT'
+      }
     }
 
     // Trouver les commandes qui contiennent des produits de ce producteur
-    // Note: Cette requête est plus complexe car nous devons joindre plusieurs tables
     const ordersWithProducerItems = await prisma.order.findMany({
       where: {
         OR: [
@@ -97,7 +100,7 @@ export const GET = apiAuthMiddleware(async (req: NextRequest, session: Session) 
             }
           }
         },
-        invoice: true,  // Ajout pour inclure les informations de facture
+        invoice: true,
       },
       orderBy: {
         createdAt: 'desc'
@@ -136,8 +139,7 @@ export const GET = apiAuthMiddleware(async (req: NextRequest, session: Session) 
         ...order,
         items: filteredItems,
         bookings: filteredBookings,
-        total: producerTotal, // Remplacer le total par le sous-total des produits du producteur
-        // Conserver les informations de facturation
+        total: producerTotal,
         invoice: order.invoice
       }
     })
@@ -147,4 +149,4 @@ export const GET = apiAuthMiddleware(async (req: NextRequest, session: Session) 
     console.error("Erreur lors de la récupération des commandes:", error)
     return new NextResponse("Erreur lors de la récupération des commandes", { status: 500 })
   }
-}, ["PRODUCER"]) // Restreindre l'accès aux producteurs
+}, ["PRODUCER"])

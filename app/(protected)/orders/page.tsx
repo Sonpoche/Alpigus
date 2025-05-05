@@ -15,7 +15,8 @@ import {
   ChevronRight,
   Search,
   FilterIcon,
-  AlertCircle
+  AlertCircle,
+  Edit2 // Ajout de l'icône Edit2 pour le statut DRAFT
 } from 'lucide-react'
 import Link from 'next/link'
 import { Badge } from '@/components/ui/badge'
@@ -140,16 +141,20 @@ export default function OrdersPage() {
   // Gestion du statut de commande avec le bon badge
   const getStatusBadge = (status: OrderStatus) => {
     const statusLabels: Record<OrderStatus, string> = {
+      DRAFT: 'Brouillon',
       PENDING: 'En attente',
       CONFIRMED: 'Confirmée',
       SHIPPED: 'Expédiée',
       DELIVERED: 'Livrée',
       CANCELLED: 'Annulée',
       INVOICE_PENDING: 'Facture en attente',
-      INVOICE_PAID: 'Facture payée'
+      INVOICE_PAID: 'Facture payée',
+      INVOICE_OVERDUE: 'Facture en retard'
     }
 
     switch (status) {
+      case 'DRAFT':
+        return <Badge variant="outline" className="bg-gray-100 text-gray-800 border-gray-200 dark:bg-gray-900/20 dark:text-gray-300 dark:border-gray-800">{statusLabels.DRAFT}</Badge>
       case 'PENDING':
         return <Badge variant="warning" className="bg-amber-100 text-amber-800 border-amber-200 dark:bg-amber-900/20 dark:text-amber-300 dark:border-amber-800">{statusLabels.PENDING}</Badge>
       case 'CONFIRMED':
@@ -164,6 +169,8 @@ export default function OrdersPage() {
         return <Badge variant="outline" className="bg-yellow-100 text-yellow-800 border-yellow-200 dark:bg-yellow-900/20 dark:text-yellow-300 dark:border-yellow-800">{statusLabels.INVOICE_PENDING}</Badge>
       case 'INVOICE_PAID':
         return <Badge variant="outline" className="bg-green-100 text-green-800 border-green-200 dark:bg-green-900/20 dark:text-green-300 dark:border-green-800">{statusLabels.INVOICE_PAID}</Badge>
+      case 'INVOICE_OVERDUE':
+        return <Badge variant="outline" className="bg-red-100 text-red-800 border-red-200 dark:bg-red-900/20 dark:text-red-300 dark:border-red-800">{statusLabels.INVOICE_OVERDUE}</Badge>
       default:
         return <Badge variant="outline">Inconnu</Badge>
     }
@@ -172,6 +179,8 @@ export default function OrdersPage() {
   // Gestion de l'icône de statut
   const getStatusIcon = (status: OrderStatus) => {
     switch (status) {
+      case 'DRAFT':
+        return <Edit2 className="h-5 w-5 text-gray-500" />
       case 'PENDING':
         return <Clock className="h-5 w-5 text-amber-500" />
       case 'CONFIRMED':
@@ -186,6 +195,8 @@ export default function OrdersPage() {
         return <Clock className="h-5 w-5 text-yellow-500" />
       case 'INVOICE_PAID':
         return <CheckCircle className="h-5 w-5 text-green-500" />
+      case 'INVOICE_OVERDUE':
+        return <AlertCircle className="h-5 w-5 text-red-500" />
       default:
         return <AlertCircle className="h-5 w-5 text-gray-500" />
     }
@@ -209,13 +220,15 @@ export default function OrdersPage() {
     
     // Recherche par statut
     const statusLabels: Record<OrderStatus, string> = {
+      DRAFT: 'brouillon',
       PENDING: 'en attente',
       CONFIRMED: 'confirmée',
       SHIPPED: 'expédiée',
       DELIVERED: 'livrée',
       CANCELLED: 'annulée',
       INVOICE_PENDING: 'facture en attente',
-      INVOICE_PAID: 'facture payée'
+      INVOICE_PAID: 'facture payée',
+      INVOICE_OVERDUE: 'facture en retard'
     }
     
     const statusLabel = statusLabels[order.status]
@@ -649,128 +662,140 @@ export default function OrdersPage() {
                                   src={booking.deliverySlot.product.image}
                                   alt={booking.deliverySlot.product.name}
                                   className="w-full h-full object-cover"
-                                />
-                              ) : (
-                                <div className="w-full h-full bg-blue-100 dark:bg-blue-900/20 flex items-center justify-center">
-                                  <Calendar className="h-8 w-8 text-blue-600 dark:text-blue-400" />
-                                </div>
-                              )}
-                            </div>
-                            <div className="ml-4 flex-1">
-                              <div className="flex items-center">
-                                <p className="font-medium">{booking.deliverySlot.product.name}</p>
-                                {isPast && (
-                                  <span className="ml-2 text-xs bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 px-2 py-0.5 rounded-full">
-                                    Passé
-                                  </span>
+                                  />
+                                ) : (
+                                  <div className="w-full h-full bg-blue-100 dark:bg-blue-900/20 flex items-center justify-center">
+                                    <Calendar className="h-8 w-8 text-blue-600 dark:text-blue-400" />
+                                  </div>
                                 )}
                               </div>
-                              <p className="text-sm text-muted-foreground">
-                              {isPast ? "Livraison était prévue le " : "Livraison prévue le "} 
-                                {new Date(booking.deliverySlot.date).toLocaleDateString('fr-FR', {
-                                  day: 'numeric',
-                                  month: 'long',
-                                  year: 'numeric'
-                                })}
-                              </p>
-                              <p className="text-sm mt-1">
-                                Quantité: {booking.quantity} {booking.deliverySlot.product.unit}
-                              </p>
-                              <p className="text-sm font-medium mt-1">
-                                {(booking.price ? booking.price * booking.quantity : 
-                                  booking.deliverySlot.product.price ? booking.deliverySlot.product.price * booking.quantity : 
-                                  0).toFixed(2)} CHF
-                              </p>
+                              <div className="ml-4 flex-1">
+                                <div className="flex items-center">
+                                  <p className="font-medium">{booking.deliverySlot.product.name}</p>
+                                  {isPast && (
+                                    <span className="ml-2 text-xs bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 px-2 py-0.5 rounded-full">
+                                      Passé
+                                    </span>
+                                  )}
+                                </div>
+                                <p className="text-sm text-muted-foreground">
+                                {isPast ? "Livraison était prévue le " : "Livraison prévue le "} 
+                                  {new Date(booking.deliverySlot.date).toLocaleDateString('fr-FR', {
+                                    day: 'numeric',
+                                    month: 'long',
+                                    year: 'numeric'
+                                  })}
+                                </p>
+                                <p className="text-sm mt-1">
+                                  Quantité: {booking.quantity} {booking.deliverySlot.product.unit}
+                                </p>
+                                <p className="text-sm font-medium mt-1">
+                                  {(booking.price ? booking.price * booking.quantity : 
+                                    booking.deliverySlot.product.price ? booking.deliverySlot.product.price * booking.quantity : 
+                                    0).toFixed(2)} CHF
+                                </p>
+                              </div>
                             </div>
-                          </div>
-                        );
-                      })}
+                          );
+                        })}
+                      </div>
                     </div>
-                  </div>
-                )}
-                
-                {/* Résumé des coûts */}
-                <div className="border-t border-foreground/10 pt-4">
-                  <div className="flex justify-between mb-2">
-                    <p>Sous-total</p>
-                    <p>{selectedOrder.total.toFixed(2)} CHF</p>
-                  </div>
-                  {getDeliveryInfo(selectedOrder)?.type === 'delivery' && (
+                  )}
+                  
+                  {/* Résumé des coûts */}
+                  <div className="border-t border-foreground/10 pt-4">
                     <div className="flex justify-between mb-2">
-                      <p>Frais de livraison</p>
-                      <p>15.00 CHF</p>
+                      <p>Sous-total</p>
+                      <p>{selectedOrder.total.toFixed(2)} CHF</p>
                     </div>
-                  )}
-                  <div className="flex justify-between font-semibold text-lg pt-2 border-t border-foreground/10">
-                    <p>Total</p>
-                    <p>{((getDeliveryInfo(selectedOrder)?.type === 'delivery' ? 15 : 0) + selectedOrder.total).toFixed(2)} CHF</p>
+                    {getDeliveryInfo(selectedOrder)?.type === 'delivery' && (
+                      <div className="flex justify-between mb-2">
+                        <p>Frais de livraison</p>
+                        <p>15.00 CHF</p>
+                      </div>
+                    )}
+                    <div className="flex justify-between font-semibold text-lg pt-2 border-t border-foreground/10">
+                      <p>Total</p>
+                      <p>{((getDeliveryInfo(selectedOrder)?.type === 'delivery' ? 15 : 0) + selectedOrder.total).toFixed(2)} CHF</p>
+                    </div>
                   </div>
-                </div>
-                
-                {/* Actions */}
-                <div className="flex justify-between pt-4">
-                  <button
-                    onClick={() => setIsDetailOpen(false)}
-                    className="px-4 py-2 border border-foreground/10 rounded-md hover:bg-foreground/5 transition-colors"
-                  >
-                    Fermer
-                  </button>
                   
-                  {selectedOrder.status === 'DELIVERED' && (
+                  {/* Actions */}
+                  <div className="flex justify-between pt-4">
                     <button
-                      className="bg-custom-accent text-white px-4 py-2 rounded-md hover:opacity-90 transition-opacity"
+                      onClick={() => setIsDetailOpen(false)}
+                      className="px-4 py-2 border border-foreground/10 rounded-md hover:bg-foreground/5 transition-colors"
                     >
-                      Télécharger la facture
+                      Fermer
                     </button>
-                  )}
-                  
-                  {selectedOrder.status === 'PENDING' && (
-                    <button
-                      onClick={async () => {
-                        if (window.confirm("Êtes-vous sûr de vouloir annuler cette commande ? Cette action est irréversible.")) {
-                          try {
-                            const response = await fetch(`/api/orders/${selectedOrder.id}`, {
-                              method: 'PATCH',
-                              headers: { 'Content-Type': 'application/json' },
-                              body: JSON.stringify({ status: 'CANCELLED' })
-                            });
-                            
-                            if (!response.ok) {
-                              throw new Error('Erreur lors de l\'annulation de la commande');
+                    
+                    {selectedOrder.status === 'DELIVERED' && (
+                      <button
+                        className="bg-custom-accent text-white px-4 py-2 rounded-md hover:opacity-90 transition-opacity"
+                      >
+                        Télécharger la facture
+                      </button>
+                    )}
+                    
+                    {(selectedOrder.status === 'PENDING' || selectedOrder.status === 'DRAFT') && (
+                      <button
+                        onClick={async () => {
+                          if (window.confirm("Êtes-vous sûr de vouloir annuler cette commande ? Cette action est irréversible.")) {
+                            try {
+                              const response = await fetch(`/api/orders/${selectedOrder.id}`, {
+                                method: 'PATCH',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ status: 'CANCELLED' })
+                              });
+                              
+                              if (!response.ok) {
+                                throw new Error('Erreur lors de l\'annulation de la commande');
+                              }
+                              
+                              toast({
+                                title: "Commande annulée",
+                                description: "Votre commande a été annulée avec succès"
+                              });
+                              
+                              setIsDetailOpen(false);
+                              
+                              // Rafraîchir la liste des commandes
+                              setTimeout(() => {
+                                window.location.reload();
+                              }, 500);
+                            } catch (error) {
+                              console.error('Erreur:', error);
+                              toast({
+                                title: "Erreur",
+                                description: "Impossible d'annuler la commande",
+                                variant: "destructive"
+                              });
                             }
-                            
-                            toast({
-                              title: "Commande annulée",
-                              description: "Votre commande a été annulée avec succès"
-                            });
-                            
-                            setIsDetailOpen(false);
-                            
-                            // Rafraîchir la liste des commandes
-                            setTimeout(() => {
-                              window.location.reload();
-                            }, 500);
-                          } catch (error) {
-                            console.error('Erreur:', error);
-                            toast({
-                              title: "Erreur",
-                              description: "Impossible d'annuler la commande",
-                              variant: "destructive"
-                            });
                           }
-                        }
-                      }}
-                      className="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-md transition-colors"
-                    >
-                      Annuler la commande
-                    </button>
-                  )}
+                        }}
+                        className="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-md transition-colors"
+                      >
+                        Annuler la commande
+                      </button>
+                    )}
+                    
+                    {/* Bouton spécifique pour les paniers (DRAFT) */}
+                    {selectedOrder.status === 'DRAFT' && (
+                      <button
+                        onClick={() => {
+                          router.push('/checkout');
+                        }}
+                        className="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-md transition-colors ml-2"
+                      >
+                        Passer au paiement
+                      </button>
+                    )}
+                  </div>
                 </div>
               </div>
             </div>
           </div>
-        </div>
-      )}
-    </div>
-  )
-}
+        )}
+      </div>
+    )
+  }

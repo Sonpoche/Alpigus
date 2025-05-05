@@ -64,12 +64,13 @@ export const POST = apiAuthMiddleware(
 
       // Effectuer le processus de paiement/confirmation
       const result = await prisma.$transaction(async (tx) => {
-        // 1. Mettre à jour le statut de la commande
+        // 1. Mettre à jour le statut de la commande de DRAFT à PENDING ou CONFIRMED selon méthode de paiement
         const updatedOrder = await tx.order.update({
           where: { id: orderId },
           data: { 
-            status: OrderStatus.CONFIRMED,
-            total: totalWithDelivery, // Mettre à jour le total avec les frais de livraison
+            // Si paiement par facture, passer directement à CONFIRMED, sinon à PENDING
+            status: paymentMethod === 'invoice' ? OrderStatus.CONFIRMED : OrderStatus.PENDING,
+            total: totalWithDelivery,
             // Ajouter les informations additionnelles avec le nouveau format
             metadata: JSON.stringify({
               deliveryType,
@@ -127,7 +128,7 @@ export const POST = apiAuthMiddleware(
         const completeOrderData = {
           ...order,
           user,
-          status: OrderStatus.CONFIRMED,
+          status: result.status,
           total: totalWithDelivery
         };
 

@@ -183,6 +183,7 @@ enum ProductType {
 }
 
 enum OrderStatus {
+  DRAFT     // Nouveau statut pour les paniers non confirmés
   PENDING
   CONFIRMED
   SHIPPED

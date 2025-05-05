@@ -43,6 +43,14 @@ export const PATCH = apiAuthMiddleware(async (
       return new NextResponse("Non autorisé", { status: 403 })
     }
     
+    // Vérifier que la commande est bien un panier (DRAFT) ou en attente (PENDING)
+    if (orderItem.order.status !== "DRAFT" && orderItem.order.status !== "PENDING") {
+      return new NextResponse(
+        "Impossible de modifier cette commande car son statut est " + orderItem.order.status, 
+        { status: 400 }
+      )
+    }
+    
     // Calculer la différence de quantité pour la mise à jour du stock
     const quantityDifference = quantity - orderItem.quantity
     
@@ -134,6 +142,14 @@ export const DELETE = apiAuthMiddleware(async (
     // Vérifier que l'article appartient à l'utilisateur
     if (orderItem.order.userId !== session.user.id) {
       return new NextResponse("Non autorisé", { status: 403 })
+    }
+    
+    // Vérifier que la commande est bien un panier (DRAFT) ou en attente (PENDING)
+    if (orderItem.order.status !== "DRAFT" && orderItem.order.status !== "PENDING") {
+      return new NextResponse(
+        "Impossible de modifier cette commande car son statut est " + orderItem.order.status, 
+        { status: 400 }
+      )
     }
     
     // Effectuer les mises à jour dans une transaction
