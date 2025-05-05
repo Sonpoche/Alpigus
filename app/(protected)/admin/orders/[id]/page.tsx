@@ -499,14 +499,26 @@ export default function AdminOrderDetailPage() {
               </div>
               
               {order.invoice && (
-                <div className="mt-4">
-                  <Link 
-                    href={`/admin/invoices/${order.invoice.id}`}
-                    className="w-full flex items-center justify-center py-2 px-3 bg-foreground/5 hover:bg-foreground/10 transition-colors rounded-md text-sm font-medium"
-                  >
-                    <FileText className="h-4 w-4 mr-2" />
-                    Voir la facture
-                  </Link>
+                <div className="mt-4 bg-foreground/5 p-3 rounded-md">
+                  <h4 className="text-sm font-medium mb-2">Détails de la facture</h4>
+                  <div className="text-sm space-y-1">
+                    <div className="flex justify-between">
+                      <span>Numéro:</span>
+                      <span className="font-medium">{order.invoice.id.substring(0, 8)}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>Date:</span>
+                      <span>{format(new Date(order.invoice.createdAt), 'dd/MM/yyyy', { locale: fr })}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>Montant:</span>
+                      <span className="font-medium">{order.invoice.amount.toFixed(2)} CHF</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>Échéance:</span>
+                      <span>{format(new Date(order.invoice.dueDate), 'dd/MM/yyyy', { locale: fr })}</span>
+                    </div>
+                  </div>
                 </div>
               )}
             </div>
