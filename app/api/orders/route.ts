@@ -58,9 +58,10 @@ export const GET = apiAuthMiddleware(async (req: NextRequest, session: Session) 
    if (statusParam) {
      baseWhere.status = statusParam
    } else {
-     // Exclure les paniers temporaires (status DRAFT) par défaut
+     // Par défaut, n'inclure que les commandes réellement validées
+     // Exclure à la fois DRAFT (paniers) et PENDING (en attente de paiement)
      baseWhere.status = {
-       not: 'DRAFT'
+       notIn: [OrderStatus.DRAFT, OrderStatus.PENDING]
      }
    }
 
@@ -89,7 +90,8 @@ export const GET = apiAuthMiddleware(async (req: NextRequest, session: Session) 
                }
              }
            }
-         }
+         },
+         invoice: true
        },
        orderBy: {
          createdAt: 'desc'
@@ -133,7 +135,7 @@ export const POST = apiAuthMiddleware(async (req: NextRequest, session: Session)
       const cart = await prisma.order.findFirst({
         where: {
           userId: session.user.id,
-          status: "DRAFT"
+          status: OrderStatus.DRAFT
         },
         include: {
           items: {
@@ -175,7 +177,7 @@ export const POST = apiAuthMiddleware(async (req: NextRequest, session: Session)
       data: {
         userId: session.user.id,
         total: 0,
-        status: "DRAFT", // Utiliser DRAFT pour les paniers
+        status: OrderStatus.DRAFT,  // Toujours utiliser DRAFT pour les paniers
         // Si des items sont fournis, les ajouter
         ...(itemsToCreate.length > 0 && {
           items: {

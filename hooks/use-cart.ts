@@ -80,7 +80,7 @@ export function useCart() {
         const response = await fetch('/api/orders', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ items: [] })
+          body: JSON.stringify({ items: [] }) // Créer un panier vide
         })
         
         if (!response.ok) {
@@ -107,7 +107,8 @@ export function useCart() {
       })
       
       if (!response.ok) {
-        throw new Error('Erreur lors de l\'ajout au panier')
+        const errorText = await response.text();
+        throw new Error(errorText || 'Erreur lors de l\'ajout au panier')
       }
       
       // Mettre à jour localement le panier pour une réponse immédiate
@@ -138,9 +139,9 @@ export function useCart() {
         
         // Mettre à jour le résumé du panier
         setCartSummary({
-          itemCount: cartSummary.itemCount + 1,
+          itemCount: updatedItems.length,
           items: updatedItems,
-          totalPrice: cartSummary.totalPrice + (product.price * quantity)
+          totalPrice: updatedItems.reduce((total, item) => total + (item.price * item.quantity), 0)
         })
       } else {
         // Si c'est le premier produit, initialiser le résumé
@@ -193,10 +194,11 @@ export function useCart() {
       if (cartSummary) {
         const itemToRemove = cartSummary.items.find(item => item.id === itemId);
         if (itemToRemove) {
+          const updatedItems = cartSummary.items.filter(item => item.id !== itemId);
           setCartSummary({
-            itemCount: Math.max(0, cartSummary.itemCount - 1),
-            items: cartSummary.items.filter(item => item.id !== itemId),
-            totalPrice: Math.max(0, cartSummary.totalPrice - (itemToRemove.price * itemToRemove.quantity))
+            itemCount: updatedItems.length,
+            items: updatedItems,
+            totalPrice: updatedItems.reduce((total, item) => total + (item.price * item.quantity), 0)
           });
         }
       }

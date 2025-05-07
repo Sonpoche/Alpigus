@@ -86,11 +86,15 @@ export const PATCH = apiAuthMiddleware(async (
 
       // Vérifier les transitions d'état valides pour un producteur
       const validTransitions: Record<OrderStatus, OrderStatus[]> = {
-        PENDING: ['CONFIRMED', 'CANCELLED'],
-        CONFIRMED: ['SHIPPED', 'CANCELLED'],
-        SHIPPED: ['DELIVERED', 'CANCELLED'],
-        DELIVERED: [],
-        CANCELLED: []
+        [OrderStatus.PENDING]: [OrderStatus.CONFIRMED, OrderStatus.CANCELLED],
+        [OrderStatus.CONFIRMED]: [OrderStatus.SHIPPED, OrderStatus.CANCELLED],
+        [OrderStatus.SHIPPED]: [OrderStatus.DELIVERED, OrderStatus.CANCELLED],
+        [OrderStatus.DELIVERED]: [],
+        [OrderStatus.CANCELLED]: [],
+        [OrderStatus.DRAFT]: [],
+        [OrderStatus.INVOICE_PENDING]: [],
+        [OrderStatus.INVOICE_PAID]: [],
+        [OrderStatus.INVOICE_OVERDUE]: []
       }
 
       if (!validTransitions[order.status].includes(status as OrderStatus)) {

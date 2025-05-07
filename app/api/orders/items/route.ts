@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { apiAuthMiddleware } from "@/lib/api-middleware"
 import { Session } from "next-auth"
+import { OrderStatus } from "@prisma/client"  // Importer OrderStatus
 
 export const POST = apiAuthMiddleware(async (
   req: NextRequest,
@@ -35,7 +36,20 @@ export const POST = apiAuthMiddleware(async (
       if (!product.available) {
         throw new Error("Produit non disponible")
       }
-      if (!product.stock || quantity > product.stock.quantity) {
+      
+      // Vérifier le stock
+      if (!product.stock) {
+        // Créer un stock s'il n'existe pas
+        await tx.stock.create({
+          data: {
+            productId: product.id,
+            quantity: 0
+          }
+        });
+        throw new Error("Stock insuffisant")
+      }
+      
+      if (product.stock.quantity < quantity) {
         throw new Error("Stock insuffisant")
       }
 
@@ -44,13 +58,17 @@ export const POST = apiAuthMiddleware(async (
         where: { id: orderId }
       })
 
-      if (!order || order.userId !== session.user.id) {
-        throw new Error("Commande non trouvée ou non autorisée")
+      if (!order) {
+        throw new Error("Commande non trouvée")
+      }
+      
+      if (order.userId !== session.user.id) {
+        throw new Error("Non autorisé")
       }
 
       // Vérifier que la commande est bien un panier (DRAFT) ou en attente (PENDING)
-      if (order.status !== "DRAFT" && order.status !== "PENDING") {
-        throw new Error("Impossible de modifier cette commande car son statut est " + order.status)
+      if (order.status !== OrderStatus.DRAFT && order.status !== OrderStatus.PENDING) {
+        throw new Error(`Impossible de modifier cette commande car son statut est ${order.status}`)
       }
 
       // 3. Vérifier si l'article existe déjà dans la commande

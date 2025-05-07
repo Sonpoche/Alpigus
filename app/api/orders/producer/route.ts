@@ -35,9 +35,9 @@ export const GET = apiAuthMiddleware(async (req: NextRequest, session: Session) 
     if (statusParam) {
       baseWhere.status = statusParam
     } else {
-      // Exclure les paniers temporaires (commandes au statut DRAFT)
+      // Par défaut, montrer seulement les commandes validées (exclure DRAFT et PENDING)
       baseWhere.status = {
-        not: 'DRAFT'
+        notIn: [OrderStatus.DRAFT, OrderStatus.PENDING]
       }
     }
 

@@ -4,7 +4,7 @@ import { prisma } from "@/lib/prisma"
 import { apiAuthMiddleware } from "@/lib/api-middleware"
 import { Session } from "next-auth"
 import { NotificationService } from '@/lib/notification-service'
-import { OrderStatus } from '@/types/order'
+import { OrderStatus } from '@prisma/client'
 
 export const POST = apiAuthMiddleware(
   async (

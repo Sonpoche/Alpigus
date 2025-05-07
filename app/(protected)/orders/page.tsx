@@ -16,11 +16,11 @@ import {
   Search,
   FilterIcon,
   AlertCircle,
-  Edit2 // Ajout de l'icône Edit2 pour le statut DRAFT
+  Edit2
 } from 'lucide-react'
 import Link from 'next/link'
 import { Badge } from '@/components/ui/badge'
-import { motion } from 'framer-motion'
+import { motion, AnimatePresence } from 'framer-motion'
 import { OrderStatus } from '@prisma/client'
 
 interface OrderItem {
@@ -68,6 +68,13 @@ interface Order {
   }
 }
 
+interface DeliveryInfo {
+  type?: string;
+  address?: string;
+  notes?: string;
+  paymentMethod?: string;
+}
+
 export default function OrdersPage() {
   const router = useRouter()
   const { toast } = useToast()
@@ -98,8 +105,11 @@ export default function OrdersPage() {
         
         const data = await response.json()
         
+        // Filtrer explicitement les commandes pour exclure les DRAFT
+        const filteredOrders = data.filter((order: Order) => order.status !== OrderStatus.DRAFT)
+        
         // Trier les commandes par date (plus récentes en premier)
-        const sortedOrders = data.sort((a: Order, b: Order) => {
+        const sortedOrders = filteredOrders.sort((a: Order, b: Order) => {
           return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
         })
         
@@ -141,36 +151,36 @@ export default function OrdersPage() {
   // Gestion du statut de commande avec le bon badge
   const getStatusBadge = (status: OrderStatus) => {
     const statusLabels: Record<OrderStatus, string> = {
-      DRAFT: 'Brouillon',
-      PENDING: 'En attente',
-      CONFIRMED: 'Confirmée',
-      SHIPPED: 'Expédiée',
-      DELIVERED: 'Livrée',
-      CANCELLED: 'Annulée',
-      INVOICE_PENDING: 'Facture en attente',
-      INVOICE_PAID: 'Facture payée',
-      INVOICE_OVERDUE: 'Facture en retard'
+      [OrderStatus.DRAFT]: 'Brouillon',
+      [OrderStatus.PENDING]: 'En attente',
+      [OrderStatus.CONFIRMED]: 'Confirmée',
+      [OrderStatus.SHIPPED]: 'Expédiée',
+      [OrderStatus.DELIVERED]: 'Livrée',
+      [OrderStatus.CANCELLED]: 'Annulée',
+      [OrderStatus.INVOICE_PENDING]: 'Facture en attente',
+      [OrderStatus.INVOICE_PAID]: 'Facture payée',
+      [OrderStatus.INVOICE_OVERDUE]: 'Facture en retard'
     }
 
     switch (status) {
-      case 'DRAFT':
-        return <Badge variant="outline" className="bg-gray-100 text-gray-800 border-gray-200 dark:bg-gray-900/20 dark:text-gray-300 dark:border-gray-800">{statusLabels.DRAFT}</Badge>
-      case 'PENDING':
-        return <Badge variant="warning" className="bg-amber-100 text-amber-800 border-amber-200 dark:bg-amber-900/20 dark:text-amber-300 dark:border-amber-800">{statusLabels.PENDING}</Badge>
-      case 'CONFIRMED':
-        return <Badge variant="success" className="bg-blue-100 text-blue-800 border-blue-200 dark:bg-blue-900/20 dark:text-blue-300 dark:border-blue-800">{statusLabels.CONFIRMED}</Badge>
-      case 'SHIPPED':
-        return <Badge variant="info" className="bg-purple-100 text-purple-800 border-purple-200 dark:bg-purple-900/20 dark:text-purple-300 dark:border-purple-800">{statusLabels.SHIPPED}</Badge>
-      case 'DELIVERED':
-        return <Badge variant="success" className="bg-green-100 text-green-800 border-green-200 dark:bg-green-900/20 dark:text-green-300 dark:border-green-800">{statusLabels.DELIVERED}</Badge>
-      case 'CANCELLED':
-        return <Badge variant="destructive" className="bg-red-100 text-red-800 border-red-200 dark:bg-red-900/20 dark:text-red-300 dark:border-red-800">{statusLabels.CANCELLED}</Badge>
-      case 'INVOICE_PENDING':
-        return <Badge variant="outline" className="bg-yellow-100 text-yellow-800 border-yellow-200 dark:bg-yellow-900/20 dark:text-yellow-300 dark:border-yellow-800">{statusLabels.INVOICE_PENDING}</Badge>
-      case 'INVOICE_PAID':
-        return <Badge variant="outline" className="bg-green-100 text-green-800 border-green-200 dark:bg-green-900/20 dark:text-green-300 dark:border-green-800">{statusLabels.INVOICE_PAID}</Badge>
-      case 'INVOICE_OVERDUE':
-        return <Badge variant="outline" className="bg-red-100 text-red-800 border-red-200 dark:bg-red-900/20 dark:text-red-300 dark:border-red-800">{statusLabels.INVOICE_OVERDUE}</Badge>
+      case OrderStatus.DRAFT:
+        return <Badge variant="outline" className="bg-gray-100 text-gray-800 border-gray-200 dark:bg-gray-900/20 dark:text-gray-300 dark:border-gray-800">{statusLabels[OrderStatus.DRAFT]}</Badge>
+      case OrderStatus.PENDING:
+        return <Badge variant="warning" className="bg-amber-100 text-amber-800 border-amber-200 dark:bg-amber-900/20 dark:text-amber-300 dark:border-amber-800">{statusLabels[OrderStatus.PENDING]}</Badge>
+      case OrderStatus.CONFIRMED:
+        return <Badge variant="success" className="bg-blue-100 text-blue-800 border-blue-200 dark:bg-blue-900/20 dark:text-blue-300 dark:border-blue-800">{statusLabels[OrderStatus.CONFIRMED]}</Badge>
+      case OrderStatus.SHIPPED:
+        return <Badge variant="info" className="bg-purple-100 text-purple-800 border-purple-200 dark:bg-purple-900/20 dark:text-purple-300 dark:border-purple-800">{statusLabels[OrderStatus.SHIPPED]}</Badge>
+      case OrderStatus.DELIVERED:
+        return <Badge variant="success" className="bg-green-100 text-green-800 border-green-200 dark:bg-green-900/20 dark:text-green-300 dark:border-green-800">{statusLabels[OrderStatus.DELIVERED]}</Badge>
+      case OrderStatus.CANCELLED:
+        return <Badge variant="destructive" className="bg-red-100 text-red-800 border-red-200 dark:bg-red-900/20 dark:text-red-300 dark:border-red-800">{statusLabels[OrderStatus.CANCELLED]}</Badge>
+      case OrderStatus.INVOICE_PENDING:
+        return <Badge variant="outline" className="bg-yellow-100 text-yellow-800 border-yellow-200 dark:bg-yellow-900/20 dark:text-yellow-300 dark:border-yellow-800">{statusLabels[OrderStatus.INVOICE_PENDING]}</Badge>
+      case OrderStatus.INVOICE_PAID:
+        return <Badge variant="outline" className="bg-green-100 text-green-800 border-green-200 dark:bg-green-900/20 dark:text-green-300 dark:border-green-800">{statusLabels[OrderStatus.INVOICE_PAID]}</Badge>
+      case OrderStatus.INVOICE_OVERDUE:
+        return <Badge variant="outline" className="bg-red-100 text-red-800 border-red-200 dark:bg-red-900/20 dark:text-red-300 dark:border-red-800">{statusLabels[OrderStatus.INVOICE_OVERDUE]}</Badge>
       default:
         return <Badge variant="outline">Inconnu</Badge>
     }
@@ -179,23 +189,23 @@ export default function OrdersPage() {
   // Gestion de l'icône de statut
   const getStatusIcon = (status: OrderStatus) => {
     switch (status) {
-      case 'DRAFT':
+      case OrderStatus.DRAFT:
         return <Edit2 className="h-5 w-5 text-gray-500" />
-      case 'PENDING':
+      case OrderStatus.PENDING:
         return <Clock className="h-5 w-5 text-amber-500" />
-      case 'CONFIRMED':
+      case OrderStatus.CONFIRMED:
         return <CheckCircle className="h-5 w-5 text-blue-500" />
-      case 'SHIPPED':
+      case OrderStatus.SHIPPED:
         return <Truck className="h-5 w-5 text-purple-500" />
-      case 'DELIVERED':
+      case OrderStatus.DELIVERED:
         return <Package className="h-5 w-5 text-green-500" />
-      case 'CANCELLED':
+      case OrderStatus.CANCELLED:
         return <XCircle className="h-5 w-5 text-red-500" />
-      case 'INVOICE_PENDING':
+      case OrderStatus.INVOICE_PENDING:
         return <Clock className="h-5 w-5 text-yellow-500" />
-      case 'INVOICE_PAID':
+      case OrderStatus.INVOICE_PAID:
         return <CheckCircle className="h-5 w-5 text-green-500" />
-      case 'INVOICE_OVERDUE':
+      case OrderStatus.INVOICE_OVERDUE:
         return <AlertCircle className="h-5 w-5 text-red-500" />
       default:
         return <AlertCircle className="h-5 w-5 text-gray-500" />
@@ -204,6 +214,9 @@ export default function OrdersPage() {
 
   // Filtrer les commandes par recherche
   const filteredOrders = orders.filter(order => {
+    // D'abord, s'assurer qu'on n'inclut JAMAIS les commandes DRAFT (paniers)
+    if (order.status === OrderStatus.DRAFT) return false;
+    
     if (!searchTerm) return true
     
     const searchLower = searchTerm.toLowerCase()
@@ -220,15 +233,15 @@ export default function OrdersPage() {
     
     // Recherche par statut
     const statusLabels: Record<OrderStatus, string> = {
-      DRAFT: 'brouillon',
-      PENDING: 'en attente',
-      CONFIRMED: 'confirmée',
-      SHIPPED: 'expédiée',
-      DELIVERED: 'livrée',
-      CANCELLED: 'annulée',
-      INVOICE_PENDING: 'facture en attente',
-      INVOICE_PAID: 'facture payée',
-      INVOICE_OVERDUE: 'facture en retard'
+      [OrderStatus.DRAFT]: 'brouillon',
+      [OrderStatus.PENDING]: 'en attente',
+      [OrderStatus.CONFIRMED]: 'confirmée',
+      [OrderStatus.SHIPPED]: 'expédiée',
+      [OrderStatus.DELIVERED]: 'livrée',
+      [OrderStatus.CANCELLED]: 'annulée',
+      [OrderStatus.INVOICE_PENDING]: 'facture en attente',
+      [OrderStatus.INVOICE_PAID]: 'facture payée',
+      [OrderStatus.INVOICE_OVERDUE]: 'facture en retard'
     }
     
     const statusLabel = statusLabels[order.status]
@@ -238,7 +251,7 @@ export default function OrdersPage() {
   })
 
   // Extraire les informations de livraison des métadonnées
-  const getDeliveryInfo = (order: Order) => {
+  const getDeliveryInfo = (order: Order): DeliveryInfo | null => {
     if (!order.metadata) return null;
     
     try {
@@ -300,9 +313,9 @@ export default function OrdersPage() {
           </button>
           
           <button
-            onClick={() => setActiveStatus('PENDING')}
+            onClick={() => setActiveStatus(OrderStatus.PENDING)}
             className={`px-3 py-1.5 rounded-md text-sm font-medium whitespace-nowrap ${
-              activeStatus === 'PENDING'
+              activeStatus === OrderStatus.PENDING
                 ? 'bg-amber-100 text-amber-800 dark:bg-amber-900/20 dark:text-amber-300'
                 : 'bg-foreground/5 hover:bg-foreground/10 text-foreground transition-colors'
             }`}
@@ -312,9 +325,9 @@ export default function OrdersPage() {
           </button>
           
           <button
-            onClick={() => setActiveStatus('CONFIRMED')}
+            onClick={() => setActiveStatus(OrderStatus.CONFIRMED)}
             className={`px-3 py-1.5 rounded-md text-sm font-medium whitespace-nowrap ${
-              activeStatus === 'CONFIRMED'
+              activeStatus === OrderStatus.CONFIRMED
                 ? 'bg-blue-100 text-blue-800 dark:bg-blue-900/20 dark:text-blue-300'
                 : 'bg-foreground/5 hover:bg-foreground/10 text-foreground transition-colors'
             }`}
@@ -324,9 +337,9 @@ export default function OrdersPage() {
           </button>
           
           <button
-            onClick={() => setActiveStatus('SHIPPED')}
+            onClick={() => setActiveStatus(OrderStatus.SHIPPED)}
             className={`px-3 py-1.5 rounded-md text-sm font-medium whitespace-nowrap ${
-              activeStatus === 'SHIPPED'
+              activeStatus === OrderStatus.SHIPPED
                 ? 'bg-purple-100 text-purple-800 dark:bg-purple-900/20 dark:text-purple-300'
                 : 'bg-foreground/5 hover:bg-foreground/10 text-foreground transition-colors'
             }`}
@@ -336,9 +349,9 @@ export default function OrdersPage() {
           </button>
           
           <button
-            onClick={() => setActiveStatus('DELIVERED')}
+            onClick={() => setActiveStatus(OrderStatus.DELIVERED)}
             className={`px-3 py-1.5 rounded-md text-sm font-medium whitespace-nowrap ${
-              activeStatus === 'DELIVERED'
+              activeStatus === OrderStatus.DELIVERED
                 ? 'bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-300'
                 : 'bg-foreground/5 hover:bg-foreground/10 text-foreground transition-colors'
             }`}
@@ -350,7 +363,7 @@ export default function OrdersPage() {
       </div>
       
       {/* Liste des commandes */}
-      {orders.length === 0 ? (
+      {filteredOrders.length === 0 ? (
         <div className="bg-background border border-foreground/10 rounded-lg p-12 text-center">
           <ShoppingBag className="h-20 w-20 mx-auto text-muted-foreground mb-6 opacity-20" />
           <h2 className="text-2xl font-medium mb-4">Vous n'avez pas encore de commande</h2>
@@ -364,7 +377,7 @@ export default function OrdersPage() {
             Explorer le catalogue
           </Link>
         </div>
-      ) : filteredOrders.length > 0 ? (
+      ) : (
         <div className="grid grid-cols-1 gap-6">
           {filteredOrders.map((order) => (
             <motion.div
@@ -509,29 +522,18 @@ export default function OrdersPage() {
             </motion.div>
           ))}
         </div>
-      ) : (
-        <div className="bg-background border border-foreground/10 rounded-lg p-8 text-center">
-          <ShoppingBag className="h-16 w-16 mx-auto text-muted-foreground mb-4" />
-          <h2 className="text-xl font-medium mb-2">Aucune commande trouvée</h2>
-          <p className="text-muted-foreground mb-6">
-            {searchTerm || activeStatus
-              ? "Aucune commande ne correspond à vos critères de recherche."
-              : "Vous n'avez pas encore passé de commande."}
-          </p>
-          <Link 
-            href="/products" 
-            className="bg-custom-accent text-white px-4 py-2 rounded-md hover:opacity-90 transition-opacity"
-          >
-            Découvrir nos produits
-          </Link>
-        </div>
       )}
       
-      {/* Modal de détails de commande */}
-      {selectedOrder && (
-        <div className={`fixed inset-0 bg-black/50 z-50 transition-opacity ${isDetailOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
-          <div className="flex items-center justify-center min-h-screen p-4">
-            <div className="bg-background rounded-lg shadow-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+      {/* Modal détaillée de la commande */}
+      <AnimatePresence>
+        {selectedOrder && isDetailOpen && (
+          <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="bg-background rounded-lg shadow-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto"
+            >
               <div className="p-6 border-b border-foreground/10 flex justify-between items-center sticky top-0 bg-background z-10">
                 <div className="flex items-center gap-2">
                   {getStatusIcon(selectedOrder.status)}
@@ -659,143 +661,143 @@ export default function OrdersPage() {
                             <div className="w-16 h-16 rounded-md overflow-hidden flex-shrink-0">
                               {booking.deliverySlot.product.image ? (
                                 <img
-                                  src={booking.deliverySlot.product.image}
-                                  alt={booking.deliverySlot.product.name}
-                                  className="w-full h-full object-cover"
-                                  />
-                                ) : (
-                                  <div className="w-full h-full bg-blue-100 dark:bg-blue-900/20 flex items-center justify-center">
-                                    <Calendar className="h-8 w-8 text-blue-600 dark:text-blue-400" />
-                                  </div>
-                                )}
+                                src={booking.deliverySlot.product.image}
+                                alt={booking.deliverySlot.product.name}
+                                className="w-full h-full object-cover"
+                              />
+                            ) : (
+                              <div className="w-full h-full bg-blue-100 dark:bg-blue-900/20 flex items-center justify-center">
+                                <Calendar className="h-8 w-8 text-blue-600 dark:text-blue-400" />
                               </div>
-                              <div className="ml-4 flex-1">
-                                <div className="flex items-center">
-                                  <p className="font-medium">{booking.deliverySlot.product.name}</p>
-                                  {isPast && (
-                                    <span className="ml-2 text-xs bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 px-2 py-0.5 rounded-full">
-                                      Passé
-                                    </span>
-                                  )}
-                                </div>
-                                <p className="text-sm text-muted-foreground">
-                                {isPast ? "Livraison était prévue le " : "Livraison prévue le "} 
-                                  {new Date(booking.deliverySlot.date).toLocaleDateString('fr-FR', {
-                                    day: 'numeric',
-                                    month: 'long',
-                                    year: 'numeric'
-                                  })}
-                                </p>
-                                <p className="text-sm mt-1">
-                                  Quantité: {booking.quantity} {booking.deliverySlot.product.unit}
-                                </p>
-                                <p className="text-sm font-medium mt-1">
-                                  {(booking.price ? booking.price * booking.quantity : 
-                                    booking.deliverySlot.product.price ? booking.deliverySlot.product.price * booking.quantity : 
-                                    0).toFixed(2)} CHF
-                                </p>
-                              </div>
+                            )}
+                          </div>
+                          <div className="ml-4 flex-1">
+                            <div className="flex items-center">
+                              <p className="font-medium">{booking.deliverySlot.product.name}</p>
+                              {isPast && (
+                                <span className="ml-2 text-xs bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 px-2 py-0.5 rounded-full">
+                                  Passé
+                                </span>
+                              )}
                             </div>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  )}
-                  
-                  {/* Résumé des coûts */}
-                  <div className="border-t border-foreground/10 pt-4">
-                    <div className="flex justify-between mb-2">
-                      <p>Sous-total</p>
-                      <p>{selectedOrder.total.toFixed(2)} CHF</p>
-                    </div>
-                    {getDeliveryInfo(selectedOrder)?.type === 'delivery' && (
-                      <div className="flex justify-between mb-2">
-                        <p>Frais de livraison</p>
-                        <p>15.00 CHF</p>
-                      </div>
-                    )}
-                    <div className="flex justify-between font-semibold text-lg pt-2 border-t border-foreground/10">
-                      <p>Total</p>
-                      <p>{((getDeliveryInfo(selectedOrder)?.type === 'delivery' ? 15 : 0) + selectedOrder.total).toFixed(2)} CHF</p>
-                    </div>
-                  </div>
-                  
-                  {/* Actions */}
-                  <div className="flex justify-between pt-4">
-                    <button
-                      onClick={() => setIsDetailOpen(false)}
-                      className="px-4 py-2 border border-foreground/10 rounded-md hover:bg-foreground/5 transition-colors"
-                    >
-                      Fermer
-                    </button>
-                    
-                    {selectedOrder.status === 'DELIVERED' && (
-                      <button
-                        className="bg-custom-accent text-white px-4 py-2 rounded-md hover:opacity-90 transition-opacity"
-                      >
-                        Télécharger la facture
-                      </button>
-                    )}
-                    
-                    {(selectedOrder.status === 'PENDING' || selectedOrder.status === 'DRAFT') && (
-                      <button
-                        onClick={async () => {
-                          if (window.confirm("Êtes-vous sûr de vouloir annuler cette commande ? Cette action est irréversible.")) {
-                            try {
-                              const response = await fetch(`/api/orders/${selectedOrder.id}`, {
-                                method: 'PATCH',
-                                headers: { 'Content-Type': 'application/json' },
-                                body: JSON.stringify({ status: 'CANCELLED' })
-                              });
-                              
-                              if (!response.ok) {
-                                throw new Error('Erreur lors de l\'annulation de la commande');
-                              }
-                              
-                              toast({
-                                title: "Commande annulée",
-                                description: "Votre commande a été annulée avec succès"
-                              });
-                              
-                              setIsDetailOpen(false);
-                              
-                              // Rafraîchir la liste des commandes
-                              setTimeout(() => {
-                                window.location.reload();
-                              }, 500);
-                            } catch (error) {
-                              console.error('Erreur:', error);
-                              toast({
-                                title: "Erreur",
-                                description: "Impossible d'annuler la commande",
-                                variant: "destructive"
-                              });
-                            }
-                          }
-                        }}
-                        className="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-md transition-colors"
-                      >
-                        Annuler la commande
-                      </button>
-                    )}
-                    
-                    {/* Bouton spécifique pour les paniers (DRAFT) */}
-                    {selectedOrder.status === 'DRAFT' && (
-                      <button
-                        onClick={() => {
-                          router.push('/checkout');
-                        }}
-                        className="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-md transition-colors ml-2"
-                      >
-                        Passer au paiement
-                      </button>
-                    )}
+                            <p className="text-sm text-muted-foreground">
+                              {isPast ? "Livraison était prévue le " : "Livraison prévue le "} 
+                              {new Date(booking.deliverySlot.date).toLocaleDateString('fr-FR', {
+                                day: 'numeric',
+                                month: 'long',
+                                year: 'numeric'
+                              })}
+                            </p>
+                            <p className="text-sm mt-1">
+                              Quantité: {booking.quantity} {booking.deliverySlot.product.unit}
+                            </p>
+                            <p className="text-sm font-medium mt-1">
+                              {(booking.price ? booking.price * booking.quantity : 
+                                booking.deliverySlot.product.price ? booking.deliverySlot.product.price * booking.quantity : 
+                                0).toFixed(2)} CHF
+                            </p>
+                          </div>
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
+              )}
+              
+              {/* Résumé des coûts */}
+              <div className="border-t border-foreground/10 pt-4">
+                <div className="flex justify-between mb-2">
+                  <p>Sous-total</p>
+                  <p>{selectedOrder.total.toFixed(2)} CHF</p>
+                </div>
+                {getDeliveryInfo(selectedOrder)?.type === 'delivery' && (
+                  <div className="flex justify-between mb-2">
+                    <p>Frais de livraison</p>
+                    <p>15.00 CHF</p>
+                  </div>
+                )}
+                <div className="flex justify-between font-semibold text-lg pt-2 border-t border-foreground/10">
+                  <p>Total</p>
+                  <p>{((getDeliveryInfo(selectedOrder)?.type === 'delivery' ? 15 : 0) + selectedOrder.total).toFixed(2)} CHF</p>
+                </div>
+              </div>
+              
+              {/* Actions */}
+              <div className="flex justify-between pt-4">
+                <button
+                  onClick={() => setIsDetailOpen(false)}
+                  className="px-4 py-2 border border-foreground/10 rounded-md hover:bg-foreground/5 transition-colors"
+                >
+                  Fermer
+                </button>
+                
+                {selectedOrder.status === OrderStatus.DELIVERED && (
+                  <button
+                    className="bg-custom-accent text-white px-4 py-2 rounded-md hover:opacity-90 transition-opacity"
+                  >
+                    Télécharger la facture
+                  </button>
+                )}
+                
+                {(selectedOrder.status === OrderStatus.PENDING || selectedOrder.status === OrderStatus.DRAFT) && (
+                  <button
+                    onClick={async () => {
+                      if (window.confirm("Êtes-vous sûr de vouloir annuler cette commande ? Cette action est irréversible.")) {
+                        try {
+                          const response = await fetch(`/api/orders/${selectedOrder.id}`, {
+                            method: 'PATCH',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ status: OrderStatus.CANCELLED })
+                          });
+                          
+                          if (!response.ok) {
+                            throw new Error('Erreur lors de l\'annulation de la commande');
+                          }
+                          
+                          toast({
+                            title: "Commande annulée",
+                            description: "Votre commande a été annulée avec succès"
+                          });
+                          
+                          setIsDetailOpen(false);
+                          
+                          // Rafraîchir la liste des commandes
+                          setTimeout(() => {
+                            window.location.reload();
+                          }, 500);
+                        } catch (error) {
+                          console.error('Erreur:', error);
+                          toast({
+                            title: "Erreur",
+                            description: "Impossible d'annuler la commande",
+                            variant: "destructive"
+                          });
+                        }
+                      }
+                    }}
+                    className="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-md transition-colors"
+                  >
+                    Annuler la commande
+                  </button>
+                )}
+                
+                {/* Bouton spécifique pour les paniers (DRAFT) */}
+                {selectedOrder.status === OrderStatus.DRAFT && (
+                  <button
+                    onClick={() => {
+                      router.push('/checkout');
+                    }}
+                    className="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-md transition-colors ml-2"
+                  >
+                    Passer au paiement
+                  </button>
+                )}
               </div>
             </div>
-          </div>
-        )}
-      </div>
-    )
-  }
+          </motion.div>
+        </div>
+      )}
+    </AnimatePresence>
+  </div>
+)
+}
