@@ -86,6 +86,8 @@ model Product {
   stockAlerts      StockAlert?          // Relation inverse pour StockAlert
   stockHistory     StockHistory[]       // Relation inverse pour StockHistory
   productionSchedules ProductionSchedule[] // Relation inverse pour ProductionSchedule
+  acceptDeferred   Boolean              @default(false)  // Accepte paiement sous 30 jours
+  minOrderQuantity Float                @default(0)      // Quantité minimale à la vente
 }
 
 model Stock {

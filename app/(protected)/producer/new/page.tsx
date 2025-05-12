@@ -35,6 +35,10 @@ const productSchema = z.object({
     .min(0, "Le stock ne peut pas être négatif"),
   categories: z.array(z.string())
     .min(1, "Sélectionnez au moins une catégorie"),
+  minOrderQuantity: z.coerce.number()
+    .min(0, "La quantité minimale ne peut pas être négative")
+    .optional(),
+  acceptDeferred: z.boolean().optional()
 })
 
 type ProductFormData = z.infer<typeof productSchema>
@@ -59,6 +63,8 @@ export default function NewProductPage() {
     defaultValues: {
       unit: 'kg',
       categories: [],
+      minOrderQuantity: 0,
+      acceptDeferred: false
     }
   })
 
@@ -113,6 +119,8 @@ export default function NewProductPage() {
       const productData = {
         ...data,
         imagePreset: selectedPreset,
+        acceptDeferred: !!data.acceptDeferred,
+        minOrderQuantity: data.minOrderQuantity || 0
       }
 
       const response = await fetch('/api/products', {
@@ -293,7 +301,7 @@ export default function NewProductPage() {
           {/* Stock initial */}
           <div>
             <label htmlFor="initialStock" className="block text-sm font-medium text-custom-title">
-              Stock initial <span className="text-custom-accent">*</span>
+              Stock initial<span className="text-custom-accent">*</span>
             </label>
             <div className="relative mt-1">
               <input
@@ -314,6 +322,53 @@ export default function NewProductPage() {
             {errors.initialStock && (
               <p className="mt-1 text-sm text-destructive">{errors.initialStock.message}</p>
             )}
+          </div>
+
+          {/* Quantité minimale */}
+          <div>
+            <label htmlFor="minOrderQuantity" className="block text-sm font-medium text-custom-title">
+              Quantité minimale de commande ({selectedUnit})
+            </label>
+            <div className="relative mt-1">
+              <input
+                {...register('minOrderQuantity')}
+                type="number"
+                id="minOrderQuantity"
+                min="0"
+                step={selectedUnit === 'kg' ? "0.1" : "1"}
+                className={cn(
+                  "block w-full rounded-md border border-foreground/10 bg-background px-3 py-2 pr-12",
+                  errors.minOrderQuantity && "border-destructive"
+                )}
+              />
+              <div className="absolute inset-y-0 right-0 flex items-center px-3 pointer-events-none text-foreground/60">
+                {selectedUnit}
+              </div>
+            </div>
+            <p className="mt-1 text-xs text-muted-foreground">
+              Laissez à 0 pour aucun minimum
+            </p>
+            {errors.minOrderQuantity && (
+              <p className="mt-1 text-sm text-destructive">{errors.minOrderQuantity.message}</p>
+            )}
+          </div>
+
+          {/* Paiement différé */}
+          <div className="mt-4">
+            <div className="flex items-center gap-2">
+              <input
+                {...register('acceptDeferred')}
+                type="checkbox"
+                id="acceptDeferred"
+                className="h-4 w-4 border-foreground/10 text-custom-accent focus:ring-custom-accent rounded"
+              />
+              <label htmlFor="acceptDeferred" className="text-sm font-medium text-custom-title">
+                Accepter le paiement sous 30 jours
+              </label>
+            </div>
+            <p className="mt-1 text-xs text-muted-foreground ml-6">
+              Les clients éligibles pourront commander ce produit avec paiement différé
+            </p>
           </div>
 
           {/* Image */}

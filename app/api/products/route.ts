@@ -112,7 +112,9 @@ export const POST = apiAuthMiddleware(
         unit, 
         categories, 
         initialStock,
-        imagePreset
+        imagePreset,
+        acceptDeferred,   // Nouvel attribut
+        minOrderQuantity  // Nouvel attribut
       } = body
 
       // Validations
@@ -126,6 +128,10 @@ export const POST = apiAuthMiddleware(
 
       if (initialStock < 0) {
         return new NextResponse("Le stock initial ne peut pas être négatif", { status: 400 })
+      }
+
+      if (minOrderQuantity < 0) {
+        return new NextResponse("La quantité minimale ne peut pas être négative", { status: 400 })
       }
 
       if (!Object.values(ProductType).includes(type)) {
@@ -171,6 +177,8 @@ export const POST = apiAuthMiddleware(
           image: imageUrl,
           producerId: producer.id,
           available: true,
+          acceptDeferred: acceptDeferred === true,          // Nouvelle valeur
+          minOrderQuantity: minOrderQuantity || 0,          // Nouvelle valeur
           stock: {
             create: {
               quantity: initialStock

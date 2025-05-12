@@ -53,6 +53,11 @@ export const POST = apiAuthMiddleware(async (
         throw new Error("Stock insuffisant")
       }
 
+      // Vérifier la quantité minimale de commande
+      if (product.minOrderQuantity && quantity < product.minOrderQuantity) {
+        throw new Error(`La quantité minimale pour ce produit est de ${product.minOrderQuantity} ${product.unit}`)
+      }
+
       // 2. Vérifier que la commande existe et appartient à l'utilisateur
       const order = await tx.order.findUnique({
         where: { id: orderId }
@@ -71,6 +76,11 @@ export const POST = apiAuthMiddleware(async (
         throw new Error(`Impossible de modifier cette commande car son statut est ${order.status}`)
       }
 
+      // Vérifier si le produit accepte le paiement différé pour les commandes de type INVOICE_PENDING
+      if (order.status === OrderStatus.INVOICE_PENDING && !product.acceptDeferred) {
+        throw new Error("Ce produit n'accepte pas le paiement différé")
+      }
+
       // 3. Vérifier si l'article existe déjà dans la commande
       const existingItem = await tx.orderItem.findFirst({
         where: {
@@ -81,11 +91,14 @@ export const POST = apiAuthMiddleware(async (
 
       let orderItem;
       if (existingItem) {
+        // Vérifier si la nouvelle quantité totale est supérieure à la quantité minimale
+        const newTotalQuantity = existingItem.quantity + quantity;
+        
         // Mise à jour de la quantité
         orderItem = await tx.orderItem.update({
           where: { id: existingItem.id },
           data: {
-            quantity: existingItem.quantity + quantity
+            quantity: newTotalQuantity
           }
         })
       } else {

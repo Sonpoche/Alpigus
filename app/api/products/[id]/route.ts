@@ -74,7 +74,9 @@ export const PATCH = apiAuthMiddleware(
         categories, 
         available,
         stock,
-        imagePreset
+        imagePreset,
+        acceptDeferred,
+        minOrderQuantity
       } = body
 
       // Gérer l'image prédéfinie
@@ -115,6 +117,11 @@ export const PATCH = apiAuthMiddleware(
         return new NextResponse("Type de produit invalide", { status: 400 })
       }
 
+      // Valider la quantité minimale si fournie
+      if (minOrderQuantity !== undefined && minOrderQuantity < 0) {
+        return new NextResponse("La quantité minimale ne peut pas être négative", { status: 400 })
+      }
+
       // Mise à jour du produit avec gestion du stock
       const updatedProduct = await prisma.$transaction(async (tx) => {
         // Mise à jour du produit
@@ -128,6 +135,8 @@ export const PATCH = apiAuthMiddleware(
             ...(unit !== undefined && { unit }),
             ...(imageUrl !== undefined && { image: imageUrl }),
             ...(available !== undefined && { available }),
+            ...(acceptDeferred !== undefined && { acceptDeferred }),
+            ...(minOrderQuantity !== undefined && { minOrderQuantity }),
             ...(categories && {
               categories: {
                 set: categories.map((id: string) => ({ id }))

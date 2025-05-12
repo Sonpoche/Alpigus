@@ -5,7 +5,7 @@ import { useState, useEffect } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { useToast } from "@/hooks/use-toast"
 import { ProductType } from '@prisma/client'
-import { ShoppingCart, Truck, AlertCircle, ArrowLeft, Star, Box, Leaf, ShieldCheck, ChevronRight } from 'lucide-react'
+import { ShoppingCart, Truck, AlertCircle, ArrowLeft, Star, Box, Leaf, ShieldCheck, ChevronRight, CreditCard, Clock } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import ProductDeliveryCalendar from '@/components/client/product-delivery-calendar'
 import { LoadingButton } from '@/components/ui/loading-button'
@@ -39,6 +39,11 @@ export default function ProductDetailPage() {
         const data = await response.json()
         setProduct(data)
         
+        // Si le produit a une quantité minimale, initialiser la quantité avec cette valeur
+        if (data.minOrderQuantity && data.minOrderQuantity > 0) {
+          setQuantity(data.minOrderQuantity.toString())
+        }
+        
         // Montrer automatiquement le calendrier pour les produits frais
         if (data.type === ProductType.FRESH) {
           setShowDeliveryCalendar(true)
@@ -61,6 +66,16 @@ export default function ProductDetailPage() {
     // Pour les produits frais, on utilise le calendrier de livraison
     if (product.type === ProductType.FRESH) {
       setShowDeliveryCalendar(true)
+      return
+    }
+    
+    // Vérifier la quantité minimale
+    if (product.minOrderQuantity && parseFloat(quantity) < product.minOrderQuantity) {
+      toast({
+        title: "Quantité insuffisante",
+        description: `La quantité minimale pour ce produit est de ${product.minOrderQuantity} ${product.unit}`,
+        variant: "destructive"
+      })
       return
     }
     
@@ -119,6 +134,11 @@ export default function ProductDetailPage() {
       default:
         return <Box className="h-5 w-5 mr-2" />
     }
+  }
+  
+  // Fonction pour formater les nombres à maximum 2 décimales sans zéros inutiles
+  const formatNumber = (num: number): string => {
+    return parseFloat(num.toFixed(2)).toString();
   }
   
   if (isLoading) {
@@ -214,9 +234,33 @@ export default function ProductDetailPage() {
               </div>
               
               <div className="flex items-baseline">
-                <span className="text-2xl font-semibold">{product.price.toFixed(2)} CHF</span>
+                <span className="text-2xl font-semibold">{formatNumber(product.price)} CHF</span>
                 <span className="text-sm text-muted-foreground ml-2">par {product.unit}</span>
               </div>
+              
+              {/* Indication de quantité minimale */}
+              {product.minOrderQuantity > 0 && (
+                <div className="bg-amber-50 dark:bg-amber-900/20 p-3 rounded-lg flex items-start gap-2">
+                  <AlertCircle className="h-5 w-5 text-amber-600 dark:text-amber-400 mt-0.5 flex-shrink-0" />
+                  <div>
+                    <p className="text-sm font-medium text-amber-800 dark:text-amber-300">
+                      Quantité minimale: {formatNumber(product.minOrderQuantity)} {product.unit}
+                    </p>
+                  </div>
+                </div>
+              )}
+              
+              {/* Indication de paiement différé */}
+              {product.acceptDeferred && (
+                <div className="bg-green-50 dark:bg-green-900/20 p-3 rounded-lg flex items-start gap-2">
+                  <Clock className="h-5 w-5 text-green-600 dark:text-green-400 mt-0.5 flex-shrink-0" />
+                  <div>
+                    <p className="text-sm font-medium text-green-800 dark:text-green-300">
+                      Paiement sous 30 jours accepté pour les clients éligibles
+                    </p>
+                  </div>
+                </div>
+              )}
               
               {/* Catégories */}
               {product.categories && product.categories.length > 0 && (
@@ -237,7 +281,7 @@ export default function ProductDetailPage() {
                 <div className="bg-foreground/5 p-4 rounded-lg">
                   <div className="flex justify-between items-center mb-2">
                     <h3 className="font-medium">Stock disponible</h3>
-                    <span className="text-sm font-medium">{product.stock.quantity} {product.unit}</span>
+                    <span className="text-sm font-medium">{formatNumber(product.stock.quantity)} {product.unit}</span>
                   </div>
                   <div className="h-2 w-full bg-foreground/10 rounded-full overflow-hidden">
                     <div 
@@ -282,7 +326,13 @@ export default function ProductDetailPage() {
                         </label>
                         <div className="flex items-center border border-foreground/10 rounded-md">
                           <button
-                            onClick={() => setQuantity(Math.max(0.1, parseFloat(quantity) - 0.1).toString())}
+                            onClick={() => {
+                              const newQty = Math.max(
+                                product.minOrderQuantity || 0.1, 
+                                parseFloat(quantity) - 0.1
+                              ).toString();
+                              setQuantity(newQty);
+                            }}
                             className="w-10 h-10 flex items-center justify-center hover:bg-foreground/5 transition-colors"
                           >
                             -
@@ -291,8 +341,11 @@ export default function ProductDetailPage() {
                             id="quantity"
                             type="number"
                             value={quantity}
-                            onChange={(e) => setQuantity(e.target.value)}
-                            min="0.1"
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              setQuantity(val);
+                            }}
+                            min={product.minOrderQuantity || 0.1}
                             step="0.1"
                             className="w-16 h-10 text-center border-x border-foreground/10"
                           />
@@ -350,6 +403,7 @@ export default function ProductDetailPage() {
               <ProductDeliveryCalendar 
                 productId={productId} 
                 onReservationComplete={handleReservationComplete}
+                minQuantity={product.minOrderQuantity || 0}
               />
             </motion.div>
           )}
@@ -434,8 +488,14 @@ export default function ProductDetailPage() {
                         </li>
                         <li className="flex justify-between">
                           <span className="text-sm text-muted-foreground">Prix unitaire:</span>
-                          <span className="text-sm font-medium">{product.price.toFixed(2)} CHF</span>
+                          <span className="text-sm font-medium">{formatNumber(product.price)} CHF</span>
                         </li>
+                        {product.minOrderQuantity > 0 && (
+                          <li className="flex justify-between">
+                            <span className="text-sm text-muted-foreground">Quantité minimale:</span>
+                            <span className="text-sm font-medium">{formatNumber(product.minOrderQuantity)} {product.unit}</span>
+                          </li>
+                        )}
                         <li className="flex justify-between">
                           <span className="text-sm text-muted-foreground">Disponibilité:</span>
                           <span className={`text-sm font-medium ${product.available ? 'text-green-600' : 'text-red-600'}`}>
@@ -445,11 +505,39 @@ export default function ProductDetailPage() {
                       </ul>
                     </div>
                     
-                    {/* Catégories détaillées (remplace les informations du producteur) */}
+                    {/* Catégories détaillées */}
                     <div className="bg-foreground/5 p-4 rounded-lg">
-                      <h3 className="font-medium mb-2">Catégories</h3>
-                      {product.categories && product.categories.length > 0 ? (
-                        <div className="space-y-2">
+                      <h3 className="font-medium mb-2">Modalités</h3>
+                      <ul className="space-y-2">
+                        <li className="flex justify-between">
+                          <span className="text-sm text-muted-foreground">Paiement différé:</span>
+                          <span className={`text-sm font-medium ${
+                            product.acceptDeferred ? 'text-green-600' : 'text-muted-foreground'
+                          }`}>
+                            {product.acceptDeferred ? 'Accepté (30 jours)' : 'Non accepté'}
+                          </span>
+                        </li>
+                        <li className="flex justify-between">
+                          <span className="text-sm text-muted-foreground">Livraison:</span>
+                          <span className="text-sm font-medium">{
+                            product.type === ProductType.FRESH 
+                              ? 'Sur réservation de créneau' 
+                              : 'Standard (3-5 jours)'
+                          }</span>
+                        </li>
+                        <li className="flex justify-between">
+                          <span className="text-sm text-muted-foreground">Origine:</span>
+                          <span className="text-sm font-medium">Suisse</span>
+                        </li>
+                        <li className="flex justify-between">
+                          <span className="text-sm text-muted-foreground">Certification:</span>
+                          <span className="text-sm font-medium">Bio</span>
+                        </li>
+                      </ul>
+                      
+                      {product.categories && product.categories.length > 0 && (
+                        <div className="mt-4">
+                          <p className="text-sm text-muted-foreground mb-2">Catégories:</p>
                           <div className="flex flex-wrap gap-2">
                             {product.categories.map((category: any) => (
                               <Badge 
@@ -461,17 +549,7 @@ export default function ProductDetailPage() {
                               </Badge>
                             ))}
                           </div>
-                          <div className="mt-4">
-                            <p className="text-sm text-muted-foreground">Origine:</p>
-                            <p className="text-sm font-medium">Suisse</p>
-                          </div>
-                          <div>
-                            <p className="text-sm text-muted-foreground">Certification:</p>
-                            <p className="text-sm font-medium">Bio</p>
-                          </div>
                         </div>
-                      ) : (
-                        <p className="text-muted-foreground italic">Aucune catégorie définie</p>
                       )}
                     </div>
                   </div>

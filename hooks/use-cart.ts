@@ -9,6 +9,8 @@ interface Product {
   image: string | null
   price: number
   unit: string
+  minOrderQuantity?: number
+  acceptDeferred?: boolean
 }
 
 interface CartItem {
@@ -73,6 +75,11 @@ export function useCart() {
   const addToCart = async (product: Product, quantity: number) => {
     try {
       setIsLoading(true)
+      
+      // Vérifier la quantité minimale
+      if (product.minOrderQuantity && quantity < product.minOrderQuantity) {
+        throw new Error(`La quantité minimale pour ce produit est de ${product.minOrderQuantity} ${product.unit}`)
+      }
       
       // Si pas de panier, en créer un
       let currentId = cartId

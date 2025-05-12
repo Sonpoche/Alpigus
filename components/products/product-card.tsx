@@ -25,6 +25,8 @@ interface Product {
   stock?: {
     quantity: number
   } | null
+  minOrderQuantity?: number
+  acceptDeferred?: boolean
 }
 
 interface ProductCardProps {
@@ -170,6 +172,13 @@ export function ProductCard({ product }: ProductCardProps) {
               </span>
             )}
           </div>
+
+          {/* Information quantité minimale si applicable */}
+            {product.minOrderQuantity && product.minOrderQuantity > 0 && (
+              <div className="text-xs bg-amber-50 dark:bg-amber-900/20 text-amber-800 dark:text-amber-300 p-2 rounded-md mb-3">
+                Quantité minimale: {product.minOrderQuantity} {product.unit}
+              </div>
+            )}
 
           {/* Tags */}
           <div className="mt-2 flex flex-wrap gap-1 mb-3">

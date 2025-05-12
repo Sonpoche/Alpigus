@@ -58,6 +58,12 @@ export default function ProducerDashboard() {
   const [productToDelete, setProductToDelete] = useState<{ id: string, name: string } | null>(null)
   const [freshProductsWithoutSlots, setFreshProductsWithoutSlots] = useState<FreshProductWithoutSlots[]>([])
 
+  // Fonction pour formater les nombres décimaux proprement
+  const formatNumber = (num: number): string => {
+    // On garde 2 décimales maximum et on supprime les zéros inutiles en fin de nombre
+    return parseFloat(num.toFixed(2)).toString();
+  };
+
   // Fonction pour vérifier si une date est aujourd'hui ou dans le futur (ignorant l'heure)
   const isDateTodayOrFuture = (date: Date): boolean => {
     const today = new Date();
@@ -254,7 +260,7 @@ export default function ProducerDashboard() {
             <div>
               <p className="text-sm text-muted-foreground">Stock total</p>
               <p className="text-2xl font-semibold text-custom-title">
-                {stats.totalStock.toFixed(2)} kg
+                {formatNumber(stats.totalStock)} kg
               </p>
             </div>
           </div>
@@ -380,14 +386,22 @@ export default function ProducerDashboard() {
             <div className="space-y-2">
               <div className="flex justify-between">
                 <span className="text-custom-text">Prix</span>
-                <span className="font-medium">{product.price.toFixed(2)} CHF/{product.unit}</span>
+                <span className="font-medium">{formatNumber(product.price)} CHF/{product.unit}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-custom-text">Stock</span>
                 <span className="font-medium">
-                  {product.stock?.quantity || 0} {product.unit}
+                  {product.stock ? formatNumber(product.stock.quantity) : '0'} {product.unit}
                 </span>
               </div>
+              {product.minOrderQuantity > 0 && (
+                <div className="flex justify-between">
+                  <span className="text-custom-text">Quantité min.</span>
+                  <span className="font-medium">
+                    {formatNumber(product.minOrderQuantity)} {product.unit}
+                  </span>
+                </div>
+              )}
               <div className="flex justify-between">
                 <span className="text-custom-text">Statut</span>
                 <span className={cn(
@@ -395,6 +409,15 @@ export default function ProducerDashboard() {
                   product.available ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"
                 )}>
                   {product.available ? 'Disponible' : 'Indisponible'}
+                </span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-custom-text">Paiement 30j</span>
+                <span className={cn(
+                  "font-medium",
+                  product.acceptDeferred ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"
+                )}>
+                  {product.acceptDeferred ? 'Accepté' : 'Non accepté'}
                 </span>
               </div>
             </div>

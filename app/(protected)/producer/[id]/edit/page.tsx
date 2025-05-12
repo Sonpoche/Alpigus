@@ -22,6 +22,8 @@ interface Product {
   stock?: {
     quantity: number
   } | null
+  acceptDeferred?: boolean
+  minOrderQuantity?: number
 }
 
 interface Category {
@@ -37,6 +39,7 @@ interface FieldErrors {
   unit?: boolean
   stock?: boolean
   categories?: boolean
+  minOrderQuantity?: boolean
 }
 
 interface PageProps {
@@ -151,6 +154,8 @@ export default function EditProductPage({ params }: PageProps) {
       const quantity = parseFloat(formData.get('stock') as string)
       const description = formData.get('description') as string || ''
       const available = (formData.get('available') as string) === 'true'
+      const acceptDeferred = formData.has('acceptDeferred')
+      const minOrderQuantity = parseFloat(formData.get('minOrderQuantity') as string || '0')
 
       // Validations
       const errors: FieldErrors = {}
@@ -176,6 +181,10 @@ export default function EditProductPage({ params }: PageProps) {
         errors.categories = true
         hasErrors = true
       }
+      if (minOrderQuantity < 0 || isNaN(minOrderQuantity)) {
+        errors.minOrderQuantity = true
+        hasErrors = true
+      }
 
       if (hasErrors) {
         setFieldErrors(errors)
@@ -192,7 +201,9 @@ export default function EditProductPage({ params }: PageProps) {
         categories: selectedCategories,
         stock: { quantity },
         available,
-        imagePreset: selectedPreset
+        imagePreset: selectedPreset,
+        acceptDeferred,
+        minOrderQuantity
       }
 
       // Mettre à jour le produit principal
@@ -257,6 +268,11 @@ export default function EditProductPage({ params }: PageProps) {
       </div>
     )
   }
+
+  // Fonction pour formater les nombres à maximum 2 décimales sans zéros inutiles
+  const formatNumber = (num: number): string => {
+    return parseFloat(num.toFixed(2)).toString();
+  };
 
   return (
     <div className="min-h-screen p-6">
@@ -405,6 +421,52 @@ export default function EditProductPage({ params }: PageProps) {
                 {selectedUnit}
               </div>
             </div>
+          </div>
+
+          {/* Quantité minimale */}
+          <div>
+            <label htmlFor="minOrderQuantity" className="block text-sm font-medium text-custom-title">
+              Quantité minimale de commande ({selectedUnit})
+            </label>
+            <div className="relative mt-1">
+              <input
+                type="number"
+                id="minOrderQuantity"
+                name="minOrderQuantity"
+                defaultValue={product.minOrderQuantity || 0}
+                min="0"
+                step={selectedUnit === 'kg' ? "0.1" : "1"}
+                className={cn(
+                  "block w-full rounded-md border border-foreground/10 bg-background px-3 py-2 pr-12",
+                  fieldErrors.minOrderQuantity && "border-destructive"
+                )}
+              />
+              <div className="absolute inset-y-0 right-0 flex items-center px-3 pointer-events-none text-foreground/60">
+                {selectedUnit}
+              </div>
+            </div>
+            <p className="mt-1 text-xs text-muted-foreground">
+              Laissez à 0 pour aucun minimum
+            </p>
+          </div>
+
+          {/* Paiement différé */}
+          <div className="mt-4">
+            <div className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                id="acceptDeferred"
+                name="acceptDeferred"
+                defaultChecked={product.acceptDeferred || false}
+                className="h-4 w-4 border-foreground/10 text-custom-accent focus:ring-custom-accent rounded"
+              />
+              <label htmlFor="acceptDeferred" className="text-sm font-medium text-custom-title">
+                Accepter le paiement sous 30 jours
+              </label>
+            </div>
+            <p className="mt-1 text-xs text-muted-foreground ml-6">
+              Les clients éligibles pourront commander ce produit avec paiement différé
+            </p>
           </div>
 
           {/* Disponibilité */}
