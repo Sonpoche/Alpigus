@@ -239,7 +239,7 @@ export default function ProductDetailPage() {
               </div>
               
               {/* Indication de quantité minimale */}
-              {product.minOrderQuantity > 0 && (
+              {(product.minOrderQuantity !== undefined && product.minOrderQuantity > 0) ? (
                 <div className="bg-amber-50 dark:bg-amber-900/20 p-3 rounded-lg flex items-start gap-2">
                   <AlertCircle className="h-5 w-5 text-amber-600 dark:text-amber-400 mt-0.5 flex-shrink-0" />
                   <div>
@@ -248,7 +248,7 @@ export default function ProductDetailPage() {
                     </p>
                   </div>
                 </div>
-              )}
+              ) : null}
               
               {/* Indication de paiement différé */}
               {product.acceptDeferred && (
@@ -347,7 +347,7 @@ export default function ProductDetailPage() {
                             }}
                             min={product.minOrderQuantity || 0.1}
                             step="0.1"
-                            className="w-16 h-10 text-center border-x border-foreground/10"
+                            className="w-16 h-10 text-center border-x border-foreground/10 bg-transparent text-foreground"
                           />
                           <button
                             onClick={() => setQuantity((parseFloat(quantity) + 0.1).toString())}
@@ -490,12 +490,12 @@ export default function ProductDetailPage() {
                           <span className="text-sm text-muted-foreground">Prix unitaire:</span>
                           <span className="text-sm font-medium">{formatNumber(product.price)} CHF</span>
                         </li>
-                        {product.minOrderQuantity > 0 && (
+                        {(product.minOrderQuantity !== undefined && product.minOrderQuantity > 0) ? (
                           <li className="flex justify-between">
                             <span className="text-sm text-muted-foreground">Quantité minimale:</span>
                             <span className="text-sm font-medium">{formatNumber(product.minOrderQuantity)} {product.unit}</span>
                           </li>
-                        )}
+                        ) : null}
                         <li className="flex justify-between">
                           <span className="text-sm text-muted-foreground">Disponibilité:</span>
                           <span className={`text-sm font-medium ${product.available ? 'text-green-600' : 'text-red-600'}`}>

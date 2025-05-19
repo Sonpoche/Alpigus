@@ -58,6 +58,29 @@ export const POST = apiAuthMiddleware(
         return new NextResponse("Commande non trouvée", { status: 404 });
       }
 
+      // AJOUT: Vérification que tous les produits acceptent le paiement différé
+      if (paymentMethod === 'invoice') {
+        // Vérifier chaque produit standard du panier
+        const nonDeferredProduct = order.items.find(item => !item.product.acceptDeferred);
+        if (nonDeferredProduct) {
+          return new NextResponse(
+            `Le produit ${nonDeferredProduct.product.name} n'accepte pas le paiement sous 30 jours`, 
+            { status: 400 }
+          );
+        }
+        
+        // Vérifier aussi les produits des réservations
+        const nonDeferredBooking = order.bookings.find(
+          booking => !booking.deliverySlot.product.acceptDeferred
+        );
+        if (nonDeferredBooking) {
+          return new NextResponse(
+            `Le produit ${nonDeferredBooking.deliverySlot.product.name} n'accepte pas le paiement sous 30 jours`, 
+            { status: 400 }
+          );
+        }
+      }
+
       // Calculer les frais de livraison
       const deliveryFee = deliveryType === 'delivery' ? 15 : 0;
       const totalWithDelivery = order.total + deliveryFee;

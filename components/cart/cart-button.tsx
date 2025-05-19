@@ -174,7 +174,7 @@ export function CartButton({ className }: CartButtonProps) {
                     <p className="text-sm font-medium truncate">{item.product.name}</p>
                     <div className="flex justify-between items-center">
                       <p className="text-xs text-muted-foreground">
-                        {item.quantity} x {item.price.toFixed(2)} CHF
+                        {item.quantity} {item.product.unit} x {item.price.toFixed(2)} CHF
                       </p>
                       <p className="text-xs font-medium">{(item.quantity * item.price).toFixed(2)} CHF</p>
                     </div>

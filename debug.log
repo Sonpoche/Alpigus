@@ -1027,3 +1027,44 @@
   "itemsCount": 1,
   "bookingsCount": 0
 }
+[2025-05-15T11:32:40.480Z] NotificationService: Début envoi notification commande {
+  "orderId": "cmabdk91n000ue7inypw3dn0z"
+}
+[2025-05-15T11:32:40.482Z] Items dans la commande: 1
+[2025-05-15T11:32:40.483Z] Traitement item produit: {
+  "productId": "cm9wm4b1e000513uqh4qdtr89",
+  "productName": "test_order"
+}
+[2025-05-15T11:32:40.484Z] Producer ID directement ajouté: "cm7yn4iaf0003qxwp7jjkgdiu"
+[2025-05-15T11:32:40.485Z] Bookings dans la commande: 
+[2025-05-15T11:32:40.486Z] Nombre de producteurs à notifier: 1
+[2025-05-15T11:32:40.487Z] Liste des IDs producteurs: [
+  "cm7yn4iaf0003qxwp7jjkgdiu"
+]
+[2025-05-15T11:32:40.488Z] Traitement du producteur: "cm7yn4iaf0003qxwp7jjkgdiu"
+[2025-05-15T11:32:40.490Z] Producer userId: "cm7yn45lj0000qxwps52dljee"
+[2025-05-15T11:32:40.491Z] Montant total pour ce producteur: {
+  "itemsTotal": 1,
+  "bookingsTotal": 0,
+  "total": 1
+}
+[2025-05-15T11:32:40.496Z] Notification créée avec ID: "cmapaisa50004tf44jlsupofa"
+[2025-05-15T11:32:40.497Z] NotificationService: Fin de l'envoi de notification 
+[2025-05-15T11:32:40.627Z] Notification de création de facture envoyée au client: {
+  "userId": "cm87c7hvh00006aia2k26zc26",
+  "invoiceId": "cmapais9m0002tf44zgzkt6pf"
+}
+[2025-05-15T11:57:39.361Z] Requête de création de commande reçue {
+  "items": []
+}
+[2025-05-15T11:57:39.362Z] ATTENTION: Requête reçue sans items 
+[2025-05-15T11:57:39.365Z] Aucun panier existant avec des items trouvé 
+[2025-05-15T11:57:39.366Z] Items qui seront utilisés pour créer la commande: []
+[2025-05-15T11:57:39.397Z] Panier créé avec ID: "cmapbewtl0008tf44qrmkj1m6"
+[2025-05-15T11:57:39.398Z] Contenu de l'objet order.items: []
+[2025-05-15T11:57:39.401Z] Vérification des items dans la base de données: []
+[2025-05-15T11:57:39.402Z] Panier créé {
+  "id": "cmapbewtl0008tf44qrmkj1m6",
+  "itemsCount": 0,
+  "bookingsCount": 0
+}

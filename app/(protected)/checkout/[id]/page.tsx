@@ -1,7 +1,7 @@
 // app/(protected)/checkout/[id]/page.tsx
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import { useToast } from '@/hooks/use-toast'
 import { LoadingButton } from '@/components/ui/loading-button'
@@ -18,7 +18,8 @@ import {
   Trash2,
   Loader2,
   CreditCard as CardIcon,
-  Clock
+  Clock,
+  AlertCircle
 } from 'lucide-react'
 import Link from 'next/link'
 
@@ -37,6 +38,7 @@ interface CartItem {
     name: string
     unit: string
     image: string | null
+    acceptDeferred?: boolean
   }
 }
 
@@ -51,6 +53,7 @@ interface Booking {
       unit: string
       price: number
       image: string | null
+      acceptDeferred?: boolean
     }
   }
 }
@@ -93,6 +96,30 @@ export default function CheckoutPage({ params }: CheckoutProps) {
   const [updatingItemId, setUpdatingItemId] = useState<string | null>(null)
   const [isUpdating, setIsUpdating] = useState(false)
   const [formErrors, setFormErrors] = useState<Record<string, string>>({})
+  
+  // Vérifier si tous les produits acceptent le paiement différé
+  const allProductsAcceptDeferred = useMemo(() => {
+    if (!order) return false;
+    
+    // Vérifier tous les articles standards
+    const allItemsAcceptDeferred = order.items.every(item => 
+      item.product.acceptDeferred === true
+    );
+    
+    // Vérifier aussi les réservations/livraisons
+    const allBookingsAcceptDeferred = order.bookings.every(booking => 
+      booking.deliverySlot.product.acceptDeferred === true
+    );
+    
+    return allItemsAcceptDeferred && allBookingsAcceptDeferred;
+  }, [order]);
+  
+  // Définir le mode de paiement par défaut en fonction des produits
+  useEffect(() => {
+    if (!allProductsAcceptDeferred) {
+      setPaymentMethod('card');
+    }
+  }, [allProductsAcceptDeferred]);
   
   useEffect(() => {
     if (params.id) {
@@ -323,7 +350,8 @@ export default function CheckoutPage({ params }: CheckoutProps) {
       })
       
       if (!response.ok) {
-        throw new Error('Erreur lors de la finalisation de la commande')
+        const errorData = await response.text();
+        throw new Error(errorData || 'Erreur lors de la finalisation de la commande');
       }
       
       // Supprimer l'ID de commande du localStorage
@@ -335,7 +363,7 @@ export default function CheckoutPage({ params }: CheckoutProps) {
       console.error('Erreur:', error)
       toast({
         title: 'Erreur',
-        description: 'Impossible de finaliser votre commande',
+        description: error instanceof Error ? error.message : 'Impossible de finaliser votre commande',
         variant: 'destructive'
       })
     } finally {
@@ -632,24 +660,40 @@ export default function CheckoutPage({ params }: CheckoutProps) {
               Méthode de paiement
             </h2>
             
-            <div className="space-y-4">
-              <div className="flex items-start space-x-3">
-                <input
-                  id="invoice"
-                  type="radio"
-                  name="paymentMethod"
-                  value="invoice"
-                  checked={paymentMethod === 'invoice'}
-                  onChange={() => setPaymentMethod('invoice')}
-                  className="mt-1 h-4 w-4 border-foreground/10 text-custom-accent focus:ring-custom-accent"
-                />
-                <div className="flex-1">
-                  <label htmlFor="invoice" className="font-medium">Paiement à 30 jours</label>
-                  <p className="text-sm text-muted-foreground">
-                    Recevez une facture à régler dans un délai de 30 jours. Les factures impayées seront visibles dans votre espace client.
+            {!allProductsAcceptDeferred && (
+              <div className="mb-4 p-4 bg-amber-50 dark:bg-amber-900/20 rounded-lg flex items-start gap-2">
+                <AlertCircle className="h-5 w-5 text-amber-600 dark:text-amber-400 mt-0.5 flex-shrink-0" />
+                <div>
+                  <p className="text-sm font-medium text-amber-800 dark:text-amber-300">
+                    Certains produits de votre panier n'acceptent pas le paiement sous 30 jours
+                  </p>
+                  <p className="text-xs text-amber-700 dark:text-amber-400 mt-1">
+                    Seul le paiement par carte est disponible pour cette commande.
                   </p>
                 </div>
               </div>
+            )}
+            
+            <div className="space-y-4">
+              {allProductsAcceptDeferred && (
+                <div className="flex items-start space-x-3">
+                  <input
+                    id="invoice"
+                    type="radio"
+                    name="paymentMethod"
+                    value="invoice"
+                    checked={paymentMethod === 'invoice'}
+                    onChange={() => setPaymentMethod('invoice')}
+                    className="mt-1 h-4 w-4 border-foreground/10 text-custom-accent focus:ring-custom-accent"
+                  />
+                  <div className="flex-1">
+                    <label htmlFor="invoice" className="font-medium">Paiement à 30 jours</label>
+                    <p className="text-sm text-muted-foreground">
+                      Recevez une facture à régler dans un délai de 30 jours. Les factures impayées seront visibles dans votre espace client.
+                    </p>
+                  </div>
+                </div>
+              )}
               
               <div className="flex items-start space-x-3">
                 <input

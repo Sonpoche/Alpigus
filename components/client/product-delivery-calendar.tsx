@@ -24,11 +24,13 @@ interface Product {
 interface ProductDeliveryCalendarProps {
   productId: string
   onReservationComplete: (slotId: string, quantity: number) => void
+  minQuantity?: number // Ajout de cette propriété
 }
 
 export default function ProductDeliveryCalendar({ 
   productId,
-  onReservationComplete
+  onReservationComplete,
+  minQuantity = 0 // Valeur par défaut à 0
 }: ProductDeliveryCalendarProps) {
   const { toast } = useToast()
   const [slots, setSlots] = useState<DeliverySlot[]>([])
@@ -36,7 +38,7 @@ export default function ProductDeliveryCalendar({
   const [isLoading, setIsLoading] = useState(true)
   const [selectedDate, setSelectedDate] = useState<Date | null>(null)
   const [selectedSlot, setSelectedSlot] = useState<DeliverySlot | null>(null)
-  const [quantity, setQuantity] = useState<string>("1")
+  const [quantity, setQuantity] = useState<string>(minQuantity > 0 ? minQuantity.toString() : "1")
   const [isReserving, setIsReserving] = useState(false)
 
   // Charger les créneaux disponibles et les informations du produit
@@ -90,6 +92,11 @@ export default function ProductDeliveryCalendar({
     setSelectedSlot(slotForDate || null)
   }, [selectedDate, slots])
 
+  // Fonction pour formater les nombres à maximum 2 décimales sans zéros inutiles
+  const formatNumber = (num: number): string => {
+    return parseFloat(num.toFixed(2)).toString();
+  }
+
   // Fonction pour réserver un créneau
   const handleReserve = async () => {
     if (!selectedSlot) return
@@ -100,6 +107,11 @@ export default function ProductDeliveryCalendar({
       const qtyNum = parseFloat(quantity)
       if (isNaN(qtyNum) || qtyNum <= 0) {
         throw new Error('Quantité invalide')
+      }
+      
+      // Vérifier la quantité minimale
+      if (minQuantity > 0 && qtyNum < minQuantity) {
+        throw new Error(`La quantité minimale pour ce produit est de ${minQuantity} ${product?.unit}`)
       }
       
       // Vérifier si une commande en cours existe, sinon en créer une
@@ -177,7 +189,7 @@ export default function ProductDeliveryCalendar({
       // Réinitialiser l'état
       setSelectedDate(null)
       setSelectedSlot(null)
-      setQuantity("1")
+      setQuantity(minQuantity > 0 ? minQuantity.toString() : "1")
       
     } catch (error: any) {
       console.error("Erreur de réservation:", error)
@@ -222,20 +234,31 @@ export default function ProductDeliveryCalendar({
           </h4>
           
           <p className="text-sm text-muted-foreground mb-4">
-            Capacité disponible: {(selectedSlot.maxCapacity - selectedSlot.reserved).toFixed(2)} {product?.unit || ''}
+            Capacité disponible: {formatNumber(selectedSlot.maxCapacity - selectedSlot.reserved)} {product?.unit || ''}
           </p>
           
           <div className="flex gap-4 items-end mb-4">
             <div>
               <label htmlFor="quantity" className="block text-sm font-medium mb-1">
                 Quantité à réserver ({product?.unit || ''})
+                {minQuantity > 0 && (
+                  <span className="text-xs text-amber-600 ml-2">
+                    Min: {formatNumber(minQuantity)} {product?.unit}
+                  </span>
+                )}
               </label>
               <input
                 id="quantity"
                 type="number"
                 value={quantity}
-                onChange={(e) => setQuantity(e.target.value)}
-                min="0.1"
+                onChange={(e) => {
+                  const val = e.target.value;
+                  // Permettre d'effacer l'input, mais pas de descendre en dessous du minimum
+                  if (val === "" || parseFloat(val) >= (minQuantity || 0)) {
+                    setQuantity(val);
+                  }
+                }}
+                min={minQuantity || 0.1}
                 step="0.1"
                 max={selectedSlot.maxCapacity - selectedSlot.reserved}
                 className="w-24 rounded-md border border-foreground/10 bg-background px-3 py-2"
@@ -245,7 +268,7 @@ export default function ProductDeliveryCalendar({
             <LoadingButton
               onClick={handleReserve}
               isLoading={isReserving}
-              disabled={!selectedSlot || parseFloat(quantity) <= 0}
+              disabled={!selectedSlot || parseFloat(quantity) <= 0 || (minQuantity > 0 && parseFloat(quantity) < minQuantity)}
             >
               Réserver ce créneau
             </LoadingButton>

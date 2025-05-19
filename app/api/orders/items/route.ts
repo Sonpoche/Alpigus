@@ -71,13 +71,17 @@ export const POST = apiAuthMiddleware(async (
         throw new Error("Non autorisé")
       }
 
-      // Vérifier que la commande est bien un panier (DRAFT) ou en attente (PENDING)
-      if (order.status !== OrderStatus.DRAFT && order.status !== OrderStatus.PENDING) {
-        throw new Error(`Impossible de modifier cette commande car son statut est ${order.status}`)
+      // Vérifier que la commande est bien un panier (DRAFT) ou en attente (PENDING) ou avec paiement différé (INVOICE_PENDING)
+      // Correction pour l'erreur de type
+      const orderStatus = order.status as string; // Convertir en string pour la comparaison
+      const validStatuses = ["DRAFT", "PENDING", "INVOICE_PENDING"];
+      
+      if (!validStatuses.includes(orderStatus)) {
+        throw new Error(`Impossible de modifier cette commande car son statut est ${orderStatus}`)
       }
 
       // Vérifier si le produit accepte le paiement différé pour les commandes de type INVOICE_PENDING
-      if (order.status === OrderStatus.INVOICE_PENDING && !product.acceptDeferred) {
+      if (orderStatus === "INVOICE_PENDING" && !product.acceptDeferred) {
         throw new Error("Ce produit n'accepte pas le paiement différé")
       }
 
@@ -91,14 +95,11 @@ export const POST = apiAuthMiddleware(async (
 
       let orderItem;
       if (existingItem) {
-        // Vérifier si la nouvelle quantité totale est supérieure à la quantité minimale
-        const newTotalQuantity = existingItem.quantity + quantity;
-        
         // Mise à jour de la quantité
         orderItem = await tx.orderItem.update({
           where: { id: existingItem.id },
           data: {
-            quantity: newTotalQuantity
+            quantity: existingItem.quantity + quantity
           }
         })
       } else {

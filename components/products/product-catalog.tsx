@@ -1,7 +1,7 @@
 // components/products/product-catalog.tsx
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { ProductType } from '@prisma/client'
 import { 
   Search, 
@@ -13,7 +13,9 @@ import {
   ChevronDown, 
   Tag, 
   ArrowRight,
-  ArrowLeft
+  ArrowLeft,
+  RefreshCw,
+  Loader,
 } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
 import { ProductCard } from './product-card'
@@ -21,6 +23,19 @@ import { ProductListItem } from './product-list-item'
 import { Badge } from '@/components/ui/badge'
 import { motion, AnimatePresence } from 'framer-motion'
 import { LoadingButton } from '@/components/ui/loading-button'
+import { cn } from '@/lib/utils'
+
+// Fonction debounce pour retarder l'exécution des recherches
+function debounce<T extends (...args: any[]) => any>(
+  fn: T,
+  ms = 300
+): (...args: Parameters<T>) => void {
+  let timeoutId: ReturnType<typeof setTimeout>;
+  return function(this: any, ...args: Parameters<T>) {
+    clearTimeout(timeoutId);
+    timeoutId = setTimeout(() => fn.apply(this, args), ms);
+  };
+}
 
 interface Category {
   id: string
@@ -40,6 +55,8 @@ interface Product {
   stock?: {
     quantity: number
   } | null
+  minOrderQuantity?: number
+  acceptDeferred?: boolean
 }
 
 interface FilterState {
@@ -65,9 +82,11 @@ const initialFilters: FilterState = {
 export default function ProductCatalog() {
   // États
   const [products, setProducts] = useState<Product[]>([])
+  const [filteredProducts, setFilteredProducts] = useState<Product[]>([])
   const [categories, setCategories] = useState<Category[]>([])
   const [filters, setFilters] = useState<FilterState>(initialFilters)
   const [isLoading, setIsLoading] = useState(true)
+  const [isSearching, setIsSearching] = useState(false)
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid')
   const [showFilters, setShowFilters] = useState(false)
   const [showMobileFilters, setShowMobileFilters] = useState(false)
@@ -75,6 +94,7 @@ export default function ProductCatalog() {
   const [page, setPage] = useState(1)
   const [totalPages, setTotalPages] = useState(1)
   const { toast } = useToast()
+  const searchInputRef = useRef<HTMLInputElement>(null)
 
   // Charger les données initiales
   useEffect(() => {
@@ -129,20 +149,24 @@ export default function ProductCatalog() {
       newActiveFilters.push(`Disponibilité: ${filters.available ? 'Disponible' : 'Indisponible'}`)
     }
     
+    if (filters.search) {
+      newActiveFilters.push(`Recherche: ${filters.search}`)
+    }
+    
     setActiveFilters(newActiveFilters)
   }, [filters, categories])
   
   // Fonction pour récupérer les produits
   const fetchProducts = async (pageNum = 1) => {
     setIsLoading(true)
+    setIsSearching(true)
     
     try {
       // Construire l'URL avec les filtres
       const url = new URL('/api/products', window.location.origin)
       url.searchParams.append('page', pageNum.toString())
-      url.searchParams.append('limit', '12')
+      url.searchParams.append('limit', '50') // Augmenter la limite pour mieux gérer la recherche côté client
       
-      if (filters.search) url.searchParams.append('search', filters.search)
       if (filters.type) url.searchParams.append('type', filters.type)
       if (filters.category) url.searchParams.append('category', filters.category)
       if (filters.minPrice) url.searchParams.append('minPrice', filters.minPrice)
@@ -154,7 +178,13 @@ export default function ProductCatalog() {
       if (!response.ok) throw new Error('Erreur lors du chargement des produits')
       
       const data = await response.json()
+      
+      // Stocker tous les produits
       setProducts(data.products)
+      
+      // Filtrer localement par recherche
+      filterProductsBySearch(data.products, filters.search)
+      
       setTotalPages(data.pagination.pages)
       setPage(pageNum)
     } catch (error) {
@@ -166,7 +196,48 @@ export default function ProductCatalog() {
       })
     } finally {
       setIsLoading(false)
+      setIsSearching(false)
     }
+  }
+  
+  // Fonction pour filtrer les produits par recherche localement
+  const filterProductsBySearch = (productsToFilter: Product[], searchTerm: string) => {
+    if (!searchTerm || searchTerm.trim() === '') {
+      setFilteredProducts(productsToFilter)
+      return
+    }
+    
+    const term = searchTerm.toLowerCase().trim()
+    const filtered = productsToFilter.filter(product => {
+      return (
+        product.name.toLowerCase().includes(term) ||
+        (product.description && product.description.toLowerCase().includes(term)) ||
+        product.categories.some(cat => cat.name.toLowerCase().includes(term)) ||
+        product.type.toLowerCase().includes(term)
+      )
+    })
+    
+    setFilteredProducts(filtered)
+  }
+  
+  // Debounce la recherche pour éviter trop d'appels
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const debouncedSearch = useCallback(
+    debounce((searchTerm: string) => {
+      filterProductsBySearch(products, searchTerm)
+      setIsSearching(false)
+    }, 300),
+    [products]
+  )
+  
+  // Gestion de la recherche dynamique
+  const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const searchTerm = e.target.value
+    setFilters(prev => ({ ...prev, search: searchTerm }))
+    
+    // Utiliser le debounce pour la recherche
+    setIsSearching(true)
+    debouncedSearch(searchTerm)
   }
   
   // Appliquer les filtres
@@ -178,6 +249,9 @@ export default function ProductCatalog() {
   // Réinitialiser les filtres
   const resetFilters = () => {
     setFilters(initialFilters)
+    if (searchInputRef.current) {
+      searchInputRef.current.value = ''
+    }
     fetchProducts(1)
     setShowMobileFilters(false)
   }
@@ -202,11 +276,18 @@ export default function ProductCatalog() {
       case 'Disponibilité':
         setFilters(prev => ({ ...prev, available: null }))
         break
+      case 'Recherche':
+        setFilters(prev => ({ ...prev, search: '' }))
+        if (searchInputRef.current) {
+          searchInputRef.current.value = ''
+        }
+        break
       default:
         break
     }
     
-    fetchProducts(1)
+    // Appliquer les filtres après avoir supprimé un filtre
+    setTimeout(() => fetchProducts(1), 0)
   }
 
   // Rendu du squelette de chargement
@@ -282,15 +363,28 @@ export default function ProductCatalog() {
                 <div className="relative">
                   <input
                     type="text"
+                    ref={searchInputRef}
                     value={filters.search}
-                    onChange={(e) => setFilters(prev => ({ ...prev, search: e.target.value }))}
+                    onChange={handleSearchChange}
                     placeholder="Rechercher..."
                     className="w-full pl-9 pr-3 py-2 bg-background border border-foreground/10 rounded-md"
                   />
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-foreground/60" />
+                  <div className="absolute left-3 top-1/2 -translate-y-1/2">
+                    {isSearching ? (
+                      <Loader className="h-4 w-4 text-foreground/60 animate-spin" />
+                    ) : (
+                      <Search className="h-4 w-4 text-foreground/60" />
+                    )}
+                  </div>
                   {filters.search && (
                     <button
-                      onClick={() => setFilters(prev => ({ ...prev, search: '' }))}
+                      onClick={() => {
+                        setFilters(prev => ({ ...prev, search: '' }))
+                        setFilteredProducts(products)
+                        if (searchInputRef.current) {
+                          searchInputRef.current.value = ''
+                        }
+                      }}
                       className="absolute right-3 top-1/2 -translate-y-1/2 text-foreground/60 hover:text-foreground"
                     >
                       <X className="h-4 w-4" />
@@ -436,11 +530,28 @@ export default function ProductCatalog() {
                   <input
                     type="text"
                     value={filters.search}
-                    onChange={(e) => setFilters(prev => ({ ...prev, search: e.target.value }))}
+                    onChange={handleSearchChange}
                     placeholder="Rechercher..."
                     className="w-full pl-9 pr-3 py-2 bg-background border border-foreground/10 rounded-md"
                   />
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-foreground/60" />
+                  <div className="absolute left-3 top-1/2 -translate-y-1/2">
+                    {isSearching ? (
+                      <Loader className="h-4 w-4 text-foreground/60 animate-spin" />
+                    ) : (
+                      <Search className="h-4 w-4 text-foreground/60" />
+                    )}
+                  </div>
+                  {filters.search && (
+                    <button
+                      onClick={() => {
+                        setFilters(prev => ({ ...prev, search: '' }))
+                        setFilteredProducts(products)
+                      }}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-foreground/60 hover:text-foreground"
+                    >
+                      <X className="h-4 w-4" />
+                    </button>
+                  )}
                 </div>
 
                 {/* Type de produit mobile */}
@@ -458,9 +569,6 @@ export default function ProductCatalog() {
                   </select>
                 </div>
 
-                {/* Autres filtres identiques à la version desktop */}
-                {/* ... */}
-                
                 {/* Catégories mobile */}
                 <div>
                   <label className="block text-sm font-medium mb-2">Catégorie</label>
@@ -568,7 +676,7 @@ export default function ProductCatalog() {
             <div>
               <h1 className="text-2xl font-bold font-montserrat text-title">Catalogue</h1>
               <p className="text-sm text-muted-foreground">
-                {!isLoading && `${products.length} produit${products.length > 1 ? 's' : ''} trouvé${products.length > 1 ? 's' : ''}`}
+                {!isLoading && `${filteredProducts.length} produit${filteredProducts.length > 1 ? 's' : ''} trouvé${filteredProducts.length > 1 ? 's' : ''}`}
               </p>
             </div>
             
@@ -605,22 +713,22 @@ export default function ProductCatalog() {
               
               {/* Tri rapide */}
               <div className="relative hidden sm:block">
-              <select
-                value={filters.sortBy}
-                onChange={(e) => {
-                  setFilters(prev => ({
-                    ...prev,
-                    sortBy: e.target.value as FilterState['sortBy']
-                  }))
-                  applyFilters()
-                }}
-                className="pl-3 pr-10 py-2 bg-background border border-foreground/10 rounded-md appearance-none"
-              >
-                <option value="newest">Plus récents</option>
-                <option value="price_asc">Prix (par unité) croissant</option>
-                <option value="price_desc">Prix (par unité) décroissant</option>
-                <option value="popular">Popularité</option>
-              </select>
+                <select
+                  value={filters.sortBy}
+                  onChange={(e) => {
+                    setFilters(prev => ({
+                      ...prev,
+                      sortBy: e.target.value as FilterState['sortBy']
+                    }))
+                    applyFilters()
+                  }}
+                  className="pl-3 pr-10 py-2 bg-background border border-foreground/10 rounded-md appearance-none"
+                >
+                  <option value="newest">Plus récents</option>
+                  <option value="price_asc">Prix (par unité) croissant</option>
+                  <option value="price_desc">Prix (par unité) décroissant</option>
+                  <option value="popular">Popularité</option>
+                </select>
                 <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 pointer-events-none" />
               </div>
             </div>
@@ -658,7 +766,7 @@ export default function ProductCatalog() {
             }>
               {renderSkeletons()}
             </div>
-          ) : products.length === 0 ? (
+          ) : filteredProducts.length === 0 ? (
             // Message quand aucun produit ne correspond
             <div className="text-center py-12 bg-background border border-foreground/10 rounded-lg">
               <SlidersHorizontal className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
@@ -686,7 +794,7 @@ export default function ProductCatalog() {
                     : "space-y-4"
                   }
                 >
-                  {products.map((product) => (
+                  {filteredProducts.map((product) => (
                     <motion.div
                       key={product.id}
                       layout

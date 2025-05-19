@@ -3,7 +3,7 @@
 
 import { useState } from 'react'
 import { ProductType } from '@prisma/client'
-import { ShoppingCart, Info, Truck, Star } from 'lucide-react'
+import { ShoppingCart, Info, Truck, Tag } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
 import { useCart } from '@/hooks/use-cart'
 import { Badge } from '@/components/ui/badge'
@@ -47,17 +47,22 @@ export function ProductCard({ product }: ProductCardProps) {
       return
     }
     
+    // Déterminer la quantité à ajouter (utiliser la quantité minimale si définie)
+    const quantityToAdd = product.minOrderQuantity !== undefined && product.minOrderQuantity > 0 
+      ? product.minOrderQuantity 
+      : 1;
+    
     // Pour les autres types de produits, on ajoute directement au panier
     setIsAddingToCart(true)
     try {
-      const success = await addToCart(product, 1)
+      const success = await addToCart(product, quantityToAdd)
       
       if (success) {
         setShowAnimation(true)
         
         toast({
           title: "Produit ajouté",
-          description: `1 ${product.unit} de ${product.name} ajouté au panier`
+          description: `${quantityToAdd} ${product.unit} de ${product.name} ajouté au panier`
         })
       } else {
         throw new Error('Erreur lors de l\'ajout au panier')
@@ -88,15 +93,20 @@ export function ProductCard({ product }: ProductCardProps) {
     }
   }
   
+  // Formater le prix pour n'afficher que 2 décimales maximum
+  const formatPrice = (price: number): string => {
+    return price.toFixed(2).replace(/\.00$/, '')
+  }
+  
   return (
     <>
       <div 
-        className="card overflow-hidden transition-all duration-300"
+        className="card overflow-hidden transition-all duration-300 h-full flex flex-col"
         onMouseEnter={() => setIsHovered(true)}
         onMouseLeave={() => setIsHovered(false)}
       >
         {/* Image avec lien vers détail */}
-        <Link href={`/products/${product.id}`}>
+        <Link href={`/products/${product.id}`} className="relative block">
           <div className="aspect-square bg-foreground/5 relative overflow-hidden">
             {product.image ? (
               <img
@@ -113,123 +123,113 @@ export function ProductCard({ product }: ProductCardProps) {
               </div>
             )}
             
-            {/* Badges de coin */}
+            {/* Badges de coin en haut à gauche */}
             <div className="absolute top-2 left-2 flex flex-col gap-2">
               {product.type === ProductType.FRESH && (
                 <Badge variant="info" className="bg-blue-500/90 text-white shadow-md">Frais</Badge>
               )}
-              
-              {/* Ajoutez ici d'autres badges comme "Nouveau", "Populaire", etc. */}
-            </div>
-            
-            {/* Type */}
-            <div className="absolute top-2 right-2">
-              <Badge className={`${productTypeColor()} shadow-md`}>
-                {product.type}
-              </Badge>
-            </div>
-            
-            {/* Disponibilité */}
-            <div className="absolute bottom-0 inset-x-0 p-2 text-center text-sm font-medium backdrop-blur-sm">
-              {product.available ? (
-                <div className="bg-green-500/90 text-white py-1 px-2 rounded-md">
-                  Disponible
-                </div>
-              ) : (
-                <div className="bg-red-500/90 text-white py-1 px-2 rounded-md">
-                  Indisponible
-                </div>
+              {product.acceptDeferred && (
+                <Badge variant="outline" className="bg-green-500/90 text-white shadow-md">Paiement 30j</Badge>
               )}
+            </div>
+            
+            {/* Badge de disponibilité en haut à droite */}
+            <div className="absolute top-2 right-2">
+              <Badge className={`${product.available ? 'bg-green-500/90 text-white' : 'bg-red-500/90 text-white'} shadow-md`}>
+                {product.available ? 'Disponible' : 'Indisponible'}
+              </Badge>
             </div>
           </div>
         </Link>
 
-        {/* Infos */}
-        <div className="p-4">
-          <Link href={`/products/${product.id}`}>
-            <h3 className="font-semibold text-custom-title mb-1 hover:text-custom-accent truncate">
-              {product.name}
-            </h3>
-          </Link>
-          
-          <div className="flex items-center text-amber-500 mb-2">
-            <Star className="h-4 w-4 fill-amber-500" />
-            <Star className="h-4 w-4 fill-amber-500" />
-            <Star className="h-4 w-4 fill-amber-500" />
-            <Star className="h-4 w-4 fill-amber-500" />
-            <Star className="h-4 w-4" />
-            <span className="text-xs text-muted-foreground ml-1">(16)</span>
-          </div>
-          
-          <p className="text-sm text-muted-foreground mb-3 line-clamp-2">{product.description}</p>
-          
-          {/* Prix et stock */}
-          <div className="flex justify-between items-center mb-3">
-            <span className="font-medium text-lg">{product.price.toFixed(2)} CHF/{product.unit}</span>
-            {product.stock && (
-              <span className="text-xs text-muted-foreground">
-                Stock: {product.stock.quantity.toFixed(2)} {product.unit}
-              </span>
-            )}
+        {/* Corps de la carte avec flex-1 pour remplir l'espace */}
+        <div className="p-4 flex flex-col flex-1">
+          {/* Zone supérieure avec nom et évaluation */}
+          <div className="mb-2">
+            <Link href={`/products/${product.id}`}>
+              <h3 className="font-semibold text-lg text-custom-title mb-1 hover:text-custom-accent line-clamp-1">
+                {product.name}
+              </h3>
+            </Link>
+            
+            
           </div>
 
-          {/* Information quantité minimale si applicable */}
-            {product.minOrderQuantity && product.minOrderQuantity > 0 && (
-              <div className="text-xs bg-amber-50 dark:bg-amber-900/20 text-amber-800 dark:text-amber-300 p-2 rounded-md mb-3">
-                Quantité minimale: {product.minOrderQuantity} {product.unit}
-              </div>
-            )}
-
-          {/* Tags */}
-          <div className="mt-2 flex flex-wrap gap-1 mb-3">
-            {product.categories.map(cat => (
-              <Badge
-                key={cat.id}
-                variant="secondary"
-                className="text-xs"
-              >
+          {/* Catégories dans une ligne dédiée */}
+          <div className="flex flex-wrap gap-1 mb-2">
+            <Badge variant="outline" className="text-xs flex items-center">
+              <Tag className="h-3 w-3 mr-1" />{product.type}
+            </Badge>
+            {product.categories.slice(0, 2).map(cat => (
+              <Badge key={cat.id} variant="secondary" className="text-xs">
                 {cat.name}
               </Badge>
             ))}
+            {product.categories.length > 2 && (
+              <Badge variant="outline" className="text-xs">
+                +{product.categories.length - 2}
+              </Badge>
+            )}
           </div>
           
-          {/* Boutons d'action */}
-          {product.available && (
-            <motion.div 
-              className="flex gap-2 mt-3"
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.1 }}
-            >
-              <Link 
-                href={`/products/${product.id}`}
-                className="flex-1 flex items-center justify-center gap-2 py-2 border border-foreground/10 rounded-md hover:bg-foreground/5 transition-colors text-sm font-medium"
-              >
-                <Info className="h-4 w-4" />
-                Détails
-              </Link>
-              
-              {product.type === ProductType.FRESH ? (
+          {/* Espace entre tags et prix - croît pour occuper l'espace disponible */}
+          <div className="flex-1 min-h-[24px] flex items-center">
+            {/* Information quantité minimale si applicable */}
+            {(product.minOrderQuantity !== undefined && product.minOrderQuantity > 0) ? (
+              <div className="text-xs bg-amber-50 dark:bg-amber-900/20 text-amber-800 dark:text-amber-300 p-2 rounded-md w-full">
+                Minimum: {product.minOrderQuantity} {product.unit}
+              </div>
+            ) : null}
+          </div>
+          
+          {/* Zone inférieure avec prix et boutons - toujours alignée en bas */}
+          <div className="mt-auto pt-3 border-t border-foreground/5">
+            <div className="flex justify-between items-center mb-3">
+              <div className="flex flex-col">
+                <span className="font-medium text-lg">{formatPrice(product.price)} CHF/{product.unit}</span>
+                {product.stock && (
+                  <span className="text-xs text-muted-foreground">
+                    Stock: {formatPrice(product.stock.quantity)} {product.unit}
+                  </span>
+                )}
+              </div>
+            </div>
+            
+            {/* Boutons d'action */}
+            {product.available && (
+              <div className="flex gap-2">
                 <Link 
                   href={`/products/${product.id}`}
-                  className="flex-1 flex items-center justify-center gap-2 py-2 bg-custom-accent text-white rounded-md hover:bg-custom-accentHover transition-colors text-sm font-medium"
+                  className="w-12 flex items-center justify-center py-2 border border-foreground/10 rounded-md hover:bg-foreground/5 transition-colors"
+                  aria-label="Détails"
                 >
-                  <Truck className="h-4 w-4" />
-                  Réserver
+                  <Info className="h-4 w-4" />
                 </Link>
-              ) : (
-                <LoadingButton
-                  onClick={handleAddToCart}
-                  isLoading={isAddingToCart}
-                  size="sm"
-                  width="full"
-                  icon={<ShoppingCart className="h-4 w-4" />}
-                >
-                  Ajouter
-                </LoadingButton>
-              )}
-            </motion.div>
-          )}
+                
+                {product.type === ProductType.FRESH ? (
+                  <Link 
+                    href={`/products/${product.id}`}
+                    className="flex-1 flex items-center justify-center gap-1 py-2 bg-custom-accent text-white rounded-md hover:bg-custom-accentHover transition-colors text-sm font-medium"
+                  >
+                    <Truck className="h-4 w-4 mr-1" />
+                    Réserver
+                  </Link>
+                ) : (
+                  <LoadingButton
+                    onClick={handleAddToCart}
+                    isLoading={isAddingToCart}
+                    size="sm"
+                    width="full"
+                    icon={<ShoppingCart className="h-4 w-4 mr-1" />}
+                  >
+                    {(product.minOrderQuantity !== undefined && product.minOrderQuantity > 0)
+                      ? `Ajouter ${product.minOrderQuantity} ${product.unit}`
+                      : 'Ajouter'}
+                  </LoadingButton>
+                )}
+              </div>
+            )}
+          </div>
         </div>
       </div>
       
