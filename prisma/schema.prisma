@@ -64,6 +64,30 @@ model Producer {
  description String?   @db.Text
  products    Product[]
  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+ transactions        Transaction[]
+ wallet          Wallet?
+  bankName        String?
+  bankAccountName String?
+  iban            String?
+  bic             String?
+}
+
+model Transaction {
+  id                  String   @id @default(cuid())
+  orderId             String
+  order               Order    @relation(fields: [orderId], references: [id])
+  amount              Float
+  fee                 Float    // Commission de la plateforme
+  currency            String   @default("CHF")
+  status              String   // PENDING, SUCCEEDED, FAILED
+  metadata            String?  @db.Text
+  producerId          String
+  producer            Producer @relation(fields: [producerId], references: [id])
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  @@index([orderId])
+  @@index([producerId])
 }
 
 model Product {
@@ -116,6 +140,9 @@ model Order {
  user      User        @relation(fields: [userId], references: [id], onDelete: Cascade)
  bookings  Booking[]
  invoice          Invoice?
+ transactions        Transaction[]
+ walletTransactions WalletTransaction[]
+ platformFee        Float?          // Commission de la plateforme
 }
 
 model OrderItem {
@@ -255,6 +282,7 @@ model Invoice {
 
   @@index([userId])
   @@index([orderId])
+  
 }
 
 model AdminLog {
@@ -271,4 +299,48 @@ model AdminLog {
   @@index([adminId])
   @@index([entityType, entityId])
   @@index([createdAt])
+}
+
+model Wallet {
+  id              String          @id @default(cuid())
+  producerId      String          @unique
+  producer        Producer        @relation(fields: [producerId], references: [id], onDelete: Cascade)
+  balance         Float           @default(0)
+  pendingBalance  Float           @default(0)  // Montants en attente de validation
+  totalEarned     Float           @default(0)  // Total gagné historiquement
+  totalWithdrawn  Float           @default(0)  // Total retiré historiquement
+  transactions    WalletTransaction[]
+  withdrawals     Withdrawal[]
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+}
+
+model WalletTransaction {
+  id              String    @id @default(cuid())
+  walletId        String
+  wallet          Wallet    @relation(fields: [walletId], references: [id], onDelete: Cascade)
+  orderId         String?
+  order           Order?    @relation(fields: [orderId], references: [id], onDelete: SetNull)
+  amount          Float     // Montant (positif pour crédit, négatif pour débit)
+  status          String    @default("PENDING") // PENDING, COMPLETED, FAILED, CANCELLED
+  type            String    // SALE, WITHDRAWAL, REFUND, ADJUSTMENT, FEE
+  description     String?
+  metadata        String?   @db.Text // JSON avec détails supplémentaires
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+}
+
+model Withdrawal {
+  id              String    @id @default(cuid())
+  walletId        String
+  wallet          Wallet    @relation(fields: [walletId], references: [id], onDelete: Cascade)
+  amount          Float
+  status          String    @default("PENDING") // PENDING, PROCESSING, COMPLETED, REJECTED
+  bankDetails     String    @db.Text // JSON avec informations bancaires
+  reference       String?   // Référence de paiement externe
+  processorNote   String?   // Note de l'administrateur sur le traitement
+  requestedAt     DateTime  @default(now())
+  processedAt     DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
 }
