@@ -13,7 +13,8 @@ import {
   BarChart4,
   ShieldAlert,
   Tags,
-  Gauge
+  Gauge,
+  Wallet
 } from 'lucide-react'
 import { motion } from 'framer-motion'
 import { cn } from '@/lib/utils'
@@ -42,6 +43,11 @@ export default function AdminMenu() {
       href: '/admin/products',
       label: 'Produits',
       icon: <Package className="h-5 w-5" />
+    },
+    {
+      href: '/admin/wallets',
+      label: 'Portefeuilles',
+      icon: <Wallet className="h-5 w-5" />
     },
     {
       href: '/admin/orders/supervision',

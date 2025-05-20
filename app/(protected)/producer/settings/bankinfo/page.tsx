@@ -108,49 +108,46 @@ export default function BankInfoSettingsPage() {
     return isValid
   }
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
+  // Composant pour mettre à jour les infos bancaires (extrait)
+const handleSubmit = async (e: React.FormEvent) => {
+  e.preventDefault()
+  
+  try {
+    setIsSaving(true)
     
-    if (!validateForm()) {
-      return
+    // Formatter l'IBAN (supprimer les espaces)
+    const formattedData = {
+      ...formData,
+      iban: formData.iban.replace(/\s+/g, '')
     }
     
-    try {
-      setIsSaving(true)
-      
-      // Formatter l'IBAN (supprimer les espaces)
-      const formattedData = {
-        ...formData,
-        iban: formData.iban.replace(/\s+/g, '')
-      }
-      
-      const response = await fetch(`/api/producers/${producerData.id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formattedData)
-      })
-      
-      if (!response.ok) {
-        throw new Error('Erreur lors de la mise à jour des informations bancaires')
-      }
-      
-      toast({
-        title: "Succès",
-        description: "Vos informations bancaires ont été mises à jour avec succès"
-      })
-      
-      router.push('/producer/settings')
-    } catch (error) {
-      console.error('Erreur:', error)
-      toast({
-        title: "Erreur",
-        description: "Impossible de mettre à jour vos informations bancaires",
-        variant: "destructive"
-      })
-    } finally {
-      setIsSaving(false)
+    const response = await fetch('/api/users/producer-profile/bankinfo', {
+      method: 'PATCH', // Assurez-vous que c'est bien PATCH
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(formattedData)
+    })
+    
+    if (!response.ok) {
+      throw new Error('Erreur lors de la mise à jour des informations bancaires')
     }
+    
+    toast({
+      title: "Succès",
+      description: "Vos informations bancaires ont été mises à jour avec succès"
+    })
+    
+    router.push('/producer/settings')
+  } catch (error) {
+    console.error('Erreur:', error)
+    toast({
+      title: "Erreur",
+      description: "Impossible de mettre à jour vos informations bancaires",
+      variant: "destructive"
+    })
+  } finally {
+    setIsSaving(false)
   }
+}
 
   if (isLoading) {
     return (

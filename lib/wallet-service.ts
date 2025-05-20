@@ -347,6 +347,84 @@ export class WalletService {
   }
 
   /**
+   * Approuve une demande de retrait
+   */
+  static async approveWithdrawal(withdrawalId: string, reference?: string): Promise<void> {
+    await this.processWithdrawal(withdrawalId, 'COMPLETED', reference);
+    
+    // Récupérer les détails pour les notifications
+    const withdrawal = await prisma.withdrawal.findUnique({
+      where: { id: withdrawalId },
+      include: {
+        wallet: {
+          include: {
+            producer: {
+              include: { user: true }
+            }
+          }
+        }
+      }
+    });
+    
+    // Si le withdrawal existe et a un producteur associé, notifier
+    if (withdrawal?.wallet?.producer?.user) {
+      // Importer le service de notification ici pour éviter les dépendances circulaires
+      const { NotificationService } = require('./notification-service');
+      
+      // Envoyer une notification au producteur
+      await NotificationService.createNotification({
+        userId: withdrawal.wallet.producer.user.id,
+        type: 'WITHDRAWAL_APPROVED',
+        title: 'Retrait approuvé',
+        message: `Votre demande de retrait de ${withdrawal.amount} CHF a été approuvée et le virement est en cours.`,
+        link: '/producer/wallet',
+        data: { withdrawalId, amount: withdrawal.amount }
+      });
+    }
+  }
+
+  /**
+   * Rejette une demande de retrait
+   */
+  static async rejectWithdrawal(withdrawalId: string, reason: string): Promise<void> {
+    if (!reason || reason.trim() === '') {
+      throw new Error('Une raison de rejet est nécessaire');
+    }
+    
+    await this.processWithdrawal(withdrawalId, 'REJECTED', reason);
+    
+    // Récupérer les détails pour les notifications
+    const withdrawal = await prisma.withdrawal.findUnique({
+      where: { id: withdrawalId },
+      include: {
+        wallet: {
+          include: {
+            producer: {
+              include: { user: true }
+            }
+          }
+        }
+      }
+    });
+    
+    // Si le withdrawal existe et a un producteur associé, notifier
+    if (withdrawal?.wallet?.producer?.user) {
+      // Importer le service de notification ici pour éviter les dépendances circulaires
+      const { NotificationService } = require('./notification-service');
+      
+      // Envoyer une notification au producteur
+      await NotificationService.createNotification({
+        userId: withdrawal.wallet.producer.user.id,
+        type: 'WITHDRAWAL_REJECTED',
+        title: 'Retrait rejeté',
+        message: `Votre demande de retrait de ${withdrawal.amount} CHF a été rejetée. Raison: ${reason}`,
+        link: '/producer/wallet',
+        data: { withdrawalId, amount: withdrawal.amount, reason }
+      });
+    }
+  }
+
+  /**
    * Récupère le solde et l'historique des transactions d'un producteur
    */
   static async getProducerWalletDetails(producerId: string): Promise<any> {

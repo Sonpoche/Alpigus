@@ -19,20 +19,30 @@ type RequestContext = {
 
 export function apiAuthMiddleware(handler: HandlerFunction, allowedRoles?: UserRole[]) {
   return async function (req: NextRequest, context: RequestContext) {
-    // Utiliser la session de test si elle existe, sinon obtenir une vraie session
-    const session = context.session || await getServerSession(authOptions)
+    try {
+      // Utiliser la session de test si elle existe, sinon obtenir une vraie session
+      const session = context.session || await getServerSession(authOptions)
 
-    if (!session) {
-      return new NextResponse("Non autorisé", { status: 401 })
-    }
-
-    // Vérifier les rôles si nécessaire
-    if (allowedRoles && session.user.role) {
-      if (!allowedRoles.includes(session.user.role)) {
-        return new NextResponse("Accès interdit", { status: 403 })
+      if (!session || !session.user) {
+        return new NextResponse("Non authentifié", { status: 401 })
       }
-    }
 
-    return handler(req, session, context)
+      // Vérifier les rôles si nécessaire
+      if (allowedRoles && allowedRoles.length > 0) {
+        const userRole = session.user.role as UserRole;
+        if (!userRole || !allowedRoles.includes(userRole)) {
+          return new NextResponse("Accès interdit - rôle non autorisé", { status: 403 })
+        }
+      }
+
+      // Tout est correct, appeler le handler
+      return handler(req, session, context)
+    } catch (error) {
+      console.error("Erreur dans le middleware d'API:", error);
+      const errorMessage = error instanceof Error 
+        ? error.message 
+        : "Erreur serveur inconnue";
+      return new NextResponse(`Erreur serveur: ${errorMessage}`, { status: 500 });
+    }
   }
 }

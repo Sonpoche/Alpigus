@@ -1068,3 +1068,22 @@
   "itemsCount": 0,
   "bookingsCount": 0
 }
+[2025-05-20T10:40:33.358Z] Notification de changement de statut créée pour le client: "cm87c7hvh00006aia2k26zc26"
+[2025-05-20T10:40:59.790Z] Début notification changement de statut {
+  "orderId": "cmabdk91n000ue7inypw3dn0z",
+  "oldStatus": "CONFIRMED",
+  "newStatus": "SHIPPED"
+}
+[2025-05-20T10:40:59.796Z] Notification changement statut créée {
+  "id": "cmawdvl3m0006n2vn1oq7c0p0"
+}
+[2025-05-20T10:40:59.800Z] Notification de changement de statut créée pour le client: "cm87c7hvh00006aia2k26zc26"
+[2025-05-20T10:41:01.442Z] Début notification changement de statut {
+  "orderId": "cmabdk91n000ue7inypw3dn0z",
+  "oldStatus": "SHIPPED",
+  "newStatus": "DELIVERED"
+}
+[2025-05-20T10:41:01.447Z] Notification changement statut créée {
+  "id": "cmawdvmdi000an2vn7soigqle"
+}
+[2025-05-20T10:41:01.451Z] Notification de changement de statut créée pour le client: "cm87c7hvh00006aia2k26zc26"

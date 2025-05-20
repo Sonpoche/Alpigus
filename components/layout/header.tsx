@@ -4,7 +4,7 @@
 import Link from 'next/link'
 import { useSession } from 'next-auth/react'
 import { usePathname } from 'next/navigation'
-import { Store, Menu, X, Home, ShoppingBag, Package, Calendar, Search } from 'lucide-react'
+import { Store, Menu, X, Home, ShoppingBag, Package, Calendar, Search, Wallet } from 'lucide-react'
 import { useState, useEffect } from 'react'
 import { UserMenu } from './user-menu'
 import { ThemeToggle } from './theme-toggle'
@@ -30,6 +30,7 @@ const producerNavItems = [
   { href: '/producer', label: 'Mes Produits', icon: Package },
   { href: '/producer/delivery-slots/overview', label: 'Livraisons', icon: Calendar },
   { href: '/producer/orders', label: 'Commandes', icon: ShoppingBag },
+  { href: '/producer/wallet', label: 'Portefeuille', icon: Wallet }, // Ajout du lien vers le portefeuille
 ]
 
 const adminNavItems = [
@@ -124,9 +125,14 @@ export function Header() {
               </button>
             
               {session?.user?.role === 'PRODUCER' && (
-                <Link href="/producer" className="text-custom-text hover:text-custom-accent">
-                  <Store className="h-5 w-5" />
-                </Link>
+                <>
+                  <Link href="/producer" className="text-custom-text hover:text-custom-accent">
+                    <Store className="h-5 w-5" />
+                  </Link>
+                  <Link href="/producer/wallet" className="text-custom-text hover:text-custom-accent">
+                    <Wallet className="h-5 w-5" />
+                  </Link>
+                </>
               )}
               
               {isClient && (

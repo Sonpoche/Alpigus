@@ -11,7 +11,8 @@ import {
   Settings, 
   BarChart4, 
   Truck,
-  Users
+  Users,
+  Wallet // Importation de l'icône Wallet
 } from 'lucide-react'
 import { motion } from 'framer-motion'
 import { cn } from '@/lib/utils'
@@ -45,6 +46,11 @@ export default function ProducerMenu() {
       href: '/producer/stats',
       label: 'Statistiques',
       icon: <BarChart4 className="h-5 w-5" />
+    },
+    {
+      href: '/producer/wallet', // Ajout du nouveau lien vers la page wallet
+      label: 'Portefeuille',
+      icon: <Wallet className="h-5 w-5" />
     },
     {
       href: '/producer/clients',
