@@ -118,54 +118,8 @@ export function useCart() {
         throw new Error(errorText || 'Erreur lors de l\'ajout au panier')
       }
       
-      // Mettre à jour localement le panier pour une réponse immédiate
-      if (cartSummary) {
-        // Vérifier si le produit existe déjà dans le panier
-        const existingItemIndex = cartSummary.items.findIndex(item => 
-          item.product.id === product.id
-        )
-        
-        let updatedItems = [...cartSummary.items]
-        
-        if (existingItemIndex >= 0) {
-          // Mettre à jour la quantité d'un produit existant
-          updatedItems[existingItemIndex] = {
-            ...updatedItems[existingItemIndex],
-            quantity: updatedItems[existingItemIndex].quantity + quantity
-          }
-        } else {
-          // Ajouter un nouveau produit
-          // Note: on utilise un ID temporaire qui sera remplacé lors du prochain fetchCartSummary
-          updatedItems.push({
-            id: `temp-${Date.now()}`,
-            quantity,
-            price: product.price,
-            product
-          })
-        }
-        
-        // Mettre à jour le résumé du panier
-        setCartSummary({
-          itemCount: updatedItems.length,
-          items: updatedItems,
-          totalPrice: updatedItems.reduce((total, item) => total + (item.price * item.quantity), 0)
-        })
-      } else {
-        // Si c'est le premier produit, initialiser le résumé
-        setCartSummary({
-          itemCount: 1,
-          items: [{
-            id: `temp-${Date.now()}`,
-            quantity,
-            price: product.price,
-            product
-          }],
-          totalPrice: product.price * quantity
-        })
-      }
-      
-      // Puis mettre à jour les données réelles (en arrière-plan)
-      fetchCartSummary(currentId)
+      // Après un ajout réussi, toujours récupérer les données à jour
+      await fetchCartSummary(currentId)
       
       // Déclencher l'événement de mise à jour du panier
       window.dispatchEvent(new CustomEvent('cart:updated', {
@@ -173,7 +127,7 @@ export function useCart() {
       }))
       
       return true
-    } catch (error) {
+    } catch (error: any) {
       console.error('Erreur:', error)
       return false
     } finally {
@@ -197,20 +151,7 @@ export function useCart() {
         throw new Error('Erreur lors de la suppression de l\'article');
       }
       
-      // Mettre à jour localement le panier
-      if (cartSummary) {
-        const itemToRemove = cartSummary.items.find(item => item.id === itemId);
-        if (itemToRemove) {
-          const updatedItems = cartSummary.items.filter(item => item.id !== itemId);
-          setCartSummary({
-            itemCount: updatedItems.length,
-            items: updatedItems,
-            totalPrice: updatedItems.reduce((total, item) => total + (item.price * item.quantity), 0)
-          });
-        }
-      }
-      
-      // Mettre à jour le résumé du panier
+      // Après une suppression réussie, toujours récupérer les données à jour
       await fetchCartSummary(cartId);
       
       // Déclencher l'événement de mise à jour du panier

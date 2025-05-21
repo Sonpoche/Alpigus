@@ -106,8 +106,44 @@ export default function ProductCatalog() {
         const categoriesData = await categoriesResponse.json()
         setCategories(categoriesData)
 
-        // Charger les produits
-        fetchProducts()
+        // Récupérer les filtres à partir de l'URL s'ils existent
+        const queryParams = new URLSearchParams(window.location.search);
+        
+        const urlType = queryParams.get('type') || '';
+        const urlCategory = queryParams.get('category') || '';
+        const urlMinPrice = queryParams.get('minPrice') || '';
+        const urlMaxPrice = queryParams.get('maxPrice') || '';
+        const urlAvailable = queryParams.get('available');
+        const urlSortBy = queryParams.get('sortBy') as FilterState['sortBy'] || 'newest';
+        const urlSearch = queryParams.get('search') || '';
+        const urlPage = parseInt(queryParams.get('page') || '1');
+        
+        // Mettre à jour les filtres avec les valeurs de l'URL
+        const initialStateFromUrl: FilterState = {
+          type: urlType as ProductType | '',
+          category: urlCategory,
+          minPrice: urlMinPrice,
+          maxPrice: urlMaxPrice,
+          available: urlAvailable === null ? null : urlAvailable === 'true',
+          sortBy: urlSortBy,
+          search: urlSearch
+        };
+        
+        // Vérifier si les filtres de l'URL sont différents des filtres par défaut
+        const hasActiveFilters = !isDefaultFilters(initialStateFromUrl);
+        
+        if (hasActiveFilters) {
+          setFilters(initialStateFromUrl);
+          if (searchInputRef.current) {
+            searchInputRef.current.value = urlSearch;
+          }
+          
+          // Charger les produits avec les filtres de l'URL
+          fetchProducts(urlPage, initialStateFromUrl);
+        } else {
+          // Charger tous les produits sans filtre
+          showAllProducts();
+        }
       } catch (error) {
         console.error('Erreur:', error)
         toast({
@@ -156,139 +192,247 @@ export default function ProductCatalog() {
     setActiveFilters(newActiveFilters)
   }, [filters, categories])
   
+  // Fonction pour vérifier si les filtres sont les filtres par défaut
+  const isDefaultFilters = (filtersToCheck: Partial<FilterState>): boolean => {
+    return (
+      !filtersToCheck.type &&
+      (!filtersToCheck.category || filtersToCheck.category === '') &&
+      (!filtersToCheck.minPrice || filtersToCheck.minPrice === '') &&
+      (!filtersToCheck.maxPrice || filtersToCheck.maxPrice === '') &&
+      (filtersToCheck.available === null || filtersToCheck.available === undefined) &&
+      (!filtersToCheck.sortBy || filtersToCheck.sortBy === 'newest') &&
+      (!filtersToCheck.search || filtersToCheck.search === '')
+    );
+  };
+  
+  // Fonction pour afficher tous les produits sans filtres
+  const showAllProducts = () => {
+    setFilters(initialFilters);
+    if (searchInputRef.current) {
+      searchInputRef.current.value = '';
+    }
+    fetchProducts(1, initialFilters);
+    
+    // Nettoyer l'URL
+    if (typeof window !== 'undefined') {
+      window.history.pushState({}, '', window.location.pathname);
+    }
+  };
+  
   // Fonction pour récupérer les produits
-  const fetchProducts = async (pageNum = 1) => {
-    setIsLoading(true)
-    setIsSearching(true)
+  const fetchProducts = async (pageNum = 1, customFilters?: Partial<FilterState>) => {
+    setIsLoading(true);
+    setIsSearching(true);
     
     try {
       // Construire l'URL avec les filtres
-      const url = new URL('/api/products', window.location.origin)
-      url.searchParams.append('page', pageNum.toString())
-      url.searchParams.append('limit', '50') // Augmenter la limite pour mieux gérer la recherche côté client
+      const url = new URL('/api/products', window.location.origin);
+      url.searchParams.append('page', pageNum.toString());
+      url.searchParams.append('limit', '50');
       
-      if (filters.type) url.searchParams.append('type', filters.type)
-      if (filters.category) url.searchParams.append('category', filters.category)
-      if (filters.minPrice) url.searchParams.append('minPrice', filters.minPrice)
-      if (filters.maxPrice) url.searchParams.append('maxPrice', filters.maxPrice)
-      if (filters.available !== null) url.searchParams.append('available', filters.available.toString())
-      if (filters.sortBy) url.searchParams.append('sortBy', filters.sortBy)
+      // Utiliser soit les filtres personnalisés passés en paramètre, soit les filtres de l'état
+      const filtersToUse = customFilters || filters;
       
-      const response = await fetch(url.toString())
-      if (!response.ok) throw new Error('Erreur lors du chargement des produits')
+      // N'ajouter que les filtres qui sont réellement définis
+      if (filtersToUse.type) 
+        url.searchParams.append('type', filtersToUse.type);
+        
+      if (filtersToUse.category) 
+        url.searchParams.append('category', filtersToUse.category);
       
-      const data = await response.json()
+      // Filtres de prix - seulement s'ils sont non vides
+      if (filtersToUse.minPrice && filtersToUse.minPrice.trim() !== '') 
+        url.searchParams.append('minPrice', filtersToUse.minPrice);
+      
+      if (filtersToUse.maxPrice && filtersToUse.maxPrice.trim() !== '') 
+        url.searchParams.append('maxPrice', filtersToUse.maxPrice);
+      
+      // Disponibilité - seulement si explicitement définie
+      if (filtersToUse.available !== null && filtersToUse.available !== undefined) 
+        url.searchParams.append('available', filtersToUse.available.toString());
+      
+      // Tri - seulement si défini et différent de la valeur par défaut
+      if (filtersToUse.sortBy && filtersToUse.sortBy !== 'newest') 
+        url.searchParams.append('sortBy', filtersToUse.sortBy);
+      
+      // Recherche - seulement si non vide
+      if (filtersToUse.search && typeof filtersToUse.search === 'string' && filtersToUse.search.trim() !== '')
+        url.searchParams.append('search', filtersToUse.search.trim());
+      
+      console.log("URL de recherche:", url.toString());
+      
+      const response = await fetch(url.toString());
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error("Erreur API:", response.status, errorText);
+        throw new Error(`Erreur lors du chargement des produits: ${errorText}`);
+      }
+      
+      const data = await response.json();
+      console.log("Données reçues:", data);
       
       // Stocker tous les produits
-      setProducts(data.products)
+      setProducts(data.products || []);
       
       // Filtrer localement par recherche
-      filterProductsBySearch(data.products, filters.search)
+      filterProductsBySearch(data.products || [], 
+        typeof filtersToUse.search === 'string' ? filtersToUse.search : '');
       
-      setTotalPages(data.pagination.pages)
-      setPage(pageNum)
+      setTotalPages(data.pagination.pages || 1);
+      setPage(pageNum);
+      
+      // Mettre à jour l'URL avec les filtres (uniquement si ce ne sont pas les filtres par défaut)
+      if (!isDefaultFilters(filtersToUse)) {
+        updateUrlWithFilters(filtersToUse, pageNum);
+      } else {
+        // Si ce sont les filtres par défaut, nettoyer l'URL
+        if (typeof window !== 'undefined') {
+          window.history.pushState({}, '', window.location.pathname);
+        }
+      }
     } catch (error) {
-      console.error('Erreur:', error)
+      console.error('Erreur:', error);
       toast({
         title: "Erreur",
         description: "Impossible de charger les produits",
         variant: "destructive"
-      })
+      });
     } finally {
-      setIsLoading(false)
-      setIsSearching(false)
+      setIsLoading(false);
+      setIsSearching(false);
     }
-  }
+  };
+  
+  // Fonction pour mettre à jour l'URL avec les filtres
+  const updateUrlWithFilters = (filtersToUse: Partial<FilterState>, pageNum: number) => {
+    if (typeof window === 'undefined') return;
+    
+    const url = new URL(window.location.href);
+    
+    // Réinitialiser les paramètres existants
+    url.searchParams.delete('type');
+    url.searchParams.delete('category');
+    url.searchParams.delete('minPrice');
+    url.searchParams.delete('maxPrice');
+    url.searchParams.delete('available');
+    url.searchParams.delete('sortBy');
+    url.searchParams.delete('search');
+    url.searchParams.delete('page');
+    
+    // Ajouter les nouveaux paramètres avec vérification explicite de type
+    if (filtersToUse.type) 
+      url.searchParams.set('type', filtersToUse.type);
+      
+    if (filtersToUse.category) 
+      url.searchParams.set('category', filtersToUse.category);
+      
+    if (filtersToUse.minPrice && filtersToUse.minPrice !== '') 
+      url.searchParams.set('minPrice', filtersToUse.minPrice);
+      
+    if (filtersToUse.maxPrice && filtersToUse.maxPrice !== '') 
+      url.searchParams.set('maxPrice', filtersToUse.maxPrice);
+      
+    if (filtersToUse.available !== null && filtersToUse.available !== undefined) 
+      url.searchParams.set('available', filtersToUse.available.toString());
+      
+    if (filtersToUse.sortBy && filtersToUse.sortBy !== 'newest') 
+      url.searchParams.set('sortBy', filtersToUse.sortBy);
+      
+    if (filtersToUse.search && typeof filtersToUse.search === 'string' && filtersToUse.search.trim() !== '') 
+      url.searchParams.set('search', filtersToUse.search.trim());
+      
+    if (pageNum > 1) 
+      url.searchParams.set('page', pageNum.toString());
+    
+    // Mettre à jour l'URL sans recharger la page
+    window.history.pushState({}, '', url.toString());
+  };
   
   // Fonction pour filtrer les produits par recherche localement
   const filterProductsBySearch = (productsToFilter: Product[], searchTerm: string) => {
     if (!searchTerm || searchTerm.trim() === '') {
-      setFilteredProducts(productsToFilter)
-      return
+      setFilteredProducts(productsToFilter);
+      return;
     }
     
-    const term = searchTerm.toLowerCase().trim()
+    const term = searchTerm.toLowerCase().trim();
     const filtered = productsToFilter.filter(product => {
       return (
         product.name.toLowerCase().includes(term) ||
         (product.description && product.description.toLowerCase().includes(term)) ||
         product.categories.some(cat => cat.name.toLowerCase().includes(term)) ||
         product.type.toLowerCase().includes(term)
-      )
-    })
+      );
+    });
     
-    setFilteredProducts(filtered)
-  }
+    setFilteredProducts(filtered);
+  };
   
   // Debounce la recherche pour éviter trop d'appels
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const debouncedSearch = useCallback(
     debounce((searchTerm: string) => {
-      filterProductsBySearch(products, searchTerm)
-      setIsSearching(false)
+      setFilters(prev => ({ ...prev, search: searchTerm }));
+      filterProductsBySearch(products, searchTerm);
+      setIsSearching(false);
     }, 300),
     [products]
-  )
+  );
   
   // Gestion de la recherche dynamique
   const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const searchTerm = e.target.value
-    setFilters(prev => ({ ...prev, search: searchTerm }))
+    const searchTerm = e.target.value;
     
     // Utiliser le debounce pour la recherche
-    setIsSearching(true)
-    debouncedSearch(searchTerm)
-  }
+    setIsSearching(true);
+    debouncedSearch(searchTerm);
+  };
   
   // Appliquer les filtres
   const applyFilters = () => {
-    fetchProducts(1)
-    setShowMobileFilters(false)
-  }
+    fetchProducts(1);
+    setShowMobileFilters(false);
+  };
   
   // Réinitialiser les filtres
   const resetFilters = () => {
-    setFilters(initialFilters)
-    if (searchInputRef.current) {
-      searchInputRef.current.value = ''
-    }
-    fetchProducts(1)
-    setShowMobileFilters(false)
-  }
+    showAllProducts();
+    setShowMobileFilters(false);
+  };
   
   // Supprimer un filtre actif
   const removeFilter = (filter: string) => {
-    const [type, value] = filter.split(': ')
+    const [type, value] = filter.split(': ');
     
     switch (type) {
       case 'Type':
-        setFilters(prev => ({ ...prev, type: '' }))
-        break
+        setFilters(prev => ({ ...prev, type: '' }));
+        break;
       case 'Catégorie':
-        setFilters(prev => ({ ...prev, category: '' }))
-        break
+        setFilters(prev => ({ ...prev, category: '' }));
+        break;
       case 'Prix min':
-        setFilters(prev => ({ ...prev, minPrice: '' }))
-        break
+        setFilters(prev => ({ ...prev, minPrice: '' }));
+        break;
       case 'Prix max':
-        setFilters(prev => ({ ...prev, maxPrice: '' }))
-        break
+        setFilters(prev => ({ ...prev, maxPrice: '' }));
+        break;
       case 'Disponibilité':
-        setFilters(prev => ({ ...prev, available: null }))
-        break
+        setFilters(prev => ({ ...prev, available: null }));
+        break;
       case 'Recherche':
-        setFilters(prev => ({ ...prev, search: '' }))
+        setFilters(prev => ({ ...prev, search: '' }));
         if (searchInputRef.current) {
-          searchInputRef.current.value = ''
+          searchInputRef.current.value = '';
         }
-        break
+        break;
       default:
-        break
+        break;
     }
     
     // Appliquer les filtres après avoir supprimé un filtre
-    setTimeout(() => fetchProducts(1), 0)
-  }
+    setTimeout(() => fetchProducts(1), 0);
+  };
 
   // Rendu du squelette de chargement
   const renderSkeletons = () => {
@@ -310,7 +454,7 @@ export default function ProductCatalog() {
             </div>
           </div>
         </div>
-      ))
+      ));
     } else {
       return [...Array(8)].map((_, index) => (
         <div key={index} className="card animate-pulse p-4 flex">
@@ -328,9 +472,9 @@ export default function ProductCatalog() {
             </div>
           </div>
         </div>
-      ))
+      ));
     }
-  }
+  };
 
   return (
     <div className="relative">
@@ -364,7 +508,7 @@ export default function ProductCatalog() {
                   <input
                     type="text"
                     ref={searchInputRef}
-                    value={filters.search}
+                    defaultValue={filters.search}
                     onChange={handleSearchChange}
                     placeholder="Rechercher..."
                     className="w-full pl-9 pr-3 py-2 bg-background border border-foreground/10 rounded-md"
@@ -379,10 +523,10 @@ export default function ProductCatalog() {
                   {filters.search && (
                     <button
                       onClick={() => {
-                        setFilters(prev => ({ ...prev, search: '' }))
-                        setFilteredProducts(products)
+                        setFilters(prev => ({ ...prev, search: '' }));
+                        setFilteredProducts(products);
                         if (searchInputRef.current) {
-                          searchInputRef.current.value = ''
+                          searchInputRef.current.value = '';
                         }
                       }}
                       className="absolute right-3 top-1/2 -translate-y-1/2 text-foreground/60 hover:text-foreground"
@@ -434,6 +578,8 @@ export default function ProductCatalog() {
                       value={filters.minPrice}
                       onChange={(e) => setFilters(prev => ({ ...prev, minPrice: e.target.value }))}
                       placeholder="Min"
+                      min="0"
+                      step="0.01"
                       className="w-full px-3 py-2 bg-background border border-foreground/10 rounded-md"
                     />
                     <input
@@ -441,6 +587,8 @@ export default function ProductCatalog() {
                       value={filters.maxPrice}
                       onChange={(e) => setFilters(prev => ({ ...prev, maxPrice: e.target.value }))}
                       placeholder="Max"
+                      min="0"
+                      step="0.01"
                       className="w-full px-3 py-2 bg-background border border-foreground/10 rounded-md"
                     />
                   </div>
@@ -452,11 +600,11 @@ export default function ProductCatalog() {
                   <select
                     value={filters.available === null ? '' : filters.available.toString()}
                     onChange={(e) => {
-                      const value = e.target.value
+                      const value = e.target.value;
                       setFilters(prev => ({
                         ...prev,
                         available: value === '' ? null : value === 'true'
-                      }))
+                      }));
                     }}
                     className="w-full px-3 py-2 bg-background border border-foreground/10 rounded-md"
                   >
@@ -529,7 +677,7 @@ export default function ProductCatalog() {
                 <div className="relative">
                   <input
                     type="text"
-                    value={filters.search}
+                    defaultValue={filters.search}
                     onChange={handleSearchChange}
                     placeholder="Rechercher..."
                     className="w-full pl-9 pr-3 py-2 bg-background border border-foreground/10 rounded-md"
@@ -544,8 +692,11 @@ export default function ProductCatalog() {
                   {filters.search && (
                     <button
                       onClick={() => {
-                        setFilters(prev => ({ ...prev, search: '' }))
-                        setFilteredProducts(products)
+                        setFilters(prev => ({ ...prev, search: '' }));
+                        setFilteredProducts(products);
+                        if (searchInputRef.current) {
+                          searchInputRef.current.value = '';
+                        }
                       }}
                       className="absolute right-3 top-1/2 -translate-y-1/2 text-foreground/60 hover:text-foreground"
                     >
@@ -593,6 +744,8 @@ export default function ProductCatalog() {
                       value={filters.minPrice}
                       onChange={(e) => setFilters(prev => ({ ...prev, minPrice: e.target.value }))}
                       placeholder="Min"
+                      min="0"
+                      step="0.01"
                       className="w-full px-3 py-2 bg-background border border-foreground/10 rounded-md"
                     />
                     <input
@@ -600,6 +753,8 @@ export default function ProductCatalog() {
                       value={filters.maxPrice}
                       onChange={(e) => setFilters(prev => ({ ...prev, maxPrice: e.target.value }))}
                       placeholder="Max"
+                      min="0"
+                      step="0.01"
                       className="w-full px-3 py-2 bg-background border border-foreground/10 rounded-md"
                     />
                   </div>
@@ -611,11 +766,11 @@ export default function ProductCatalog() {
                   <select
                     value={filters.available === null ? '' : filters.available.toString()}
                     onChange={(e) => {
-                      const value = e.target.value
+                      const value = e.target.value;
                       setFilters(prev => ({
                         ...prev,
                         available: value === '' ? null : value === 'true'
-                      }))
+                      }));
                     }}
                     className="w-full px-3 py-2 bg-background border border-foreground/10 rounded-md"
                   >
@@ -647,8 +802,8 @@ export default function ProductCatalog() {
                 <div className="grid grid-cols-2 gap-2 mt-8">
                   <button
                     onClick={() => {
-                      resetFilters()
-                      setShowMobileFilters(false)
+                      resetFilters();
+                      setShowMobileFilters(false);
                     }}
                     className="py-2 border border-foreground/10 rounded-md hover:bg-foreground/5 transition-colors text-sm"
                   >
@@ -656,8 +811,8 @@ export default function ProductCatalog() {
                   </button>
                   <button
                     onClick={() => {
-                      applyFilters()
-                      setShowMobileFilters(false)
+                      applyFilters();
+                      setShowMobileFilters(false);
                     }}
                     className="py-2 bg-custom-accent text-white rounded-md hover:bg-custom-accentHover transition-colors text-sm"
                   >
@@ -676,7 +831,7 @@ export default function ProductCatalog() {
             <div>
               <h1 className="text-2xl font-bold font-montserrat text-title">Catalogue</h1>
               <p className="text-sm text-muted-foreground">
-                {!isLoading && `${filteredProducts.length} produit${filteredProducts.length > 1 ? 's' : ''} trouvé${filteredProducts.length > 1 ? 's' : ''}`}
+                {!isLoading && `${filteredProducts.length} produit${filteredProducts.length > 1 || filteredProducts.length === 0 ? 's' : ''} trouvé${filteredProducts.length > 1 || filteredProducts.length === 0 ? 's' : ''}`}
               </p>
             </div>
             
@@ -719,8 +874,9 @@ export default function ProductCatalog() {
                     setFilters(prev => ({
                       ...prev,
                       sortBy: e.target.value as FilterState['sortBy']
-                    }))
-                    applyFilters()
+                    }));
+                    // Applique immédiatement le filtre de tri
+                    setTimeout(() => fetchProducts(1), 0);
                   }}
                   className="pl-3 pr-10 py-2 bg-background border border-foreground/10 rounded-md appearance-none"
                 >
@@ -854,5 +1010,5 @@ export default function ProductCatalog() {
         </div>
       </div>
     </div>
-  )
+  );
 }

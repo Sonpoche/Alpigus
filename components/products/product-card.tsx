@@ -1,9 +1,8 @@
 // components/products/product-card.tsx
-'use client'
 
 import { useState } from 'react'
 import { ProductType } from '@prisma/client'
-import { ShoppingCart, Info, Truck, Tag } from 'lucide-react'
+import { ShoppingCart, Info, Truck, Tag, Plus, Minus } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
 import { useCart } from '@/hooks/use-cart'
 import { Badge } from '@/components/ui/badge'
@@ -39,6 +38,12 @@ export function ProductCard({ product }: ProductCardProps) {
   const [isAddingToCart, setIsAddingToCart] = useState(false)
   const [showAnimation, setShowAnimation] = useState(false)
   const [isHovered, setIsHovered] = useState(false)
+  const [quantity, setQuantity] = useState(
+    product.minOrderQuantity !== undefined && product.minOrderQuantity > 0 
+      ? product.minOrderQuantity 
+      : 1
+  )
+  const [showQuantitySelector, setShowQuantitySelector] = useState(false)
   
   const handleAddToCart = async () => {
     // Pour les produits frais, on utilise le calendrier de livraison
@@ -47,22 +52,16 @@ export function ProductCard({ product }: ProductCardProps) {
       return
     }
     
-    // Déterminer la quantité à ajouter (utiliser la quantité minimale si définie)
-    const quantityToAdd = product.minOrderQuantity !== undefined && product.minOrderQuantity > 0 
-      ? product.minOrderQuantity 
-      : 1;
-    
-    // Pour les autres types de produits, on ajoute directement au panier
     setIsAddingToCart(true)
     try {
-      const success = await addToCart(product, quantityToAdd)
+      const success = await addToCart(product, quantity)
       
       if (success) {
         setShowAnimation(true)
         
         toast({
           title: "Produit ajouté",
-          description: `${quantityToAdd} ${product.unit} de ${product.name} ajouté au panier`
+          description: `${quantity} ${product.unit} de ${product.name} ajouté au panier`
         })
       } else {
         throw new Error('Erreur lors de l\'ajout au panier')
@@ -78,22 +77,32 @@ export function ProductCard({ product }: ProductCardProps) {
     }
   }
   
-  const productTypeColor = () => {
-    switch (product.type) {
-      case ProductType.FRESH:
-        return 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300'
-      case ProductType.DRIED:
-        return 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300'
-      case ProductType.SUBSTRATE:
-        return 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-300'
-      case ProductType.WELLNESS:
-        return 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300'
-      default:
-        return 'bg-foreground/5 text-foreground/70'
+  // Gestion de la quantité
+  const incrementQuantity = () => {
+    setQuantity(prev => prev + 1)
+  }
+  
+  const decrementQuantity = () => {
+    const minQty = product.minOrderQuantity !== undefined && product.minOrderQuantity > 0 
+      ? product.minOrderQuantity 
+      : 1
+    
+    if (quantity > minQty) {
+      setQuantity(prev => prev - 1)
     }
   }
   
-  // Formater le prix pour n'afficher que 2 décimales maximum
+  const handleQuantityChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = parseFloat(e.target.value)
+    const minQty = product.minOrderQuantity !== undefined && product.minOrderQuantity > 0 
+      ? product.minOrderQuantity 
+      : 1
+    
+    if (!isNaN(value) && value >= minQty) {
+      setQuantity(value)
+    }
+  }
+  
   const formatPrice = (price: number): string => {
     return price.toFixed(2).replace(/\.00$/, '')
   }
@@ -103,7 +112,10 @@ export function ProductCard({ product }: ProductCardProps) {
       <div 
         className="card overflow-hidden transition-all duration-300 h-full flex flex-col"
         onMouseEnter={() => setIsHovered(true)}
-        onMouseLeave={() => setIsHovered(false)}
+        onMouseLeave={() => {
+          setIsHovered(false)
+          setShowQuantitySelector(false)
+        }}
       >
         {/* Image avec lien vers détail */}
         <Link href={`/products/${product.id}`} className="relative block">
@@ -151,8 +163,6 @@ export function ProductCard({ product }: ProductCardProps) {
                 {product.name}
               </h3>
             </Link>
-            
-            
           </div>
 
           {/* Catégories dans une ligne dédiée */}
@@ -197,37 +207,78 @@ export function ProductCard({ product }: ProductCardProps) {
             
             {/* Boutons d'action */}
             {product.available && (
-              <div className="flex gap-2">
-                <Link 
-                  href={`/products/${product.id}`}
-                  className="w-12 flex items-center justify-center py-2 border border-foreground/10 rounded-md hover:bg-foreground/5 transition-colors"
-                  aria-label="Détails"
-                >
-                  <Info className="h-4 w-4" />
-                </Link>
-                
-                {product.type === ProductType.FRESH ? (
+              <>
+                {/* Sélecteur de quantité */}
+                {showQuantitySelector && product.type !== ProductType.FRESH && (
+                  <div className="flex items-center justify-between mb-3 bg-foreground/5 rounded-md p-2">
+                    <button 
+                      onClick={decrementQuantity} 
+                      className="w-8 h-8 flex items-center justify-center rounded-md border border-foreground/10 bg-background hover:bg-accent"
+                      disabled={quantity <= (product.minOrderQuantity || 1)}
+                    >
+                      <Minus className="h-3 w-3" />
+                    </button>
+                    <input 
+                      type="number" 
+                      value={quantity} 
+                      onChange={handleQuantityChange}
+                      min={product.minOrderQuantity || 1}
+                      className="w-14 text-center bg-background border border-foreground/10 rounded-md px-2 py-1 text-sm"
+                    />
+                    <span className="text-xs px-1">{product.unit}</span>
+                    <button 
+                      onClick={incrementQuantity} 
+                      className="w-8 h-8 flex items-center justify-center rounded-md border border-foreground/10 bg-background hover:bg-accent"
+                    >
+                      <Plus className="h-3 w-3" />
+                    </button>
+                  </div>
+                )}
+
+                <div className="flex gap-2">
                   <Link 
                     href={`/products/${product.id}`}
-                    className="flex-1 flex items-center justify-center gap-1 py-2 bg-custom-accent text-white rounded-md hover:bg-custom-accentHover transition-colors text-sm font-medium"
+                    className="w-12 flex items-center justify-center py-2 border border-foreground/10 rounded-md hover:bg-foreground/5 transition-colors"
+                    aria-label="Détails"
                   >
-                    <Truck className="h-4 w-4 mr-1" />
-                    Réserver
+                    <Info className="h-4 w-4" />
                   </Link>
-                ) : (
-                  <LoadingButton
-                    onClick={handleAddToCart}
-                    isLoading={isAddingToCart}
-                    size="sm"
-                    width="full"
-                    icon={<ShoppingCart className="h-4 w-4 mr-1" />}
-                  >
-                    {(product.minOrderQuantity !== undefined && product.minOrderQuantity > 0)
-                      ? `Ajouter ${product.minOrderQuantity} ${product.unit}`
-                      : 'Ajouter'}
-                  </LoadingButton>
-                )}
-              </div>
+                  
+                  {product.type === ProductType.FRESH ? (
+                    <Link 
+                      href={`/products/${product.id}`}
+                      className="flex-1 flex items-center justify-center gap-1 py-2 bg-custom-accent text-white rounded-md hover:bg-custom-accentHover transition-colors text-sm font-medium"
+                    >
+                      <Truck className="h-4 w-4 mr-1" />
+                      Réserver
+                    </Link>
+                  ) : (
+                    <>
+                      {!showQuantitySelector ? (
+                        <button
+                          onClick={() => setShowQuantitySelector(true)}
+                          className="flex-1 flex items-center justify-center gap-1 py-2 bg-custom-accent text-white rounded-md hover:bg-custom-accentHover transition-colors text-sm font-medium"
+                        >
+                          <ShoppingCart className="h-4 w-4 mr-1" />
+                          {(product.minOrderQuantity !== undefined && product.minOrderQuantity > 0)
+                            ? `Ajouter ${product.minOrderQuantity} ${product.unit}`
+                            : 'Ajouter'}
+                        </button>
+                      ) : (
+                        <LoadingButton
+                          onClick={handleAddToCart}
+                          isLoading={isAddingToCart}
+                          size="sm"
+                          width="full"
+                          icon={<ShoppingCart className="h-4 w-4 mr-1" />}
+                        >
+                          Ajouter au panier
+                        </LoadingButton>
+                      )}
+                    </>
+                  )}
+                </div>
+              </>
             )}
           </div>
         </div>

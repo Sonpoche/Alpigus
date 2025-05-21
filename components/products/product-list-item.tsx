@@ -1,9 +1,8 @@
 // components/products/product-list-item.tsx
-'use client'
 
 import { useState } from 'react'
 import { ProductType } from '@prisma/client'
-import { ShoppingCart, Info, Truck, Tag } from 'lucide-react'
+import { ShoppingCart, Info, Truck, Tag, Plus, Minus } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
 import { useCart } from '@/hooks/use-cart'
 import { Badge } from '@/components/ui/badge'
@@ -37,6 +36,12 @@ export function ProductListItem({ product }: ProductListItemProps) {
   const { addToCart } = useCart()
   const [isAddingToCart, setIsAddingToCart] = useState(false)
   const [showAnimation, setShowAnimation] = useState(false)
+  const [quantity, setQuantity] = useState(
+    product.minOrderQuantity !== undefined && product.minOrderQuantity > 0 
+      ? product.minOrderQuantity 
+      : 1
+  )
+  const [showQuantitySelector, setShowQuantitySelector] = useState(false)
   
   const handleAddToCart = async () => {
     // Pour les produits frais, on utilise le calendrier de livraison
@@ -45,22 +50,16 @@ export function ProductListItem({ product }: ProductListItemProps) {
       return
     }
     
-    // Déterminer la quantité à ajouter (utiliser la quantité minimale si définie)
-    const quantityToAdd = product.minOrderQuantity !== undefined && product.minOrderQuantity > 0 
-      ? product.minOrderQuantity 
-      : 1;
-    
-    // Pour les autres types de produits, on ajoute directement au panier
     setIsAddingToCart(true)
     try {
-      const success = await addToCart(product, quantityToAdd)
+      const success = await addToCart(product, quantity)
       
       if (success) {
         setShowAnimation(true)
         
         toast({
           title: "Produit ajouté",
-          description: `${quantityToAdd} ${product.unit} de ${product.name} ajouté(s) au panier`
+          description: `${quantity} ${product.unit} de ${product.name} ajouté(s) au panier`
         })
       } else {
         throw new Error('Erreur lors de l\'ajout au panier')
@@ -73,6 +72,32 @@ export function ProductListItem({ product }: ProductListItemProps) {
       })
     } finally {
       setIsAddingToCart(false)
+    }
+  }
+  
+  // Gestion de la quantité
+  const incrementQuantity = () => {
+    setQuantity(prev => prev + 1)
+  }
+  
+  const decrementQuantity = () => {
+    const minQty = product.minOrderQuantity !== undefined && product.minOrderQuantity > 0 
+      ? product.minOrderQuantity 
+      : 1
+    
+    if (quantity > minQty) {
+      setQuantity(prev => prev - 1)
+    }
+  }
+  
+  const handleQuantityChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = parseFloat(e.target.value)
+    const minQty = product.minOrderQuantity !== undefined && product.minOrderQuantity > 0 
+      ? product.minOrderQuantity 
+      : 1
+    
+    if (!isNaN(value) && value >= minQty) {
+      setQuantity(value)
     }
   }
   
@@ -115,8 +140,6 @@ export function ProductListItem({ product }: ProductListItemProps) {
                   {product.name}
                 </h3>
               </Link>
-              
-              
             </div>
             
             <p className="text-sm text-muted-foreground mb-2 line-clamp-2">{product.description}</p>
@@ -144,6 +167,33 @@ export function ProductListItem({ product }: ProductListItemProps) {
                 Minimum: {product.minOrderQuantity} {product.unit}
               </div>
             ) : null}
+
+            {/* Sélecteur de quantité */}
+            {showQuantitySelector && product.type !== ProductType.FRESH && (
+              <div className="flex items-center mb-3 bg-foreground/5 rounded-md p-2 w-fit">
+                <button 
+                  onClick={decrementQuantity} 
+                  className="w-8 h-8 flex items-center justify-center rounded-md border border-foreground/10 bg-background hover:bg-accent"
+                  disabled={quantity <= (product.minOrderQuantity || 1)}
+                >
+                  <Minus className="h-3 w-3" />
+                </button>
+                <input 
+                  type="number" 
+                  value={quantity} 
+                  onChange={handleQuantityChange}
+                  min={product.minOrderQuantity || 1}
+                  className="w-16 text-center bg-background border border-foreground/10 rounded-md mx-2 px-2 py-1 text-sm"
+                />
+                <span className="text-xs mr-2">{product.unit}</span>
+                <button 
+                  onClick={incrementQuantity} 
+                  className="w-8 h-8 flex items-center justify-center rounded-md border border-foreground/10 bg-background hover:bg-accent"
+                >
+                  <Plus className="h-3 w-3" />
+                </button>
+              </div>
+            )}
           </div>
           
           {/* Prix et actions */}
@@ -177,18 +227,32 @@ export function ProductListItem({ product }: ProductListItemProps) {
                     <span className="hidden sm:inline">Réserver</span>
                   </Link>
                 ) : (
-                  <LoadingButton
-                    onClick={handleAddToCart}
-                    isLoading={isAddingToCart}
-                    size="sm"
-                    icon={<ShoppingCart className="h-4 w-4" />}
-                  >
-                    <span className="hidden sm:inline">
-                      {(product.minOrderQuantity !== undefined && product.minOrderQuantity > 0)
-                        ? `Ajouter ${product.minOrderQuantity} ${product.unit}`
-                        : 'Ajouter'}
-                    </span>
-                  </LoadingButton>
+                  <>
+                    {!showQuantitySelector ? (
+                      <button
+                        onClick={() => setShowQuantitySelector(true)}
+                        className="flex items-center justify-center gap-1 py-2 px-3 bg-custom-accent text-white rounded-md hover:bg-custom-accentHover transition-all text-sm font-medium"
+                      >
+                        <ShoppingCart className="h-4 w-4" />
+                        <span className="hidden sm:inline">
+                          {(product.minOrderQuantity !== undefined && product.minOrderQuantity > 0)
+                            ? `Ajouter ${product.minOrderQuantity} ${product.unit}`
+                            : 'Ajouter'}
+                        </span>
+                      </button>
+                    ) : (
+                      <LoadingButton
+                        onClick={handleAddToCart}
+                        isLoading={isAddingToCart}
+                        size="sm"
+                        icon={<ShoppingCart className="h-4 w-4" />}
+                      >
+                        <span className="hidden sm:inline">
+                          Ajouter au panier
+                        </span>
+                      </LoadingButton>
+                    )}
+                  </>
                 )}
               </div>
             )}

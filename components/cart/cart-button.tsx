@@ -24,10 +24,13 @@ export function CartButton({ className }: CartButtonProps) {
   const [closeTimeout, setCloseTimeout] = useState<NodeJS.Timeout | null>(null)
   const [deletingItemId, setDeletingItemId] = useState<string | null>(null)
 
-  // Animation quand le panier est mis à jour
+  // Animation quand le panier est mis à jour et actualiser les données
   useEffect(() => {
     const handleCartUpdate = () => {
+      // Mettre à jour immédiatement les données du panier
       refreshCart();
+      
+      // Animer l'icône du panier
       setIsAnimating(true);
       setTimeout(() => setIsAnimating(false), 1000);
     };
@@ -35,6 +38,21 @@ export function CartButton({ className }: CartButtonProps) {
     window.addEventListener('cart:updated', handleCartUpdate);
     return () => window.removeEventListener('cart:updated', handleCartUpdate);
   }, [refreshCart]);
+
+  // Rafraîchir périodiquement le panier lorsque le dropdown est ouvert
+  useEffect(() => {
+    if (showDropdown) {
+      // Rafraîchir immédiatement lors de l'ouverture
+      refreshCart();
+      
+      // Mettre en place un intervalle pour les mises à jour périodiques
+      const interval = setInterval(() => {
+        refreshCart();
+      }, 2000); // Rafraîchir toutes les 2 secondes
+      
+      return () => clearInterval(interval);
+    }
+  }, [showDropdown, refreshCart]);
 
   // Gestion du hover avec délai pour éviter la disparition instantanée
   const handleMouseEnter = () => {
@@ -44,6 +62,8 @@ export function CartButton({ className }: CartButtonProps) {
     }
     if (cartSummary && cartSummary.itemCount > 0) {
       setShowDropdown(true);
+      // Rafraîchir le panier quand on ouvre le dropdown
+      refreshCart();
     }
   };
 
@@ -66,6 +86,9 @@ export function CartButton({ className }: CartButtonProps) {
           title: "Article supprimé",
           description: "L'article a été retiré de votre panier",
         });
+        
+        // Rafraîchir explicitement après suppression
+        refreshCart();
       } else {
         throw new Error("Impossible de supprimer l'article");
       }
@@ -101,7 +124,14 @@ export function CartButton({ className }: CartButtonProps) {
     <div className="relative">
       <button
         ref={buttonRef}
-        onClick={() => cartSummary && cartSummary.itemCount > 0 && setShowDropdown(!showDropdown)}
+        onClick={() => {
+          if (cartSummary && cartSummary.itemCount > 0) {
+            setShowDropdown(!showDropdown);
+            if (!showDropdown) {
+              refreshCart(); // Rafraîchir lorsqu'on ouvre manuellement
+            }
+          }
+        }}
         onMouseEnter={handleMouseEnter}
         onMouseLeave={handleMouseLeave}
         className={`relative p-2 rounded-md hover:bg-foreground/5 transition-colors ${className}`}
@@ -156,7 +186,7 @@ export function CartButton({ className }: CartButtonProps) {
             {/* Liste des articles (limitée à 4) */}
             <div className="max-h-56 overflow-auto mb-3 divide-y divide-foreground/5">
               {cartSummary.items.slice(0, 4).map((item, index) => (
-                <div key={index} className="flex items-center gap-3 py-3 group">
+                <div key={item.id || `temp-${index}`} className="flex items-center gap-3 py-3 group">
                   <div className="w-12 h-12 bg-foreground/5 rounded-md overflow-hidden flex-shrink-0">
                     {item.product.image ? (
                       <img

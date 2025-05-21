@@ -1247,3 +1247,17 @@
   "id": "cmaxt0x8v000hdzu9h8n8iyic"
 }
 [2025-05-21T10:32:49.234Z] Notification de changement de statut créée pour le client: "cm87c7hvh00006aia2k26zc26"
+[2025-05-21T10:49:16.302Z] Requête de création de commande reçue {
+  "items": []
+}
+[2025-05-21T10:49:16.303Z] ATTENTION: Requête reçue sans items 
+[2025-05-21T10:49:16.307Z] Aucun panier existant avec des items trouvé 
+[2025-05-21T10:49:16.309Z] Items qui seront utilisés pour créer la commande: []
+[2025-05-21T10:49:16.341Z] Panier créé avec ID: "cmaxtm2vq000ldzu9ectahmg5"
+[2025-05-21T10:49:16.342Z] Contenu de l'objet order.items: []
+[2025-05-21T10:49:16.345Z] Vérification des items dans la base de données: []
+[2025-05-21T10:49:16.346Z] Panier créé {
+  "id": "cmaxtm2vq000ldzu9ectahmg5",
+  "itemsCount": 0,
+  "bookingsCount": 0
+}
