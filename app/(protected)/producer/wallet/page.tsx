@@ -153,7 +153,7 @@ export default function ProducerWalletPage() {
               <Wallet className="h-6 w-6 text-custom-accent" />
             </div>
             <div>
-              <p className="text-sm text-muted-foreground">Solde disponible</p>
+              <p className="text-sm text-muted-foreground">Solde disponible (retirable)</p>
               <p className="text-2xl font-semibold text-custom-title">
                 {formatCHF(walletData?.balance || 0)}
               </p>
@@ -176,14 +176,14 @@ export default function ProducerWalletPage() {
               <Clock className="h-6 w-6 text-yellow-600 dark:text-yellow-400" />
             </div>
             <div>
-              <p className="text-sm text-muted-foreground">En attente</p>
+              <p className="text-sm text-muted-foreground">En attente (non retirable)</p>
               <p className="text-2xl font-semibold text-custom-title">
                 {formatCHF(walletData?.pendingBalance || 0)}
               </p>
             </div>
           </div>
           <p className="mt-4 text-xs text-muted-foreground">
-            Montants en attente de validation ou de traitement
+            Ces montants seront disponibles lorsque les commandes correspondantes seront marquées comme livrées
           </p>
         </div>
         
@@ -202,6 +202,53 @@ export default function ProducerWalletPage() {
           <p className="mt-4 text-xs text-muted-foreground">
             Depuis la création de votre compte
           </p>
+        </div>
+      </div>
+      
+      {/* Explications sur le fonctionnement des soldes */}
+      <div className="mt-6 bg-background border border-foreground/10 rounded-lg p-6 shadow-sm mb-8">
+        <h3 className="text-lg font-semibold mb-3">Comprendre votre portefeuille</h3>
+        
+        <div className="space-y-4 text-sm">
+          <div className="flex items-start gap-3">
+            <div className="p-2 bg-custom-accent/10 rounded-full mt-0.5">
+              <Wallet className="h-4 w-4 text-custom-accent" />
+            </div>
+            <div>
+              <p className="font-medium">Solde disponible</p>
+              <p className="text-muted-foreground">
+                Ce montant peut être retiré immédiatement. Il représente les paiements issus de commandes
+                qui ont été entièrement livrées.
+              </p>
+            </div>
+          </div>
+          
+          <div className="flex items-start gap-3">
+            <div className="p-2 bg-yellow-100 dark:bg-yellow-900/20 rounded-full mt-0.5">
+              <Clock className="h-4 w-4 text-yellow-600 dark:text-yellow-400" />
+            </div>
+            <div>
+              <p className="font-medium">Solde en attente</p>
+              <p className="text-muted-foreground">
+                Ces montants proviennent de commandes qui ont été confirmées mais pas encore livrées.
+                Ils seront disponibles automatiquement dès que les commandes correspondantes seront
+                marquées comme livrées.
+              </p>
+            </div>
+          </div>
+          
+          <div className="flex items-start gap-3">
+            <div className="p-2 bg-green-100 dark:bg-green-900/20 rounded-full mt-0.5">
+              <ArrowUp className="h-4 w-4 text-green-600 dark:text-green-400" />
+            </div>
+            <div>
+              <p className="font-medium">Total gagné</p>
+              <p className="text-muted-foreground">
+                Le montant total que vous avez gagné depuis la création de votre compte, incluant à la fois
+                les montants disponibles, en attente, et déjà retirés.
+              </p>
+            </div>
+          </div>
         </div>
       </div>
       
@@ -443,7 +490,7 @@ export default function ProducerWalletPage() {
                    }
                    
                    return (
-                     <tr key={withdrawal.id} className="hover:bg-foreground/5">
+                     <tr key={withdrawal.id} className="border-b border-foreground/5 hover:bg-foreground/5 transition-colors">
                        <td className="py-4 px-4 whitespace-nowrap">
                          {formattedRequestDate}
                        </td>
@@ -451,7 +498,7 @@ export default function ProducerWalletPage() {
                          {formatCHF(withdrawal.amount)}
                        </td>
                        <td className="py-4 px-4 text-center whitespace-nowrap">
-                         <span className={`px-2 py-1 text-xs font-medium rounded-full ${statusStyle}`}>
+                         <span className={`px-3 py-1 text-xs font-medium rounded-full ${statusStyle}`}>
                            {statusIcon}{statusText}
                          </span>
                        </td>
@@ -479,6 +526,7 @@ export default function ProducerWalletPage() {
            
            <div className="mb-4">
              <label htmlFor="amount" className="block text-sm font-medium mb-1">Montant (CHF)</label>
+             // app/(protected)/producer/wallet/page.tsx (fin)
              <input
                type="number"
                id="amount"

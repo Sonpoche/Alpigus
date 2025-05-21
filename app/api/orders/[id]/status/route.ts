@@ -5,6 +5,7 @@ import { apiAuthMiddleware } from "@/lib/api-middleware"
 import { Session } from "next-auth"
 import { OrderStatus, UserRole } from "@prisma/client"
 import { NotificationService } from '@/lib/notification-service'
+import { WalletService } from "@/lib/wallet-service"
 
 export const PATCH = apiAuthMiddleware(async (
   req: NextRequest,
@@ -15,6 +16,8 @@ export const PATCH = apiAuthMiddleware(async (
     const orderId = context.params.id
     const body = await req.json()
     const { status } = body
+
+    console.log(`Mise à jour du statut de la commande ${orderId} vers ${status}`);
 
     if (!status || !Object.values(OrderStatus).includes(status)) {
       return new NextResponse("Statut invalide", { status: 400 })
@@ -57,6 +60,7 @@ export const PATCH = apiAuthMiddleware(async (
     })
 
     if (!order) {
+      console.log(`Commande ${orderId} non trouvée`);
       return new NextResponse("Commande non trouvée", { status: 404 })
     }
 
@@ -146,11 +150,42 @@ export const PATCH = apiAuthMiddleware(async (
       }
     })
 
+    console.log(`Statut de la commande ${orderId} mis à jour de ${oldStatus} à ${status}`);
+
     // Envoyer une notification de changement de statut
     await NotificationService.sendOrderStatusChangeNotification(updatedOrder, oldStatus);
     
     // Envoyer également une notification au client
     await NotificationService.sendOrderStatusToClientNotification(updatedOrder);
+
+    // Gestion des transactions selon le nouveau statut
+    if (status !== oldStatus) {
+      try {
+        console.log(`Mise à jour des transactions pour la commande ${orderId} passant à ${status}`);
+        
+        // Si c'est une nouvelle commande, ajouter les transactions
+        if (status === OrderStatus.CONFIRMED && oldStatus === OrderStatus.PENDING) {
+          try {
+            await WalletService.addSaleTransaction(orderId);
+            console.log(`Transactions ajoutées avec succès pour la commande ${orderId}`);
+          } catch (walletError) {
+            console.error(`Erreur lors de l'ajout des transactions pour la commande ${orderId}:`, walletError);
+          }
+        } 
+        // Si la commande est maintenant livrée, libérer les fonds
+        else if (status === OrderStatus.DELIVERED) {
+          try {
+            await WalletService.updateTransactionsOnOrderStatus(orderId, status as OrderStatus);
+            console.log(`Transactions mises à jour pour la commande livrée ${orderId}`);
+          } catch (walletError) {
+            console.error(`Erreur lors de la mise à jour du portefeuille pour la commande ${orderId}:`, walletError);
+          }
+        }
+      } catch (walletError) {
+        console.error("Erreur globale lors de la mise à jour du portefeuille:", walletError);
+        // Continuer le processus malgré l'erreur
+      }
+    }
 
     // Si la commande est annulée, mettre à jour le stock
     if (status === OrderStatus.CANCELLED && order.status !== OrderStatus.CANCELLED) {

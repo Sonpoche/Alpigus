@@ -104,152 +104,153 @@ export class NotificationService {
 
   // Envoyer une notification pour une nouvelle commande
   static async sendNewOrderNotification(order: Order): Promise<void> {
-    try {
-      await logDebug("NotificationService: Début envoi notification commande", { orderId: order.id });
-      // Récupérer les ID des producteurs impliqués dans cette commande
-      const producerIds = new Set<string>();
-      
-      // Ajouter les producteurs des articles standards
-      await logDebug("Items dans la commande:", order.items?.length || 0);
-      
-      if (order.items && order.items.length > 0) {
-        for (const item of order.items) {
-          await logDebug("Traitement item produit:", { 
-            productId: item.product?.id,
-            productName: item.product?.name
-          });
-          
-          // Si le producer n'est pas inclus dans l'objet, le récupérer séparément
-          if (!item.product?.producerId) {
-            await logDebug("Producer manquant, tentative de récupération");
-            try {
-              const product = await prisma.product.findUnique({
-                where: { id: item.product.id },
-                include: { producer: true }
+  try {
+    await logDebug("NotificationService: Début envoi notification commande", { orderId: order.id });
+    // Récupérer les ID des producteurs impliqués dans cette commande
+    const producerIds = new Set<string>();
+    
+    // Ajouter les producteurs des articles standards
+    await logDebug("Items dans la commande:", order.items?.length || 0);
+    
+    if (order.items && order.items.length > 0) {
+      for (const item of order.items) {
+        await logDebug("Traitement item produit:", { 
+          productId: item.product?.id,
+          productName: item.product?.name
+        });
+        
+        // Si le producer n'est pas inclus dans l'objet, le récupérer séparément
+        if (!item.product?.producerId) {
+          await logDebug("Producer manquant, tentative de récupération");
+          try {
+            const product = await prisma.product.findUnique({
+              where: { id: item.product.id },
+              include: { producer: true }
+            });
+            
+            if (product?.producer?.id) {
+              producerIds.add(product.producer.id);
+              await logDebug("Producer récupéré et ajouté", { 
+                producerId: product.producer.id,
+                userId: product.producer.userId
               });
-              
-              if (product?.producer?.id) {
-                producerIds.add(product.producer.id);
-                await logDebug("Producer récupéré et ajouté", { 
-                  producerId: product.producer.id,
-                  userId: product.producer.userId
-                });
-              } else {
-                await logDebug("Impossible de trouver le producer pour le produit");
-              }
-            } catch (e) {
-              const err = e as Error;
-              await logDebug("Erreur lors de la récupération du producer", { error: err.message });
+            } else {
+              await logDebug("Impossible de trouver le producer pour le produit");
             }
-          } else if (item.product?.producerId) {
-            producerIds.add(item.product.producerId);
-            await logDebug("Producer ID directement ajouté:", item.product.producerId);
+          } catch (e) {
+            const err = e as Error;
+            await logDebug("Erreur lors de la récupération du producer", { error: err.message });
           }
-        }
-      } else {
-        await logDebug("Aucun item dans la commande");
-      }
-      
-      // Ajouter les producteurs des réservations
-      await logDebug("Bookings dans la commande:", order.bookings?.length || 0);
-      
-      if (order.bookings && order.bookings.length > 0) {
-        for (const booking of order.bookings) {
-          await logDebug("Traitement booking:", {
-            slotId: booking.deliverySlot?.id,
-            productId: booking.deliverySlot?.product?.id
-          });
-          
-          if (booking.deliverySlot?.product?.producerId) {
-            producerIds.add(booking.deliverySlot.product.producerId);
-            await logDebug("Producer ID de booking ajouté:", booking.deliverySlot.product.producerId);
-          }
+        } else if (item.product?.producerId) {
+          producerIds.add(item.product.producerId);
+          await logDebug("Producer ID directement ajouté:", item.product.producerId);
         }
       }
-      
-      await logDebug("Nombre de producteurs à notifier:", producerIds.size);
-      await logDebug("Liste des IDs producteurs:", Array.from(producerIds));
-      
-      const producerIdsArray = Array.from(producerIds);
-      
-      // Pour chaque producteur, créer une notification
-      for (const producerId of producerIdsArray) {
-        await logDebug("Traitement du producteur:", producerId);
-        
-        // Trouver le userId associé au producer
-        const producer = await prisma.producer.findUnique({
-          where: { id: producerId },
-          select: { userId: true }
-        });
-        
-        if (!producer) {
-          await logDebug("ERREUR: Producteur non trouvé dans la base de données:", producerId);
-          continue;
-        }
-        
-        await logDebug("Producer userId:", producer.userId);
-        
-        // Calculer le montant total de la commande pour ce producteur
-        const producerItems = order.items?.filter(item => 
-          item.product?.producerId === producerId
-        ) || [];
-        
-        const producerBookings = order.bookings?.filter(booking => 
-          booking.deliverySlot?.product?.producerId === producerId
-        ) || [];
-        
-        const itemsTotal = producerItems.reduce(
-          (sum, item) => sum + (item.price * item.quantity), 0
-        );
-        
-        const bookingsTotal = producerBookings.reduce(
-          (sum, booking) => {
-            const price = booking.price || booking.deliverySlot?.product?.price || 0;
-            return sum + (price * booking.quantity);
-          }, 0
-        );
-        
-        const total = itemsTotal + bookingsTotal;
-        
-        await logDebug("Montant total pour ce producteur:", { 
-          itemsTotal,
-          bookingsTotal,
-          total
-        });
-        
-        // Créer la notification avec le format de lien corrigé
-        try {
-          const notification = await prisma.notification.create({
-            data: {
-              userId: producer.userId,
-              type: NotificationType.NEW_ORDER,
-              title: 'Nouvelle commande reçue',
-              message: `Vous avez reçu une nouvelle commande (#${order.id.substring(0, 8)}) d'un montant de ${total.toFixed(2)} CHF`,
-              link: `/producer/orders?modal=${order.id}`, // Format corrigé
-              data: JSON.stringify({ orderId: order.id, total })
-            }
-          });
-          
-          await logDebug("Notification créée avec ID:", notification.id);
-        } catch (e) {
-          const createError = e as Error;
-          await logDebug("ERREUR lors de la création de la notification:", {
-            error: createError.message,
-            stack: createError.stack
-          });
-        }
-      }
-      
-      await logDebug("NotificationService: Fin de l'envoi de notification");
-    } catch (e) {
-      const error = e as Error;
-      await logDebug('Erreur lors de l\'envoi de la notification:', {
-        error: error.message,
-        stack: error.stack
-      });
-      console.error('Erreur lors de l\'envoi de la notification:', error);
+    } else {
+      await logDebug("Aucun item dans la commande");
     }
+    
+    // Ajouter les producteurs des réservations
+    await logDebug("Bookings dans la commande:", order.bookings?.length || 0);
+    
+    if (order.bookings && order.bookings.length > 0) {
+      for (const booking of order.bookings) {
+        await logDebug("Traitement booking:", {
+          slotId: booking.deliverySlot?.id,
+          productId: booking.deliverySlot?.product?.id
+        });
+        
+        if (booking.deliverySlot?.product?.producerId) {
+          producerIds.add(booking.deliverySlot.product.producerId);
+          await logDebug("Producer ID de booking ajouté:", booking.deliverySlot.product.producerId);
+        }
+      }
+    }
+    
+    await logDebug("Nombre de producteurs à notifier:", producerIds.size);
+    await logDebug("Liste des IDs producteurs:", Array.from(producerIds));
+    
+    const producerIdsArray = Array.from(producerIds);
+    
+    // Pour chaque producteur, créer une notification
+    for (const producerId of producerIdsArray) {
+      await logDebug("Traitement du producteur:", producerId);
+      
+      // Trouver le userId associé au producer
+      const producer = await prisma.producer.findUnique({
+        where: { id: producerId },
+        select: { userId: true }
+      });
+      
+      if (!producer) {
+        await logDebug("ERREUR: Producteur non trouvé dans la base de données:", producerId);
+        continue;
+      }
+      
+      await logDebug("Producer userId:", producer.userId);
+      
+      // Calculer le montant total de la commande pour ce producteur
+      const producerItems = order.items?.filter(item => 
+        item.product?.producerId === producerId
+      ) || [];
+      
+      const producerBookings = order.bookings?.filter(booking => 
+        booking.deliverySlot?.product?.producerId === producerId
+      ) || [];
+      
+      const itemsTotal = producerItems.reduce(
+        (sum, item) => sum + (item.price * item.quantity), 0
+      );
+      
+      const bookingsTotal = producerBookings.reduce(
+        (sum, booking) => {
+          const price = booking.price || booking.deliverySlot?.product?.price || 0;
+          return sum + (price * booking.quantity);
+        }, 0
+      );
+      
+      const total = itemsTotal + bookingsTotal;
+      
+      await logDebug("Montant total pour ce producteur:", { 
+        itemsTotal,
+        bookingsTotal,
+        total
+      });
+      
+      // Créer la notification avec le format de lien corrigé
+      try {
+        const truncatedOrderId = order.id.substring(0, 8).toUpperCase();
+        const notification = await prisma.notification.create({
+          data: {
+            userId: producer.userId,
+            type: NotificationType.NEW_ORDER,
+            title: 'Nouvelle commande reçue',
+            message: `Vous avez reçu une nouvelle commande (#${truncatedOrderId}) d'un montant de ${total.toFixed(2)} CHF`,
+            link: `/producer/orders`, // Modifié pour simplifier l'URL
+            data: JSON.stringify({ orderId: order.id, total })
+          }
+        });
+        
+        await logDebug("Notification créée avec ID:", notification.id);
+      } catch (e) {
+        const createError = e as Error;
+        await logDebug("ERREUR lors de la création de la notification:", {
+          error: createError.message,
+          stack: createError.stack
+        });
+      }
+    }
+    
+    await logDebug("NotificationService: Fin de l'envoi de notification");
+  } catch (e) {
+    const error = e as Error;
+    await logDebug('Erreur lors de l\'envoi de la notification:', {
+      error: error.message,
+      stack: error.stack
+    });
+    console.error('Erreur lors de l\'envoi de la notification:', error);
   }
+}
   
   // Envoyer une notification de changement de statut de commande
   static async sendOrderStatusChangeNotification(order: Order, oldStatus: string): Promise<void> {

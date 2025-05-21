@@ -39,7 +39,7 @@ export default function ProducerMenu() {
     },
     {
       href: '/producer/delivery-slots/overview',
-      label: 'Livraisons',
+      label: 'Créneaux',
       icon: <Truck className="h-5 w-5" />
     },
     {

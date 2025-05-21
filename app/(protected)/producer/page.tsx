@@ -25,6 +25,8 @@ interface Product {
     quantity: number
   } | null
   deliverySlots?: any[]
+  minOrderQuantity?: number
+  acceptDeferred?: boolean
 }
 
 interface DashboardStats {
@@ -394,11 +396,11 @@ export default function ProducerDashboard() {
                   {product.stock ? formatNumber(product.stock.quantity) : '0'} {product.unit}
                 </span>
               </div>
-              {product.minOrderQuantity > 0 && (
+              {(product.minOrderQuantity !== undefined && product.minOrderQuantity > 0) && (
                 <div className="flex justify-between">
                   <span className="text-custom-text">Quantité min.</span>
                   <span className="font-medium">
-                    {formatNumber(product.minOrderQuantity)} {product.unit}
+                    {formatNumber(product.minOrderQuantity ?? 0)} {product.unit}
                   </span>
                 </div>
               )}

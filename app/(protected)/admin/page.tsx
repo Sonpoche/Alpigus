@@ -48,6 +48,21 @@ export default function AdminPage() {
             Accéder aux produits →
           </a>
         </div>
+
+        {/* Carte Portefeuilles */}
+        <div className="bg-background border border-foreground/10 rounded-lg p-6 shadow-sm">
+          <h2 className="text-lg font-semibold text-custom-title mb-4">Gestion des retraits</h2>
+          <p className="text-custom-text mb-4">
+            Gérez les Portefeuilles producteurs et les retraits.
+          </p>
+          <a
+            href="/admin/wallets"
+            className="text-custom-accent hover:opacity-90 transition-opacity"
+          >
+            Accéder aux portefeuilles →
+          </a>
+        </div>
+
       </div>
     </div>
   )

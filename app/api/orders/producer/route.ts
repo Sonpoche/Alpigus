@@ -35,11 +35,13 @@ export const GET = apiAuthMiddleware(async (req: NextRequest, session: Session) 
     if (statusParam) {
       baseWhere.status = statusParam
     } else {
-      // Par défaut, montrer seulement les commandes validées (exclure DRAFT et PENDING)
+      // Par défaut, montrer toutes les commandes sauf DRAFT
       baseWhere.status = {
-        notIn: [OrderStatus.DRAFT, OrderStatus.PENDING]
+        notIn: [OrderStatus.DRAFT]
       }
     }
+
+    console.log(`Recherche de commandes pour le producteur ${producerId} avec filtres:`, baseWhere);
 
     // Trouver les commandes qui contiennent des produits de ce producteur
     const ordersWithProducerItems = await prisma.order.findMany({
@@ -108,6 +110,9 @@ export const GET = apiAuthMiddleware(async (req: NextRequest, session: Session) 
       skip: (page - 1) * limit,
       take: limit
     })
+
+    // app/api/orders/producer/route.ts (suite)
+    console.log(`Nombre de commandes trouvées: ${ordersWithProducerItems.length}`);
 
     // Filtrer les éléments pour ne renvoyer que ceux appartenant au producteur
     const ordersWithFilteredItems = ordersWithProducerItems.map(order => {
