@@ -16,7 +16,10 @@ import {
   Search,
   FilterIcon,
   AlertCircle,
-  Edit2
+  Edit2,
+  MapPin,
+  Store,
+  Phone
 } from 'lucide-react'
 import Link from 'next/link'
 import { Badge } from '@/components/ui/badge'
@@ -73,6 +76,94 @@ interface DeliveryInfo {
   address?: string;
   notes?: string;
   paymentMethod?: string;
+}
+
+// Composant pour afficher l'adresse de retrait
+function OrderPickupAddress({ orderId, deliveryType }: { orderId: string, deliveryType: string }) {
+  const [producerDetails, setProducerDetails] = useState<{
+    companyName: string
+    address: string
+    phone: string
+  } | null>(null)
+  const [isLoading, setIsLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (deliveryType !== 'pickup') {
+      setIsLoading(false)
+      return
+    }
+
+    async function fetchProducerAddress() {
+      try {
+        setIsLoading(true)
+        const response = await fetch(`/api/orders/${orderId}/producer-details`)
+        
+        if (!response.ok) {
+          throw new Error('Impossible de récupérer les informations du producteur')
+        }
+        
+        const data = await response.json()
+        setProducerDetails(data)
+      } catch (error) {
+        console.error('Erreur:', error)
+        setError('Impossible de charger l\'adresse de retrait')
+      } finally {
+        setIsLoading(false)
+      }
+    }
+
+    fetchProducerAddress()
+  }, [orderId, deliveryType])
+
+  if (deliveryType !== 'pickup') {
+    return null
+  }
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center h-20">
+        <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-custom-accent"></div>
+      </div>
+    )
+  }
+
+  if (error || !producerDetails) {
+    return (
+      <div className="bg-amber-50 dark:bg-amber-900/20 p-4 rounded-lg text-amber-800 dark:text-amber-300 text-sm">
+        Contactez le support pour obtenir l'adresse de retrait.
+      </div>
+    )
+  }
+
+  return (
+    <div className="bg-background border border-foreground/10 rounded-lg p-4 mt-4">
+      <h3 className="font-medium text-base mb-3 flex items-center gap-2">
+        <Store className="h-5 w-5 text-custom-accent" />
+        Adresse de retrait
+      </h3>
+      
+      <div className="space-y-2 text-sm">
+        <p className="font-semibold">{producerDetails.companyName}</p>
+        
+        <div className="flex items-start gap-2">
+          <MapPin className="h-4 w-4 text-custom-accent mt-0.5 shrink-0" />
+          <p className="text-foreground/80 whitespace-pre-line">{producerDetails.address}</p>
+        </div>
+        
+        {producerDetails.phone && (
+          <div className="flex items-start gap-2">
+            <Phone className="h-4 w-4 text-custom-accent mt-0.5 shrink-0" />
+            <p className="text-foreground/80">{producerDetails.phone}</p>
+          </div>
+        )}
+      </div>
+      
+      <div className="mt-4 text-xs text-foreground/60 bg-foreground/5 p-3 rounded-md">
+        Veuillez vous présenter avec votre numéro de commande #{orderId.substring(0, 8).toUpperCase()} lors du retrait.
+      </div>
+    </div>
+  )
 }
 
 export default function OrdersPage() {
@@ -514,290 +605,298 @@ export default function OrdersPage() {
                       setIsDetailOpen(true)
                     }}
                     className="text-custom-accent hover:opacity-80 transition-opacity text-sm font-medium flex items-center gap-1"
-                  >
-                    Détails <ChevronRight className="h-4 w-4" />
-                  </button>
-                </div>
-              </div>
-            </motion.div>
-          ))}
-        </div>
-      )}
-      
-      {/* Modal détaillée de la commande */}
-      <AnimatePresence>
-        {selectedOrder && isDetailOpen && (
-          <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-            <motion.div
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.95 }}
-              className="bg-background rounded-lg shadow-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto"
-            >
-              <div className="p-6 border-b border-foreground/10 flex justify-between items-center sticky top-0 bg-background z-10">
-                <div className="flex items-center gap-2">
-                  {getStatusIcon(selectedOrder.status)}
-                  <h3 className="font-medium text-lg">
-                    Commande #{selectedOrder.id.substring(0, 8).toUpperCase()}
-                  </h3>
-                </div>
-                
-                <button
-                  onClick={() => setIsDetailOpen(false)}
-                  className="text-muted-foreground hover:text-foreground"
-                >
-                  <XCircle className="h-5 w-5" />
-                </button>
-              </div>
-              
-              <div className="p-6 space-y-6">
-                {/* Informations générales */}
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <p className="text-sm text-muted-foreground">Date de commande</p>
-                    <p className="font-medium">
-                      {new Date(selectedOrder.createdAt).toLocaleDateString('fr-FR', {
-                        day: 'numeric',
-                        month: 'long',
-                        year: 'numeric'
-                      })}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-muted-foreground">Statut</p>
-                    <div>{getStatusBadge(selectedOrder.status)}</div>
-                  </div>
-                  
-                  {/* Informations de livraison */}
-                  {selectedOrder.metadata && (
-                    <>
-                      <div>
-                        <p className="text-sm text-muted-foreground">Mode de livraison</p>
-                        <p className="font-medium">
-                          {getDeliveryInfo(selectedOrder)?.type === 'pickup' 
-                            ? 'Retrait sur place' 
-                            : 'Livraison à domicile'}
-                        </p>
-                      </div>
-                      <div>
-                        <p className="text-sm text-muted-foreground">Paiement</p>
-                        <p className="font-medium">
-                          {getDeliveryInfo(selectedOrder)?.paymentMethod === 'invoice' 
-                            ? 'Facturation' 
-                            : 'Carte de crédit'}
-                        </p>
-                      </div>
-                    </>
-                  )}
-                </div>
-                
-                {/* Adresse de livraison si applicable */}
-                {getDeliveryInfo(selectedOrder)?.address && (
-                  <div>
-                    <p className="text-sm text-muted-foreground mb-1">Adresse de livraison</p>
-                    <p className="p-3 bg-foreground/5 rounded-md">
-                      {getDeliveryInfo(selectedOrder)?.address}
-                    </p>
-                  </div>
-                )}
-                
-                {/* Notes de livraison si applicable */}
-                {getDeliveryInfo(selectedOrder)?.notes && (
-                  <div>
-                    <p className="text-sm text-muted-foreground mb-1">Instructions spéciales</p>
-                    <p className="p-3 bg-foreground/5 rounded-md">
-                      {getDeliveryInfo(selectedOrder)?.notes}
-                    </p>
-                  </div>
-                )}
-                
-                {/* Produits */}
-                <div>
-                  <p className="font-medium mb-3">Produits commandés</p>
-                  <div className="space-y-4 divide-y divide-foreground/10">
-                    {selectedOrder.items.map((item) => (
-                      <div key={item.id} className="flex pt-4 first:pt-0">
-                        <div className="w-16 h-16 bg-foreground/5 rounded-md overflow-hidden flex-shrink-0">
-                          {item.product.image ? (
-                            <img
-                              src={item.product.image}
-                              alt={item.product.name}
-                              className="w-full h-full object-cover"
-                            />
-                          ) : (
-                            <div className="w-full h-full flex items-center justify-center text-foreground/30">
-                              <Package className="h-8 w-8" />
-                            </div>
-                          )}
-                        </div>
-                        <div className="ml-4 flex-1">
-                          <Link href={`/products/${item.product.id}`} className="font-medium hover:text-custom-accent">
-                            {item.product.name}
-                          </Link>
-                          <p className="text-sm text-muted-foreground">
-                            Quantité: {item.quantity} {item.product.unit}
-                          </p>
-                          <p className="text-sm">
-                            Prix unitaire: {item.price.toFixed(2)} CHF
-                          </p>
-                        </div>
-                        <div className="ml-4 text-right">
-                          <p className="font-medium">{(item.price * item.quantity).toFixed(2)} CHF</p>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-                
-                {/* Livraisons programmées */}
-                {selectedOrder.bookings && selectedOrder.bookings.length > 0 && (
-                  <div>
-                    <p className="font-medium mb-3">Livraisons programmées</p>
-                    <div className="space-y-4 divide-y divide-foreground/10">
-                      {selectedOrder.bookings.map((booking) => {
-                        const isPast = new Date(booking.deliverySlot.date) < new Date();
-                        return (
-                          <div key={booking.id} className="flex pt-4 first:pt-0">
-                            <div className="w-16 h-16 rounded-md overflow-hidden flex-shrink-0">
-                              {booking.deliverySlot.product.image ? (
-                                <img
-                                src={booking.deliverySlot.product.image}
-                                alt={booking.deliverySlot.product.name}
-                                className="w-full h-full object-cover"
-                              />
-                            ) : (
-                              <div className="w-full h-full bg-blue-100 dark:bg-blue-900/20 flex items-center justify-center">
-                                <Calendar className="h-8 w-8 text-blue-600 dark:text-blue-400" />
-                              </div>
-                            )}
-                          </div>
-                          <div className="ml-4 flex-1">
-                            <div className="flex items-center">
-                              <p className="font-medium">{booking.deliverySlot.product.name}</p>
-                              {isPast && (
-                                <span className="ml-2 text-xs bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 px-2 py-0.5 rounded-full">
-                                  Passé
-                                </span>
-                              )}
-                            </div>
-                            <p className="text-sm text-muted-foreground">
-                              {isPast ? "Livraison était prévue le " : "Livraison prévue le "} 
-                              {new Date(booking.deliverySlot.date).toLocaleDateString('fr-FR', {
-                                day: 'numeric',
-                                month: 'long',
-                                year: 'numeric'
-                              })}
-                            </p>
-                            <p className="text-sm mt-1">
-                              Quantité: {booking.quantity} {booking.deliverySlot.product.unit}
-                            </p>
-                            <p className="text-sm font-medium mt-1">
-                              {(booking.price ? booking.price * booking.quantity : 
-                                booking.deliverySlot.product.price ? booking.deliverySlot.product.price * booking.quantity : 
-                                0).toFixed(2)} CHF
-                            </p>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
-              
-              {/* Résumé des coûts */}
-              <div className="border-t border-foreground/10 pt-4">
-                <div className="flex justify-between mb-2">
-                  <p>Sous-total</p>
-                  <p>{selectedOrder.total.toFixed(2)} CHF</p>
-                </div>
-                {getDeliveryInfo(selectedOrder)?.type === 'delivery' && (
-                  <div className="flex justify-between mb-2">
-                    <p>Frais de livraison</p>
-                    <p>15.00 CHF</p>
-                  </div>
-                )}
-                <div className="flex justify-between font-semibold text-lg pt-2 border-t border-foreground/10">
-                  <p>Total</p>
-                  <p>{((getDeliveryInfo(selectedOrder)?.type === 'delivery' ? 15 : 0) + selectedOrder.total).toFixed(2)} CHF</p>
-                </div>
-              </div>
-              
-              {/* Actions */}
-              <div className="flex justify-between pt-4">
-                <button
-                  onClick={() => setIsDetailOpen(false)}
-                  className="px-4 py-2 border border-foreground/10 rounded-md hover:bg-foreground/5 transition-colors"
-                >
-                  Fermer
-                </button>
-                
-                {selectedOrder.status === OrderStatus.DELIVERED && (
-                  <button
-                    className="bg-custom-accent text-white px-4 py-2 rounded-md hover:opacity-90 transition-opacity"
-                  >
-                    Télécharger la facture
-                  </button>
-                )}
-                
-                {(selectedOrder.status === OrderStatus.PENDING || selectedOrder.status === OrderStatus.DRAFT) && (
-                  <button
-                    onClick={async () => {
-                      if (window.confirm("Êtes-vous sûr de vouloir annuler cette commande ? Cette action est irréversible.")) {
-                        try {
-                          const response = await fetch(`/api/orders/${selectedOrder.id}`, {
-                            method: 'PATCH',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ status: OrderStatus.CANCELLED })
-                          });
-                          
-                          if (!response.ok) {
-                            throw new Error('Erreur lors de l\'annulation de la commande');
-                          }
-                          
-                          toast({
-                            title: "Commande annulée",
-                            description: "Votre commande a été annulée avec succès"
-                          });
-                          
-                          setIsDetailOpen(false);
-                          
-                          // Rafraîchir la liste des commandes
-                          setTimeout(() => {
-                            window.location.reload();
-                          }, 500);
-                        } catch (error) {
-                          console.error('Erreur:', error);
-                          toast({
-                            title: "Erreur",
-                            description: "Impossible d'annuler la commande",
-                            variant: "destructive"
-                          });
-                        }
-                      }
-                    }}
-                    className="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-md transition-colors"
-                  >
-                    Annuler la commande
-                  </button>
-                )}
-                
-                {/* Bouton spécifique pour les paniers (DRAFT) */}
-                {selectedOrder.status === OrderStatus.DRAFT && (
-                  <button
-                    onClick={() => {
-                      router.push('/checkout');
-                    }}
-                    className="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-md transition-colors ml-2"
-                  >
-                    Passer au paiement
-                  </button>
-                )}
-              </div>
-            </div>
-          </motion.div>
-        </div>
-      )}
-    </AnimatePresence>
-  </div>
+                 >
+                   Détails <ChevronRight className="h-4 w-4" />
+                 </button>
+               </div>
+             </div>
+           </motion.div>
+         ))}
+       </div>
+     )}
+     
+     {/* Modal détaillée de la commande */}
+     <AnimatePresence>
+       {selectedOrder && isDetailOpen && (
+         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+           <motion.div
+             initial={{ opacity: 0, scale: 0.95 }}
+             animate={{ opacity: 1, scale: 1 }}
+             exit={{ opacity: 0, scale: 0.95 }}
+             className="bg-background rounded-lg shadow-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto"
+           >
+             <div className="p-6 border-b border-foreground/10 flex justify-between items-center sticky top-0 bg-background z-10">
+               <div className="flex items-center gap-2">
+                 {getStatusIcon(selectedOrder.status)}
+                 <h3 className="font-medium text-lg">
+                   Commande #{selectedOrder.id.substring(0, 8).toUpperCase()}
+                 </h3>
+               </div>
+               
+               <button
+                 onClick={() => setIsDetailOpen(false)}
+                 className="text-muted-foreground hover:text-foreground"
+               >
+                 <XCircle className="h-5 w-5" />
+               </button>
+             </div>
+             
+             <div className="p-6 space-y-6">
+               {/* Informations générales */}
+               <div className="grid grid-cols-2 gap-4">
+                 <div>
+                   <p className="text-sm text-muted-foreground">Date de commande</p>
+                   <p className="font-medium">
+                     {new Date(selectedOrder.createdAt).toLocaleDateString('fr-FR', {
+                       day: 'numeric',
+                       month: 'long',
+                       year: 'numeric'
+                     })}
+                   </p>
+                 </div>
+                 <div>
+                   <p className="text-sm text-muted-foreground">Statut</p>
+                   <div>{getStatusBadge(selectedOrder.status)}</div>
+                 </div>
+                 
+                 {/* Informations de livraison */}
+                 {selectedOrder.metadata && (
+                   <>
+                     <div>
+                       <p className="text-sm text-muted-foreground">Mode de livraison</p>
+                       <p className="font-medium">
+                         {getDeliveryInfo(selectedOrder)?.type === 'pickup' 
+                           ? 'Retrait sur place' 
+                           : 'Livraison à domicile'}
+                       </p>
+                     </div>
+                     <div>
+                       <p className="text-sm text-muted-foreground">Paiement</p>
+                       <p className="font-medium">
+                         {getDeliveryInfo(selectedOrder)?.paymentMethod === 'invoice' 
+                           ? 'Facturation' 
+                           : 'Carte de crédit'}
+                       </p>
+                     </div>
+                   </>
+                 )}
+               </div>
+               
+               {/* Adresse de retrait sur place */}
+               {getDeliveryInfo(selectedOrder)?.type === 'pickup' && (
+                 <OrderPickupAddress 
+                   orderId={selectedOrder.id} 
+                   deliveryType="pickup" 
+                 />
+               )}
+               
+               {/* Adresse de livraison si applicable */}
+               {getDeliveryInfo(selectedOrder)?.type === 'delivery' && getDeliveryInfo(selectedOrder)?.address && (
+                 <div>
+                   <p className="text-sm text-muted-foreground mb-1">Adresse de livraison</p>
+                   <p className="p-3 bg-foreground/5 rounded-md">
+                     {getDeliveryInfo(selectedOrder)?.address}
+                   </p>
+                 </div>
+               )}
+               
+               {/* Notes de livraison si applicable */}
+               {getDeliveryInfo(selectedOrder)?.notes && (
+                 <div>
+                   <p className="text-sm text-muted-foreground mb-1">Instructions spéciales</p>
+                   <p className="p-3 bg-foreground/5 rounded-md">
+                     {getDeliveryInfo(selectedOrder)?.notes}
+                   </p>
+                 </div>
+               )}
+               
+               {/* Produits */}
+               <div>
+                 <p className="font-medium mb-3">Produits commandés</p>
+                 <div className="space-y-4 divide-y divide-foreground/10">
+                   {selectedOrder.items.map((item) => (
+                     <div key={item.id} className="flex pt-4 first:pt-0">
+                       <div className="w-16 h-16 bg-foreground/5 rounded-md overflow-hidden flex-shrink-0">
+                         {item.product.image ? (
+                           <img
+                             src={item.product.image}
+                             alt={item.product.name}
+                             className="w-full h-full object-cover"
+                           />
+                         ) : (
+                           <div className="w-full h-full flex items-center justify-center text-foreground/30">
+                             <Package className="h-8 w-8" />
+                           </div>
+                         )}
+                       </div>
+                       <div className="ml-4 flex-1">
+                         <Link href={`/products/${item.product.id}`} className="font-medium hover:text-custom-accent">
+                           {item.product.name}
+                         </Link>
+                         <p className="text-sm text-muted-foreground">
+                           Quantité: {item.quantity} {item.product.unit}
+                         </p>
+                         <p className="text-sm">
+                           Prix unitaire: {item.price.toFixed(2)} CHF
+                         </p>
+                       </div>
+                       <div className="ml-4 text-right">
+                         <p className="font-medium">{(item.price * item.quantity).toFixed(2)} CHF</p>
+                       </div>
+                     </div>
+                   ))}
+                 </div>
+               </div>
+               
+               {/* Livraisons programmées */}
+               {selectedOrder.bookings && selectedOrder.bookings.length > 0 && (
+                 <div>
+                   <p className="font-medium mb-3">Livraisons programmées</p>
+                   <div className="space-y-4 divide-y divide-foreground/10">
+                     {selectedOrder.bookings.map((booking) => {
+                       const isPast = new Date(booking.deliverySlot.date) < new Date();
+                       return (
+                         <div key={booking.id} className="flex pt-4 first:pt-0">
+                           <div className="w-16 h-16 rounded-md overflow-hidden flex-shrink-0">
+                             {booking.deliverySlot.product.image ? (
+                               <img
+                               src={booking.deliverySlot.product.image}
+                               alt={booking.deliverySlot.product.name}
+                               className="w-full h-full object-cover"
+                             />
+                           ) : (
+                             <div className="w-full h-full bg-blue-100 dark:bg-blue-900/20 flex items-center justify-center">
+                               <Calendar className="h-8 w-8 text-blue-600 dark:text-blue-400" />
+                             </div>
+                           )}
+                         </div>
+                         <div className="ml-4 flex-1">
+                           <div className="flex items-center">
+                             <p className="font-medium">{booking.deliverySlot.product.name}</p>
+                             {isPast && (
+                               <span className="ml-2 text-xs bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 px-2 py-0.5 rounded-full">
+                                 Passé
+                               </span>
+                             )}
+                           </div>
+                           <p className="text-sm text-muted-foreground">
+                             {isPast ? "Livraison était prévue le " : "Livraison prévue le "} 
+                             {new Date(booking.deliverySlot.date).toLocaleDateString('fr-FR', {
+                               day: 'numeric',
+                               month: 'long',
+                               year: 'numeric'
+                             })}
+                           </p>
+                           <p className="text-sm mt-1">
+                             Quantité: {booking.quantity} {booking.deliverySlot.product.unit}
+                           </p>
+                           <p className="text-sm font-medium mt-1">
+                             {(booking.price ? booking.price * booking.quantity : 
+                               booking.deliverySlot.product.price ? booking.deliverySlot.product.price * booking.quantity : 
+                               0).toFixed(2)} CHF
+                           </p>
+                         </div>
+                       </div>
+                     );
+                   })}
+                 </div>
+               </div>
+             )}
+             
+             {/* Résumé des coûts */}
+             <div className="border-t border-foreground/10 pt-4">
+               <div className="flex justify-between mb-2">
+                 <p>Sous-total</p>
+                 <p>{selectedOrder.total.toFixed(2)} CHF</p>
+               </div>
+               {getDeliveryInfo(selectedOrder)?.type === 'delivery' && (
+                 <div className="flex justify-between mb-2">
+                   <p>Frais de livraison</p>
+                   <p>15.00 CHF</p>
+                 </div>
+               )}
+               <div className="flex justify-between font-semibold text-lg pt-2 border-t border-foreground/10">
+                 <p>Total</p>
+                 <p>{((getDeliveryInfo(selectedOrder)?.type === 'delivery' ? 15 : 0) + selectedOrder.total).toFixed(2)} CHF</p>
+               </div>
+             </div>
+             
+             {/* Actions */}
+             <div className="flex justify-between pt-4">
+               <button
+                 onClick={() => setIsDetailOpen(false)}
+                 className="px-4 py-2 border border-foreground/10 rounded-md hover:bg-foreground/5 transition-colors"
+               >
+                 Fermer
+               </button>
+               
+               {selectedOrder.status === OrderStatus.DELIVERED && (
+                 <button
+                   className="bg-custom-accent text-white px-4 py-2 rounded-md hover:opacity-90 transition-opacity"
+                 >
+                   Télécharger la facture
+                 </button>
+               )}
+               
+               {(selectedOrder.status === OrderStatus.PENDING || selectedOrder.status === OrderStatus.DRAFT) && (
+                 <button
+                   onClick={async () => {
+                     if (window.confirm("Êtes-vous sûr de vouloir annuler cette commande ? Cette action est irréversible.")) {
+                       try {
+                         const response = await fetch(`/api/orders/${selectedOrder.id}`, {
+                           method: 'PATCH',
+                           headers: { 'Content-Type': 'application/json' },
+                           body: JSON.stringify({ status: OrderStatus.CANCELLED })
+                         });
+                         
+                         if (!response.ok) {
+                           throw new Error('Erreur lors de l\'annulation de la commande');
+                         }
+                         
+                         toast({
+                           title: "Commande annulée",
+                           description: "Votre commande a été annulée avec succès"
+                         });
+                         
+                         setIsDetailOpen(false);
+                         
+                         // Rafraîchir la liste des commandes
+                         setTimeout(() => {
+                           window.location.reload();
+                         }, 500);
+                       } catch (error) {
+                         console.error('Erreur:', error);
+                         toast({
+                           title: "Erreur",
+                           description: "Impossible d'annuler la commande",
+                           variant: "destructive"
+                         });
+                       }
+                     }
+                   }}
+                   className="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-md transition-colors"
+                 >
+                   Annuler la commande
+                 </button>
+               )}
+               
+               {/* Bouton spécifique pour les paniers (DRAFT) */}
+               {selectedOrder.status === OrderStatus.DRAFT && (
+                 <button
+                   onClick={() => {
+                     router.push('/checkout');
+                   }}
+                   className="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-md transition-colors ml-2"
+                 >
+                   Passer au paiement
+                 </button>
+               )}
+             </div>
+           </div>
+         </motion.div>
+       </div>
+     )}
+   </AnimatePresence>
+ </div>
 )
 }

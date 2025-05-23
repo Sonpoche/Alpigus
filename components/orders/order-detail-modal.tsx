@@ -12,11 +12,232 @@ import {
   Truck,
   ShoppingBag,
   CreditCard,
-  FileText
+  FileText,
+  MapPin,
+  Store,
+  Phone,
+  Home
 } from 'lucide-react'
 import OrderStatusBadge from './order-status-badge'
 import OrderStatusIcon from './order-status-icon'
 import PaymentStatusBadge from './payment-status-badge'
+import { useState, useEffect } from 'react'
+
+interface OrderPickupAddressProps {
+  orderId: string
+  deliveryType: string
+}
+
+function OrderPickupAddress({ orderId, deliveryType }: OrderPickupAddressProps) {
+  const [producerDetails, setProducerDetails] = useState<{
+    companyName: string
+    address: string
+    phone: string
+  } | null>(null)
+  const [isLoading, setIsLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    // Si ce n'est pas un retrait sur place, ne rien faire
+    if (deliveryType !== 'pickup') {
+      setIsLoading(false)
+      return
+    }
+
+    async function fetchProducerAddress() {
+      try {
+        setIsLoading(true)
+        // Récupérer les détails du producteur pour cette commande
+        const response = await fetch(`/api/orders/${orderId}/producer-details`)
+        
+        if (!response.ok) {
+          throw new Error('Impossible de récupérer les informations du producteur')
+        }
+        
+        const data = await response.json()
+        setProducerDetails(data)
+      } catch (error) {
+        console.error('Erreur:', error)
+        setError('Impossible de charger l\'adresse de retrait')
+      } finally {
+        setIsLoading(false)
+      }
+    }
+
+    fetchProducerAddress()
+  }, [orderId, deliveryType])
+
+  // Ne rien afficher si ce n'est pas un retrait sur place
+  if (deliveryType !== 'pickup') {
+    return null
+  }
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center h-20">
+        <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-custom-accent"></div>
+      </div>
+    )
+  }
+
+  if (error || !producerDetails) {
+  return null; // Ou simplement ne rien afficher au lieu du message d'erreur
+}
+  return (
+    <div className="bg-background border border-foreground/10 rounded-lg p-4 mt-4">
+      <h3 className="font-medium text-base mb-3 flex items-center gap-2">
+        <Store className="h-5 w-5 text-custom-accent" />
+        Adresse de retrait
+      </h3>
+      
+      <div className="space-y-2 text-sm">
+        <p className="font-semibold">{producerDetails.companyName}</p>
+        
+        <div className="flex items-start gap-2">
+          <MapPin className="h-4 w-4 text-custom-accent mt-0.5 shrink-0" />
+          <p className="text-foreground/80 whitespace-pre-line">{producerDetails.address}</p>
+        </div>
+        
+        {producerDetails.phone && (
+          <div className="flex items-start gap-2">
+            <Phone className="h-4 w-4 text-custom-accent mt-0.5 shrink-0" />
+            <p className="text-foreground/80">{producerDetails.phone}</p>
+          </div>
+        )}
+      </div>
+      
+      <div className="mt-4 text-xs text-foreground/60 bg-foreground/5 p-3 rounded-md">
+        Veuillez vous présenter avec votre numéro de commande lors du retrait.
+      </div>
+    </div>
+  )
+}
+
+interface OrderDeliveryAddressProps {
+  orderId: string
+  deliveryType: string
+}
+
+function OrderDeliveryAddress({ orderId, deliveryType }: OrderDeliveryAddressProps) {
+  const [deliveryDetails, setDeliveryDetails] = useState<{
+    fullName: string
+    company?: string
+    address: string
+    postalCode: string
+    city: string
+    phone: string
+    notes?: string
+  } | null>(null)
+  const [isLoading, setIsLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    // Si ce n'est pas une livraison à domicile, ne rien faire
+    if (deliveryType !== 'delivery') {
+      setIsLoading(false)
+      return
+    }
+
+    async function fetchDeliveryAddress() {
+      try {
+        setIsLoading(true)
+        // Récupérer les détails de livraison pour cette commande
+        const response = await fetch(`/api/orders/${orderId}/delivery-details`)
+        
+        if (!response.ok) {
+          throw new Error('Impossible de récupérer les informations de livraison')
+        }
+        
+        const data = await response.json()
+        setDeliveryDetails(data)
+      } catch (error) {
+        console.error('Erreur:', error)
+        setError('Impossible de charger l\'adresse de livraison')
+      } finally {
+        setIsLoading(false)
+      }
+    }
+
+    fetchDeliveryAddress()
+  }, [orderId, deliveryType])
+
+  // Ne rien afficher si ce n'est pas une livraison à domicile
+  if (deliveryType !== 'delivery') {
+    return null
+  }
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center h-20">
+        <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-custom-accent"></div>
+      </div>
+    )
+  }
+
+  if (error || !deliveryDetails) {
+    return (
+      <div className="bg-amber-50 dark:bg-amber-900/20 p-4 rounded-lg text-amber-800 dark:text-amber-300 text-sm">
+        Informations de livraison non disponibles. Contactez le client directement.
+      </div>
+    )
+  }
+
+  return (
+    <div className="bg-background border border-foreground/10 rounded-lg p-4 mt-4">
+      <h3 className="font-medium text-base mb-3 flex items-center gap-2">
+        <Home className="h-5 w-5 text-custom-accent" />
+        Adresse de livraison
+      </h3>
+      
+      <div className="space-y-3 text-sm">
+        {/* Informations du destinataire */}
+        <div className="flex items-start gap-2">
+          <User className="h-4 w-4 text-custom-accent mt-0.5 shrink-0" />
+          <div>
+            <p className="font-semibold">{deliveryDetails.fullName}</p>
+            {deliveryDetails.company && (
+              <p className="text-foreground/70">{deliveryDetails.company}</p>
+            )}
+          </div>
+        </div>
+        
+        {/* Adresse complète */}
+        <div className="flex items-start gap-2">
+          <MapPin className="h-4 w-4 text-custom-accent mt-0.5 shrink-0" />
+          <div>
+            <p className="text-foreground/80">{deliveryDetails.address}</p>
+            <p className="text-foreground/80">
+              {deliveryDetails.postalCode} {deliveryDetails.city}
+            </p>
+          </div>
+        </div>
+        
+        {/* Téléphone */}
+        <div className="flex items-start gap-2">
+          <Phone className="h-4 w-4 text-custom-accent mt-0.5 shrink-0" />
+          <p className="text-foreground/80">{deliveryDetails.phone}</p>
+        </div>
+        
+        {/* Notes de livraison si présentes */}
+        {deliveryDetails.notes && (
+          <div className="flex items-start gap-2">
+            <FileText className="h-4 w-4 text-custom-accent mt-0.5 shrink-0" />
+            <div>
+              <p className="text-xs text-muted-foreground mb-1">Instructions spéciales :</p>
+              <p className="text-foreground/80 italic">{deliveryDetails.notes}</p>
+            </div>
+          </div>
+        )}
+      </div>
+      
+      <div className="mt-4 text-xs text-foreground/60 bg-foreground/5 p-3 rounded-md">
+        <p className="font-medium mb-1">Informations de livraison :</p>
+        <p>• Frais de livraison : 15.00 CHF</p>
+        <p>• Numéro de commande : #{orderId.substring(0, 8).toUpperCase()}</p>
+      </div>
+    </div>
+  )
+}
 
 interface OrderDetailModalProps {
   order: Order
@@ -35,14 +256,38 @@ export default function OrderDetailModal({
 }: OrderDetailModalProps) {
   // Parse delivery info from order metadata
   const getDeliveryInfo = (order: Order): DeliveryInfo | null => {
-    if (!order.metadata) return null;
+  if (!order.metadata) return null;
+  
+  try {
+    const metadata = JSON.parse(order.metadata);
+    // Supprimer cette ligne : console.log('Metadata parsed:', metadata);
     
-    try {
-      return JSON.parse(order.metadata) as DeliveryInfo;
-    } catch {
-      return null;
+    // Essayer différentes structures possibles
+    let deliveryType = 'pickup'; // valeur par défaut
+    
+    if (metadata.deliveryType) {
+      deliveryType = metadata.deliveryType;
+    } else if (metadata.type) {
+      deliveryType = metadata.type;
+    } else if (metadata.deliveryInfo?.type) {
+      deliveryType = metadata.deliveryInfo.type;
     }
-  };
+    
+    return {
+      type: deliveryType,
+      fullName: metadata.deliveryInfo?.fullName || metadata.fullName,
+      company: metadata.deliveryInfo?.company || metadata.company,
+      address: metadata.deliveryInfo?.address || metadata.address,
+      postalCode: metadata.deliveryInfo?.postalCode || metadata.postalCode,
+      city: metadata.deliveryInfo?.city || metadata.city,
+      phone: metadata.deliveryInfo?.phone || metadata.phone,
+      notes: metadata.deliveryInfo?.notes || metadata.notes,
+      paymentMethod: metadata.paymentMethod
+    } as DeliveryInfo;
+  } catch (e) {
+    return null; // Supprimer aussi le console.error
+  }
+};
   
   const deliveryInfo = getDeliveryInfo(order);
 
@@ -166,10 +411,13 @@ export default function OrderDetailModal({
                   <div>
                     <p className="text-sm text-muted-foreground">Mode de livraison</p>
                     <p className="font-medium">
-                      {deliveryInfo.type === 'pickup' 
+                      {deliveryInfo.type === 'pickup' || deliveryInfo.type === 'retrait' 
                         ? 'Retrait sur place' 
-                        : 'Livraison à domicile'}
+                        : deliveryInfo.type === 'delivery' || deliveryInfo.type === 'livraison'
+                        ? 'Livraison à domicile'
+                        : deliveryInfo.type || 'Non spécifié'}
                     </p>
+                    {/* Supprimer cette ligne : <p className="text-xs text-gray-500">Debug: {deliveryInfo.type}</p> */}
                   </div>
                   <div>
                     <p className="text-sm text-muted-foreground">Paiement</p>
@@ -183,18 +431,24 @@ export default function OrderDetailModal({
               )}
             </div>
             
-            {/* Adresse de livraison si applicable */}
-            {deliveryInfo?.address && (
-              <div>
-                <p className="text-sm text-muted-foreground mb-1">Adresse de livraison</p>
-                <p className="p-3 bg-foreground/5 rounded-md">
-                  {deliveryInfo.address}
-                </p>
-              </div>
+            {/* Adresse de retrait sur place */}
+            {deliveryInfo?.type === 'pickup' && (
+              <OrderPickupAddress 
+                orderId={order.id} 
+                deliveryType="pickup" 
+              />
             )}
             
-            {/* Notes de livraison si applicable */}
-            {deliveryInfo?.notes && (
+            {/* Adresse de livraison à domicile */}
+            {deliveryInfo?.type === 'delivery' && (
+              <OrderDeliveryAddress 
+                orderId={order.id} 
+                deliveryType="delivery" 
+              />
+            )}
+            
+            {/* Notes de livraison si applicable et pas déjà affichées dans OrderDeliveryAddress */}
+            {deliveryInfo?.notes && deliveryInfo?.type !== 'delivery' && (
               <div>
                 <p className="text-sm text-muted-foreground mb-1">Instructions spéciales</p>
                 <p className="p-3 bg-foreground/5 rounded-md">
@@ -354,7 +608,7 @@ export default function OrderDetailModal({
                               booking.deliverySlot.product.price ? booking.deliverySlot.product.price * booking.quantity : 
                               0).toFixed(2)} CHF
                           </p>
-                          </div>
+                        </div>
                       </div>
                     );
                   })}
@@ -447,4 +701,3 @@ export default function OrderDetailModal({
     </div>
   );
 }
-                        

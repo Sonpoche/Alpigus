@@ -2,35 +2,47 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { useRouter, useSearchParams } from 'next/navigation'
+import { useRouter } from 'next/navigation'
 import { useToast } from '@/hooks/use-toast'
+import { 
+  ShoppingBag, 
+  Search, 
+  FilterIcon, 
+  Plus,
+  Eye,
+  Clock,
+  CheckCircle,
+  Truck,
+  Package,
+  Calendar,
+  User,
+  Phone,
+  Mail
+} from 'lucide-react'
+import { motion, AnimatePresence } from 'framer-motion'
 import { OrderStatus } from '@prisma/client'
-import { Order } from '@/types/order'
-
-// Importation des composants refactorisés
-import OrderStats from '@/components/orders/order-stats'
 import OrderFilterBar from '@/components/orders/order-filter-bar'
+import OrderStats from '@/components/orders/order-stats'
 import OrderItem from '@/components/orders/order-item'
 import OrderDetailModal from '@/components/orders/order-detail-modal'
 import EmptyOrdersView from '@/components/orders/empty-orders-view'
+import { formatDateToFrench } from '@/lib/date-utils'
+import { Order } from '@/types/order' // Importer le type depuis le fichier de types
+
+// Supprimer les interfaces locales et utiliser celles du fichier types/order.ts
 
 export default function ProducerOrdersPage() {
   const router = useRouter()
-  const searchParams = useSearchParams()
   const { toast } = useToast()
   const [orders, setOrders] = useState<Order[]>([])
-  const [filteredOrders, setFilteredOrders] = useState<Order[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [activeStatus, setActiveStatus] = useState<string | null>(null)
   const [searchTerm, setSearchTerm] = useState('')
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null)
   const [isDetailOpen, setIsDetailOpen] = useState(false)
   const [isUpdating, setIsUpdating] = useState(false)
-  
-  // Récupérer l'ID de commande depuis les paramètres de l'URL
-  const modalOrderId = searchParams.get('modal')
 
-  // Charger les commandes pour le producteur
+  // Charger les commandes du producteur
   useEffect(() => {
     const fetchOrders = async () => {
       try {
@@ -56,22 +68,6 @@ export default function ProducerOrdersPage() {
         })
         
         setOrders(sortedOrders)
-        setFilteredOrders(sortedOrders)
-        
-        // Si un ID de commande est fourni dans l'URL, ouvrir la modal correspondante
-        if (modalOrderId) {
-          const orderToShow = sortedOrders.find((order: Order) => order.id === modalOrderId)
-          if (orderToShow) {
-            setSelectedOrder(orderToShow)
-            setIsDetailOpen(true)
-          } else {
-            toast({
-              title: "Commande non trouvée",
-              description: "La commande demandée n'a pas pu être trouvée",
-              variant: "destructive"
-            })
-          }
-        }
       } catch (error) {
         console.error('Erreur:', error)
         toast({
@@ -85,116 +81,115 @@ export default function ProducerOrdersPage() {
     }
     
     fetchOrders()
-  }, [activeStatus, toast, modalOrderId])
+  }, [activeStatus, toast])
 
-  // Filtrer les commandes par recherche et status
+  // Vérifier les paramètres d'URL pour ouvrir automatiquement une modal
   useEffect(() => {
-    if (!orders.length) return
-
-    let filtered = [...orders]
-    
-    // Appliquer le filtre de statut si présent
-    if (activeStatus) {
-      filtered = filtered.filter((order: Order) => order.status === activeStatus)
-    }
-    
-    // Appliquer la recherche si présente
-    if (searchTerm) {
-      const searchLower = searchTerm.toLowerCase()
-      filtered = filtered.filter((order: Order) => {
-        // Recherche par ID de commande
-        if (order.id.toLowerCase().includes(searchLower)) return true
-        
-        // Recherche par nom du client
-        if (order.user?.name?.toLowerCase().includes(searchLower)) return true
-        
-        // Recherche par email du client
-        if (order.user?.email.toLowerCase().includes(searchLower)) return true
-        
-        // Recherche par nom de produit
-        const hasMatchingProduct = [...order.items, ...order.bookings.map(b => ({ 
-          product: b.deliverySlot.product 
-        }))].some(item => 
-          item.product.name.toLowerCase().includes(searchLower)
-        )
-        
-        if (hasMatchingProduct) return true
-        
-        // Recherche par statut
-        const statusLabels: Record<OrderStatus, string> = {
-          PENDING: 'en attente',
-          CONFIRMED: 'confirmée',
-          SHIPPED: 'expédiée',
-          DELIVERED: 'livrée',
-          CANCELLED: 'annulée'
+    if (!isLoading && orders.length > 0) {
+      const params = new URLSearchParams(window.location.search);
+      const modalOrderId = params.get('modal');
+      
+      if (modalOrderId) {
+        const orderToShow = orders.find(order => order.id === modalOrderId);
+        if (orderToShow) {
+          setSelectedOrder(orderToShow);
+          setIsDetailOpen(true);
         }
-        
-        const statusLabel = statusLabels[order.status as OrderStatus]
-        if (statusLabel && statusLabel.includes(searchLower)) return true
-        
-        return false
-      })
+      }
     }
-    
-    setFilteredOrders(filtered)
-  }, [orders, searchTerm, activeStatus])
+  }, [orders, isLoading]);
 
   // Mettre à jour le statut d'une commande
-  const updateOrderStatus = async (orderId: string, newStatus: OrderStatus) => {
+  const handleUpdateStatus = async (orderId: string, newStatus: OrderStatus) => {
     try {
-      setIsUpdating(true);
+      setIsUpdating(true)
       
       const response = await fetch(`/api/orders/${orderId}/status`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ status: newStatus })
-      });
+      })
       
       if (!response.ok) {
-        throw new Error(`Erreur lors de la mise à jour du statut: ${response.statusText}`);
+        const errorText = await response.text()
+        throw new Error(errorText || 'Erreur lors de la mise à jour du statut')
       }
       
-      // Mettre à jour l'état local
+      // Rafraîchir la liste des commandes
+      const updatedOrder = await response.json()
       setOrders(prevOrders => 
         prevOrders.map(order => 
           order.id === orderId ? { ...order, status: newStatus } : order
         )
-      );
-      
-      // Mettre à jour l'ordre sélectionné si ouvert
-      if (selectedOrder?.id === orderId) {
-        setSelectedOrder(prev => prev ? { ...prev, status: newStatus } : null);
-      }
+      )
       
       toast({
-        title: "Statut mis à jour",
-        description: `La commande a été ${newStatus === 'SHIPPED' ? 'marquée comme expédiée' : 
-                      newStatus === 'DELIVERED' ? 'marquée comme livrée' : 
-                      newStatus === 'CONFIRMED' ? 'confirmée' : 'mise à jour'}`
-      });
+        title: 'Statut mis à jour',
+        description: `La commande est maintenant ${getStatusLabel(newStatus)}`
+      })
       
     } catch (error) {
-      console.error('Erreur:', error);
+      console.error('Erreur:', error)
       toast({
-        title: "Erreur",
-        description: error instanceof Error ? error.message : "Impossible de mettre à jour le statut",
-        variant: "destructive"
-      });
+        title: 'Erreur',
+        description: error instanceof Error ? error.message : 'Impossible de mettre à jour le statut',
+        variant: 'destructive'
+      })
     } finally {
-      setIsUpdating(false);
+      setIsUpdating(false)
     }
-  };
+  }
 
-  // Fonction pour fermer la modal et nettoyer l'URL
-  const closeDetailModal = () => {
-    setIsDetailOpen(false);
-    
-    // Supprimer le paramètre modal de l'URL sans rafraîchir la page
-    if (modalOrderId) {
-      const newUrl = window.location.pathname;
-      window.history.pushState({}, '', newUrl);
+  // Obtenir le libellé du statut en français
+  const getStatusLabel = (status: OrderStatus): string => {
+    const statusLabels: Record<OrderStatus, string> = {
+      [OrderStatus.DRAFT]: 'brouillon',
+      [OrderStatus.PENDING]: 'en attente',
+      [OrderStatus.CONFIRMED]: 'confirmée',
+      [OrderStatus.SHIPPED]: 'expédiée',
+      [OrderStatus.DELIVERED]: 'livrée',
+      [OrderStatus.CANCELLED]: 'annulée',
+      [OrderStatus.INVOICE_PENDING]: 'facture en attente',
+      [OrderStatus.INVOICE_PAID]: 'facture payée',
+      [OrderStatus.INVOICE_OVERDUE]: 'facture en retard'
     }
-  };
+    return statusLabels[status] || status
+  }
+
+  // Filtrer les commandes
+  const filteredOrders = orders.filter(order => {
+    if (!searchTerm) return true
+    
+    const searchLower = searchTerm.toLowerCase()
+    
+    // Recherche par ID de commande
+    if (order.id.toLowerCase().includes(searchLower)) return true
+    
+    // Recherche par nom du client
+    if (order.user?.name?.toLowerCase().includes(searchLower)) return true
+    
+    // Recherche par email du client
+    if (order.user?.email?.toLowerCase().includes(searchLower)) return true
+    
+    // Recherche par nom de produit
+    const hasMatchingProduct = order.items?.some(item => 
+      item.product.name.toLowerCase().includes(searchLower)
+    )
+    
+    if (hasMatchingProduct) return true
+    
+    // Recherche par statut
+    const statusLabel = getStatusLabel(order.status as OrderStatus)
+    if (statusLabel.includes(searchLower)) return true
+    
+    return false
+  })
+
+  // Gérer l'ouverture des détails de commande
+  const handleViewDetails = (order: Order) => {
+    setSelectedOrder(order)
+    setIsDetailOpen(true)
+  }
 
   if (isLoading) {
     return (
@@ -207,53 +202,54 @@ export default function ProducerOrdersPage() {
   return (
     <div className="container mx-auto p-6">
       <div className="mb-8">
-        <h1 className="text-3xl font-bold mb-2">Commandes</h1>
+        <h1 className="text-3xl font-bold mb-2">Mes commandes</h1>
         <p className="text-muted-foreground">
-          Gérez les commandes pour vos produits et préparez vos livraisons
+          Gérez vos commandes et leur statut
         </p>
       </div>
-      
-      {/* Filtres et recherche */}
-      <OrderFilterBar 
+
+      {/* Statistiques */}
+      <OrderStats orders={orders} />
+
+      {/* Barre de filtres */}
+      <OrderFilterBar
         searchTerm={searchTerm}
         onSearchChange={setSearchTerm}
         activeStatus={activeStatus}
         onStatusChange={setActiveStatus}
       />
-      
-      {/* Statistiques des commandes */}
-      <OrderStats orders={filteredOrders} />
-      
+
       {/* Liste des commandes */}
       {filteredOrders.length === 0 ? (
         <EmptyOrdersView searchTerm={searchTerm} activeStatus={activeStatus} />
       ) : (
-        <div className="grid grid-cols-1 gap-6">
-          {filteredOrders.map((order) => (
-            <OrderItem 
-              key={order.id}
-              order={order}
-              onViewDetails={(order) => {
-                setSelectedOrder(order)
-                setIsDetailOpen(true)
-              }}
-              onUpdateStatus={updateOrderStatus}
-              isUpdating={isUpdating}
-            />
-          ))}
+        <div className="space-y-4">
+          <AnimatePresence>
+            {filteredOrders.map((order) => (
+              <OrderItem
+                key={order.id}
+                order={order}
+                onViewDetails={handleViewDetails}
+                onUpdateStatus={handleUpdateStatus}
+                isUpdating={isUpdating}
+              />
+            ))}
+          </AnimatePresence>
         </div>
       )}
-      
-      {/* Modal de détails de commande */}
-      {selectedOrder && (
-        <OrderDetailModal
-          order={selectedOrder}
-          isOpen={isDetailOpen}
-          onClose={closeDetailModal}
-          onUpdateStatus={updateOrderStatus}
-          isUpdating={isUpdating}
-        />
-      )}
+
+      {/* Modal de détail de commande */}
+      <AnimatePresence>
+        {selectedOrder && isDetailOpen && (
+          <OrderDetailModal
+            order={selectedOrder}
+            isOpen={isDetailOpen}
+            onClose={() => setIsDetailOpen(false)}
+            onUpdateStatus={handleUpdateStatus}
+            isUpdating={isUpdating}
+          />
+        )}
+      </AnimatePresence>
     </div>
   )
 }
