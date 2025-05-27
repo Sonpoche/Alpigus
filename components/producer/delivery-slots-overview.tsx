@@ -8,9 +8,10 @@ import { fr } from 'date-fns/locale'
 import { Package, Calendar as CalendarIcon, AlertCircle } from 'lucide-react'
 import { useToast } from "@/hooks/use-toast"
 import Link from 'next/link'
-import { cn } from '@/lib/utils'
+import { cn, containerClasses, gridClasses, cardClasses, spacingClasses } from '@/lib/utils'
 import SlotsCalendar from '@/components/ui/slots-calendar'
 import { UserRole, ProductType } from '@prisma/client'
+import { motion } from 'framer-motion'
 
 interface Product {
   id: string
@@ -64,6 +65,15 @@ export default function DeliverySlotsOverview() {
     checkDate.setHours(0, 0, 0, 0);
     
     return checkDate >= today;
+  }
+
+  // Fonction pour vérifier si une date est antérieure à la date d'aujourd'hui (sans considérer l'heure)
+  const isDateBeforeToday = (date: Date) => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const dateToCheck = new Date(date);
+    dateToCheck.setHours(0, 0, 0, 0);
+    return dateToCheck < today;
   }
 
   useEffect(() => {
@@ -164,15 +174,6 @@ export default function DeliverySlotsOverview() {
     fetchData();
   }, [session, toast]);
 
-  // Fonction pour vérifier si une date est antérieure à la date d'aujourd'hui (sans considérer l'heure)
-  const isDateBeforeToday = (date: Date) => {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const dateToCheck = new Date(date);
-    dateToCheck.setHours(0, 0, 0, 0);
-    return dateToCheck < today;
-  }
-
   const getDateStyle = (date: Date) => {
     const dateStr = formatDateToYYYYMMDD(date);
     const slotsForDate = groupedSlots[dateStr] || [];
@@ -214,26 +215,30 @@ export default function DeliverySlotsOverview() {
   const selectedSlots = selectedDateStr ? groupedSlots[selectedDateStr] || [] : [];
 
   return (
-    <div className="space-y-8">
+    <div className={containerClasses("py-8")}>
       {/* Alerte pour les produits frais sans créneaux */}
       {freshProductsWithoutSlots.length > 0 && (
-        <div className="mb-6 p-4 bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-800 rounded-lg">
+        <motion.div
+          initial={{ opacity: 0, y: -10 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="mb-6 p-4 bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-800 rounded-lg"
+        >
           <div className="flex items-start gap-3">
             <AlertCircle className="h-5 w-5 text-orange-600 dark:text-orange-500 mt-0.5 flex-shrink-0" />
-            <div>
-              <h3 className="font-medium text-orange-800 dark:text-orange-200">
+            <div className="min-w-0 flex-1">
+              <h3 className="font-medium text-orange-800 dark:text-orange-200 text-sm sm:text-base">
                 Configuration des créneaux de livraison requise
               </h3>
-              <p className="mt-1 text-sm text-orange-700 dark:text-orange-300">
+              <p className="mt-1 text-xs sm:text-sm text-orange-700 dark:text-orange-300">
                 Les produits frais suivants n'ont pas de créneaux de livraison configurés :
               </p>
-              <ul className="mt-2 text-sm text-orange-700 dark:text-orange-300 space-y-1">
+              <ul className="mt-2 text-xs sm:text-sm text-orange-700 dark:text-orange-300 space-y-1">
                 {freshProductsWithoutSlots.map(product => (
                   <li key={product.id} className="flex items-center gap-2">
                     <span>•</span>
                     <Link 
                       href={`/producer/delivery-slots/product/${product.id}`}
-                      className="underline hover:text-orange-800 dark:hover:text-orange-200"
+                      className="underline hover:text-orange-800 dark:hover:text-orange-200 truncate"
                     >
                       {product.name}
                     </Link>
@@ -242,15 +247,15 @@ export default function DeliverySlotsOverview() {
               </ul>
             </div>
           </div>
-        </div>
+        </motion.div>
       )}
 
-      <div className="flex justify-between items-start">
+      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-4 mb-8">
         <div>
-          <h1 className="text-2xl font-bold font-montserrat text-custom-title mb-2">
+          <h1 className="text-xl sm:text-2xl font-bold font-montserrat text-custom-title mb-2">
             Vue d'ensemble des livraisons
           </h1>
-          <p className="text-sm text-muted-foreground">
+          <p className="text-xs sm:text-sm text-muted-foreground">
             Gérez tous vos créneaux de livraison en un coup d'œil
           </p>
         </div>
@@ -260,7 +265,7 @@ export default function DeliverySlotsOverview() {
           <select
             value={selectedProduct}
             onChange={(e) => setSelectedProduct(e.target.value)}
-            className="rounded-md border border-foreground/10 bg-background px-3 py-2 text-sm"
+            className="rounded-md border border-foreground/10 bg-background px-3 py-2 text-xs sm:text-sm w-full sm:w-auto"
           >
             <option value="">Tous les produits</option>
             {products.map((product) => (
@@ -272,124 +277,137 @@ export default function DeliverySlotsOverview() {
         </div>
       </div>
 
-      <div className="grid md:grid-cols-2 gap-8">
+      <div className={gridClasses({ default: 1, lg: 2 }, "gap-6 lg:gap-8")}>
         {/* Calendrier */}
-        <div className="bg-background border border-foreground/10 rounded-lg p-6">
-          <SlotsCalendar
-            selected={selectedDate}
-            onSelect={setSelectedDate}
-            getDayProps={(date: Date) => ({
-              style: getDateStyle(date)
-            })}
-          />
-          
-          <div className="mt-4 space-y-2">
-            <p className="text-sm text-muted-foreground">
-              <span className="inline-block w-3 h-3 bg-custom-accent/20 rounded-full mr-2" /> 
-              Faible occupation
-            </p>
-            <p className="text-sm text-muted-foreground">
-              <span className="inline-block w-3 h-3 bg-custom-accent/50 rounded-full mr-2" /> 
-              Occupation moyenne
-            </p>
-            <p className="text-sm text-muted-foreground">
-              <span className="inline-block w-3 h-3 bg-custom-accent/80 rounded-full mr-2" /> 
-              Forte occupation
-            </p>
+        <motion.div
+          initial={{ opacity: 0, x: -20 }}
+          animate={{ opacity: 1, x: 0 }}
+          className={cardClasses()}
+        >
+          <div className={spacingClasses('md')}>
+            <SlotsCalendar
+              selected={selectedDate}
+              onSelect={setSelectedDate}
+              getDayProps={(date: Date) => ({
+                style: getDateStyle(date)
+              })}
+            />
+            
+            <div className="mt-4 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-2 xl:grid-cols-3 gap-2 text-xs">
+              <div className="flex items-center gap-2">
+                <span className="inline-block w-3 h-3 bg-custom-accent/20 rounded-full flex-shrink-0" /> 
+                <span className="text-muted-foreground truncate">Faible occupation</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="inline-block w-3 h-3 bg-custom-accent/50 rounded-full flex-shrink-0" /> 
+                <span className="text-muted-foreground truncate">Occupation moyenne</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="inline-block w-3 h-3 bg-custom-accent/80 rounded-full flex-shrink-0" /> 
+                <span className="text-muted-foreground truncate">Forte occupation</span>
+              </div>
+            </div>
           </div>
-        </div>
+        </motion.div>
 
         {/* Liste des créneaux pour la date sélectionnée */}
-        <div className="bg-background border border-foreground/10 rounded-lg p-6">
-          <div className="flex items-center gap-2 mb-4">
-            <CalendarIcon className="h-5 w-5 text-custom-accent" />
-            <h2 className="font-semibold text-lg text-custom-title">
-              {selectedDate 
-                ? format(selectedDate, 'EEEE d MMMM yyyy', { locale: fr })
-                : "Sélectionnez une date"}
-            </h2>
-          </div>
+        <motion.div
+          initial={{ opacity: 0, x: 20 }}
+          animate={{ opacity: 1, x: 0 }}
+          className={cardClasses()}
+        >
+          <div className={spacingClasses('md')}>
+            <div className="flex items-center gap-2 mb-4">
+              <CalendarIcon className="h-4 w-4 sm:h-5 sm:w-5 text-custom-accent flex-shrink-0" />
+              <h2 className="font-semibold text-sm sm:text-lg text-custom-title truncate">
+                {selectedDate 
+                  ? format(selectedDate, 'EEEE d MMMM yyyy', { locale: fr })
+                  : "Sélectionnez une date"}
+              </h2>
+            </div>
 
-          {selectedDate ? (
-            selectedSlots.length > 0 ? (
-              <div className="space-y-4">
-                {selectedSlots
-                  .filter(slot => !selectedProduct || slot.productId === selectedProduct)
-                  .map(slot => {
-                    const isPastSlot = isDateBeforeToday(slot.date);
-                    
-                    return (
-                      <div
-                        key={slot.id}
-                        className={`flex items-center gap-4 p-4 border border-foreground/10 rounded-lg hover:bg-foreground/5 transition-colors ${
-                          isPastSlot ? 'opacity-50' : ''
-                        }`}
-                      >
-                        <div className="w-12 h-12 rounded-lg bg-foreground/5 flex items-center justify-center flex-shrink-0">
-                          {slot.product.image ? (
-                            <img
-                              src={slot.product.image}
-                              alt={slot.product.name}
-                              className="w-full h-full object-cover rounded-lg"
-                            />
-                          ) : (
-                            <Package className="h-6 w-6 text-foreground/30" />
+            {selectedDate ? (
+              selectedSlots.length > 0 ? (
+                <div className="space-y-3 sm:space-y-4">
+                  {selectedSlots
+                    .filter(slot => !selectedProduct || slot.productId === selectedProduct)
+                    .map(slot => {
+                      const isPastSlot = isDateBeforeToday(slot.date);
+                      
+                      return (
+                        <div
+                          key={slot.id}
+                          className={cn(
+                            "flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4 p-3 sm:p-4 border border-foreground/10 rounded-lg hover:bg-foreground/5 transition-colors",
+                            isPastSlot ? 'opacity-50' : ''
                           )}
-                        </div>
-                        
-                        <div className="flex-1">
-                          <div className="flex justify-between items-start">
-                            <div>
-                              <h3 className="font-medium text-custom-title">
-                                {slot.product.name}
-                              </h3>
-                              <p className="text-sm text-muted-foreground">
-                                {slot.reserved} / {slot.maxCapacity} {slot.product.unit} réservés
-                              </p>
-                            </div>
-                            {!isPastSlot && (
-                              <Link
-                                href={`/producer/delivery-slots/product/${slot.productId}`}
-                                className="text-custom-accent hover:opacity-80 text-sm"
-                              >
-                                Gérer
-                              </Link>
+                        >
+                          <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-lg bg-foreground/5 flex items-center justify-center flex-shrink-0">
+                            {slot.product.image ? (
+                              <img
+                                src={slot.product.image}
+                                alt={slot.product.name}
+                                className="w-full h-full object-cover rounded-lg"
+                              />
+                            ) : (
+                              <Package className="h-5 w-5 sm:h-6 sm:w-6 text-foreground/30" />
                             )}
                           </div>
-
-                          {/* Barre de progression */}
-                          <div className="mt-2 h-2 bg-foreground/5 rounded-full overflow-hidden">
-                            <div
-                              className="h-full bg-custom-accent transition-all"
-                              style={{
-                                width: `${(slot.reserved / slot.maxCapacity) * 100}%`
-                              }}
-                            />
-                          </div>
                           
-                          {/* Alerte si presque plein */}
-                          {(slot.reserved / slot.maxCapacity) > 0.8 && (
-                            <div className="flex items-center gap-1 mt-2 text-orange-600">
-                              <AlertCircle className="h-4 w-4" />
-                              <span className="text-xs">Presque complet</span>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-2">
+                              <div className="min-w-0 flex-1">
+                                <h3 className="font-medium text-custom-title text-sm sm:text-base truncate">
+                                  {slot.product.name}
+                                </h3>
+                                <p className="text-xs sm:text-sm text-muted-foreground">
+                                  {slot.reserved} / {slot.maxCapacity} {slot.product.unit} réservés
+                                </p>
+                              </div>
+                              {!isPastSlot && (
+                                <Link
+                                  href={`/producer/delivery-slots/product/${slot.productId}`}
+                                  className="text-custom-accent hover:opacity-80 text-xs sm:text-sm font-medium whitespace-nowrap"
+                                >
+                                  Gérer
+                                </Link>
+                              )}
                             </div>
-                          )}
+
+                            {/* Barre de progression */}
+                            <div className="mt-2 h-1.5 sm:h-2 bg-foreground/5 rounded-full overflow-hidden">
+                              <div
+                                className="h-full bg-custom-accent transition-all"
+                                style={{
+                                  width: `${(slot.reserved / slot.maxCapacity) * 100}%`
+                                }}
+                              />
+                            </div>
+                            
+                            {/* Alerte si presque plein */}
+                            {(slot.reserved / slot.maxCapacity) > 0.8 && (
+                              <div className="flex items-center gap-1 mt-2 text-orange-600">
+                                <AlertCircle className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
+                                <span className="text-xs">Presque complet</span>
+                              </div>
+                            )}
+                          </div>
                         </div>
-                      </div>
-                    );
-                  })}
-              </div>
+                      );
+                    })}
+                </div>
+              ) : (
+                <p className="text-center text-muted-foreground py-8 text-sm">
+                  Aucun créneau de livraison pour cette date
+                </p>
+              )
             ) : (
-              <p className="text-center text-muted-foreground py-8">
-                Aucun créneau de livraison pour cette date
+              <p className="text-center text-muted-foreground py-8 text-sm">
+                Sélectionnez une date pour voir les créneaux disponibles
               </p>
-            )
-          ) : (
-            <p className="text-center text-muted-foreground py-8">
-              Sélectionnez une date pour voir les créneaux disponibles
-            </p>
-          )}
-        </div>
+            )}
+          </div>
+        </motion.div>
       </div>
     </div>
   );

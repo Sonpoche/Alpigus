@@ -206,7 +206,7 @@ export default function ProducerDashboard() {
   }
 
   return (
-    <div className="p-8">
+    <div className="p-4 sm:p-8">
       {/* Alerte pour les nouvelles commandes */}
       <NewOrdersAlert />
       
@@ -215,20 +215,20 @@ export default function ProducerDashboard() {
         <div className="mb-6 p-4 bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-800 rounded-lg">
           <div className="flex items-start gap-3">
             <AlertTriangle className="h-5 w-5 text-orange-600 dark:text-orange-500 mt-0.5 flex-shrink-0" />
-            <div>
-              <h3 className="font-medium text-orange-800 dark:text-orange-200">
+            <div className="min-w-0 flex-1">
+              <h3 className="font-medium text-orange-800 dark:text-orange-200 text-sm sm:text-base">
                 Configuration des créneaux de livraison requise
               </h3>
-              <p className="mt-1 text-sm text-orange-700 dark:text-orange-300">
+              <p className="mt-1 text-xs sm:text-sm text-orange-700 dark:text-orange-300">
                 Les produits frais suivants n'ont pas de créneaux de livraison configurés :
               </p>
-              <ul className="mt-2 text-sm text-orange-700 dark:text-orange-300 space-y-1">
+              <ul className="mt-2 text-xs sm:text-sm text-orange-700 dark:text-orange-300 space-y-1">
                 {freshProductsWithoutSlots.map(product => (
                   <li key={product.id} className="flex items-center gap-2">
                     <span>•</span>
                     <Link 
                       href={`/producer/delivery-slots/product/${product.id}`}
-                      className="underline hover:text-orange-800 dark:hover:text-orange-200"
+                      className="underline hover:text-orange-800 dark:hover:text-orange-200 truncate"
                     >
                       {product.name}
                     </Link>
@@ -241,68 +241,68 @@ export default function ProducerDashboard() {
       )}
 
       {/* Statistiques */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-        <div className="bg-background border border-foreground/10 rounded-lg p-6 shadow-sm">
-          <div className="flex items-center gap-4">
-            <div className="p-3 bg-custom-accent/10 rounded-full">
-              <Package className="h-6 w-6 text-custom-accent" />
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 mb-6 sm:mb-8">
+        <div className="bg-background border border-foreground/10 rounded-lg p-4 sm:p-6 shadow-sm">
+          <div className="flex items-center gap-3 sm:gap-4">
+            <div className="p-2 sm:p-3 bg-custom-accent/10 rounded-full flex-shrink-0">
+              <Package className="h-5 w-5 sm:h-6 sm:w-6 text-custom-accent" />
             </div>
-            <div>
-              <p className="text-sm text-muted-foreground">Produits en ligne</p>
-              <p className="text-2xl font-semibold text-custom-title">{stats.totalProducts}</p>
+            <div className="min-w-0 flex-1">
+              <p className="text-xs sm:text-sm text-muted-foreground">Produits en ligne</p>
+              <p className="text-lg sm:text-2xl font-semibold text-custom-title">{stats.totalProducts}</p>
             </div>
           </div>
         </div>
 
-        <div className="bg-background border border-foreground/10 rounded-lg p-6 shadow-sm">
-          <div className="flex items-center gap-4">
-            <div className="p-3 bg-blue-100 dark:bg-blue-900/20 rounded-full">
-              <LineChart className="h-6 w-6 text-blue-600 dark:text-blue-400" />
+        <div className="bg-background border border-foreground/10 rounded-lg p-4 sm:p-6 shadow-sm">
+          <div className="flex items-center gap-3 sm:gap-4">
+            <div className="p-2 sm:p-3 bg-blue-100 dark:bg-blue-900/20 rounded-full flex-shrink-0">
+              <LineChart className="h-5 w-5 sm:h-6 sm:w-6 text-blue-600 dark:text-blue-400" />
             </div>
-            <div>
-              <p className="text-sm text-muted-foreground">Stock total</p>
-              <p className="text-2xl font-semibold text-custom-title">
+            <div className="min-w-0 flex-1">
+              <p className="text-xs sm:text-sm text-muted-foreground">Stock total</p>
+              <p className="text-lg sm:text-2xl font-semibold text-custom-title">
                 {formatNumber(stats.totalStock)} kg
               </p>
             </div>
           </div>
         </div>
 
-        <div className="bg-background border border-foreground/10 rounded-lg p-6 shadow-sm">
-          <div className="flex items-center gap-4">
-            <div className="p-3 bg-orange-100 dark:bg-orange-900/20 rounded-full">
-              <ShoppingBag className="h-6 w-6 text-orange-600 dark:text-orange-400" />
+        <div className="bg-background border border-foreground/10 rounded-lg p-4 sm:p-6 shadow-sm">
+          <div className="flex items-center gap-3 sm:gap-4">
+            <div className="p-2 sm:p-3 bg-orange-100 dark:bg-orange-900/20 rounded-full flex-shrink-0">
+              <ShoppingBag className="h-5 w-5 sm:h-6 sm:w-6 text-orange-600 dark:text-orange-400" />
             </div>
-            <div>
-              <p className="text-sm text-muted-foreground">Commandes en attente</p>
-              <p className="text-2xl font-semibold text-custom-title">{stats.pendingOrders}</p>
+            <div className="min-w-0 flex-1">
+              <p className="text-xs sm:text-sm text-muted-foreground">Commandes en attente</p>
+              <p className="text-lg sm:text-2xl font-semibold text-custom-title">{stats.pendingOrders}</p>
             </div>
           </div>
         </div>
 
-        <div className="bg-background border border-foreground/10 rounded-lg p-6 shadow-sm">
-          <div className="flex items-center gap-4">
-            <div className="p-3 bg-green-100 dark:bg-green-900/20 rounded-full">
-              <Truck className="h-6 w-6 text-green-600 dark:text-green-400" />
+        <div className="bg-background border border-foreground/10 rounded-lg p-4 sm:p-6 shadow-sm">
+          <div className="flex items-center gap-3 sm:gap-4">
+            <div className="p-2 sm:p-3 bg-green-100 dark:bg-green-900/20 rounded-full flex-shrink-0">
+              <Truck className="h-5 w-5 sm:h-6 sm:w-6 text-green-600 dark:text-green-400" />
             </div>
-            <div>
-              <p className="text-sm text-muted-foreground">Livraisons en cours</p>
-              <p className="text-2xl font-semibold text-custom-title">{stats.pendingDeliveries}</p>
+            <div className="min-w-0 flex-1">
+              <p className="text-xs sm:text-sm text-muted-foreground">Livraisons en cours</p>
+              <p className="text-lg sm:text-2xl font-semibold text-custom-title">{stats.pendingDeliveries}</p>
             </div>
           </div>
         </div>
       </div>
 
       {/* En-tête de la liste des produits */}
-      <div className="flex justify-between items-center mb-6">
-        <div className="flex items-center gap-4">
-          <h2 className="text-2xl font-montserrat font-bold text-custom-title">
+      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 mb-6">
+        <div className="flex flex-col sm:flex-row sm:items-center gap-4">
+          <h2 className="text-xl sm:text-2xl font-montserrat font-bold text-custom-title">
             Mes Produits
           </h2>
           <select
             value={availabilityFilter ?? ''}
             onChange={(e) => setAvailabilityFilter(e.target.value || null)}
-            className="ml-4 rounded-md border border-foreground/10 bg-background px-3 py-2 text-sm"
+            className="rounded-md border border-foreground/10 bg-background px-3 py-2 text-sm w-full sm:w-auto"
           >
             <option value="">Tous les produits</option>
             <option value="true">Disponibles</option>
@@ -311,116 +311,228 @@ export default function ProducerDashboard() {
         </div>
         <Link
           href="/producer/new"
-          className="flex items-center gap-2 bg-custom-accent text-white px-4 py-2 rounded-md hover:opacity-90 transition-opacity"
+          className="flex items-center justify-center gap-2 bg-custom-accent text-white px-4 py-2 rounded-md hover:opacity-90 transition-opacity text-sm font-medium"
         >
-          <Plus className="h-5 w-5" />
-          Nouveau Produit
+          <Plus className="h-4 w-4 sm:h-5 sm:w-5" />
+          <span className="whitespace-nowrap">Nouveau Produit</span>
         </Link>
       </div>
 
-      {/* Liste des produits */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      {/* Liste des produits - VERSION RESPONSIVE CORRIGÉE */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
         {products.map((product) => (
           <div
             key={product.id}
-            className="bg-background border border-foreground/10 rounded-lg p-6 shadow-sm hover:shadow-md transition-shadow"
+            className="bg-background border border-foreground/10 rounded-lg shadow-sm hover:shadow-md transition-shadow overflow-hidden"
           >
-            {/* En-tête avec image */}
-            <div className="flex gap-4 mb-4">
-              <div className="w-24 h-24 flex-shrink-0">
+            {/* VERSION MOBILE : Layout vertical optimisé */}
+            <div className="block sm:hidden">
+              {/* Image en haut */}
+              <div className="w-full h-40 bg-foreground/5 relative">
                 {product.image ? (
                   <img
                     src={product.image}
                     alt={product.name}
-                    className="w-full h-full object-cover rounded-lg"
+                    className="w-full h-full object-cover"
                   />
                 ) : (
-                  <div className="w-full h-full bg-foreground/5 rounded-lg flex items-center justify-center">
-                    <Package className="h-8 w-8 text-foreground/30" />
+                  <div className="w-full h-full flex items-center justify-center">
+                    <Package className="h-10 w-10 text-foreground/30" />
                   </div>
                 )}
               </div>
 
-              {/* Info produit et actions */}
-              <div className="flex flex-col flex-1">
-                <div className="flex justify-between items-start">
-                  <div>
-                    <h3 className="font-montserrat font-semibold text-custom-title">{product.name}</h3>
-                    <p className="text-sm text-muted-foreground">{product.type}</p>
-                  </div>
-                  <div className="flex gap-2">
+              {/* Contenu mobile */}
+              <div className="p-4">
+                {/* Titre et type */}
+                <div className="mb-3">
+                  <h3 className="font-montserrat font-semibold text-custom-title text-base leading-tight mb-1">
+                    {product.name}
+                  </h3>
+                  <p className="text-xs text-muted-foreground">{product.type}</p>
+                </div>
+
+                {/* Actions en ligne */}
+                <div className="flex justify-center gap-3 mb-4 p-2 bg-foreground/5 rounded-lg">
+                  <Link
+                    href={`/producer/inventory/${product.id}`}
+                    className="p-2 text-custom-text hover:text-custom-accent transition-colors rounded-md hover:bg-foreground/10"
+                    aria-label="Gérer les stocks"
+                  >
+                    <BarChart2 className="h-5 w-5" />
+                  </Link>
+                  <button
+                    onClick={() => router.push(`/producer/${product.id}/edit`)}
+                    className="p-2 text-custom-text hover:text-custom-accent transition-colors rounded-md hover:bg-foreground/10"
+                    aria-label="Modifier le produit"
+                  >
+                    <Edit className="h-5 w-5" />
+                  </button>
+                  {product.type === ProductType.FRESH && (
                     <Link
-                      href={`/producer/inventory/${product.id}`}
-                      className="text-custom-text hover:text-custom-accent transition-colors"
-                      aria-label="Gérer les stocks"
+                      href={`/producer/delivery-slots/product/${product.id}`}
+                      className="p-2 text-custom-text hover:text-custom-accent transition-colors rounded-md hover:bg-foreground/10"
+                      aria-label="Gérer les créneaux de livraison"
                     >
-                      <BarChart2 className="h-5 w-5" />
+                      <Calendar className="h-5 w-5" />
                     </Link>
-                    <button
-                      onClick={() => router.push(`/producer/${product.id}/edit`)}
-                      className="text-custom-text hover:text-custom-accent transition-colors"
-                      aria-label="Modifier le produit"
-                    >
-                      <Edit className="h-5 w-5" />
-                    </button>
-                    {product.type === ProductType.FRESH && (
-                      <Link
-                        href={`/producer/delivery-slots/product/${product.id}`}
-                        className="text-custom-text hover:text-custom-accent transition-colors"
-                        aria-label="Gérer les créneaux de livraison"
-                      >
-                        <Calendar className="h-5 w-5" />
-                      </Link>
-                    )}
-                    <button
-                      onClick={() => handleDeleteClick(product)}
-                      className="text-custom-text hover:text-destructive transition-colors"
-                      aria-label="Supprimer le produit"
-                    >
-                      <Trash2 className="h-5 w-5" />
-                    </button>
+                  )}
+                  <button
+                    onClick={() => handleDeleteClick(product)}
+                    className="p-2 text-custom-text hover:text-destructive transition-colors rounded-md hover:bg-foreground/10"
+                    aria-label="Supprimer le produit"
+                  >
+                    <Trash2 className="h-5 w-5" />
+                  </button>
+                </div>
+
+                {/* Informations détaillées */}
+                <div className="space-y-2 text-sm">
+                  <div className="flex justify-between items-center">
+                    <span className="text-custom-text">Prix</span>
+                    <span className="font-medium text-custom-title">{formatNumber(product.price)} CHF/{product.unit}</span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-custom-text">Stock</span>
+                    <span className="font-medium text-custom-title">
+                      {product.stock ? formatNumber(product.stock.quantity) : '0'} {product.unit}
+                    </span>
+                  </div>
+                  {(product.minOrderQuantity !== undefined && product.minOrderQuantity > 0) && (
+                    <div className="flex justify-between items-center">
+                      <span className="text-custom-text">Qté min.</span>
+                      <span className="font-medium text-custom-title">
+                        {formatNumber(product.minOrderQuantity ?? 0)} {product.unit}
+                      </span>
+                    </div>
+                  )}
+                  <div className="flex justify-between items-center">
+                    <span className="text-custom-text">Statut</span>
+                    <span className={cn(
+                      "font-medium text-xs px-2 py-1 rounded-full",
+                      product.available 
+                        ? "text-green-700 bg-green-100 dark:text-green-400 dark:bg-green-900/20" 
+                        : "text-red-700 bg-red-100 dark:text-red-400 dark:bg-red-900/20"
+                    )}>
+                      {product.available ? 'Disponible' : 'Indisponible'}
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-custom-text">Paiement 30j</span>
+                    <span className={cn(
+                      "font-medium text-xs px-2 py-1 rounded-full",
+                      product.acceptDeferred 
+                        ? "text-green-700 bg-green-100 dark:text-green-400 dark:bg-green-900/20" 
+                        : "text-red-700 bg-red-100 dark:text-red-400 dark:bg-red-900/20"
+                    )}>
+                      {product.acceptDeferred ? 'Accepté' : 'Non accepté'}
+                    </span>
                   </div>
                 </div>
               </div>
             </div>
 
-            {/* Informations détaillées */}
-            <div className="space-y-2">
-              <div className="flex justify-between">
-                <span className="text-custom-text">Prix</span>
-                <span className="font-medium">{formatNumber(product.price)} CHF/{product.unit}</span>
+            {/* VERSION DESKTOP : Layout horizontal (inchangé) */}
+            <div className="hidden sm:block p-6">
+              {/* En-tête avec image */}
+              <div className="flex gap-4 mb-4">
+                <div className="w-20 h-20 lg:w-24 lg:h-24 flex-shrink-0">
+                  {product.image ? (
+                    <img
+                      src={product.image}
+                      alt={product.name}
+                      className="w-full h-full object-cover rounded-lg"
+                    />
+                  ) : (
+                    <div className="w-full h-full bg-foreground/5 rounded-lg flex items-center justify-center">
+                      <Package className="h-6 w-6 lg:h-8 lg:w-8 text-foreground/30" />
+                    </div>
+                  )}
+                </div>
+
+                {/* Info produit et actions */}
+                <div className="flex flex-col flex-1 min-w-0">
+                  <div className="flex justify-between items-start gap-2">
+                    <div className="min-w-0 flex-1">
+                      <h3 className="font-montserrat font-semibold text-custom-title text-base lg:text-lg leading-tight">
+                        {product.name}
+                      </h3>
+                      <p className="text-sm text-muted-foreground">{product.type}</p>
+                    </div>
+                    <div className="flex gap-1 lg:gap-2 flex-shrink-0">
+                      <Link
+                        href={`/producer/inventory/${product.id}`}
+                        className="p-1 lg:p-1.5 text-custom-text hover:text-custom-accent transition-colors rounded-md hover:bg-foreground/10"
+                        aria-label="Gérer les stocks"
+                      >
+                        <BarChart2 className="h-4 w-4 lg:h-5 lg:w-5" />
+                      </Link>
+                      <button
+                        onClick={() => router.push(`/producer/${product.id}/edit`)}
+                        className="p-1 lg:p-1.5 text-custom-text hover:text-custom-accent transition-colors rounded-md hover:bg-foreground/10"
+                        aria-label="Modifier le produit"
+                      >
+                        <Edit className="h-4 w-4 lg:h-5 lg:w-5" />
+                      </button>
+                      {product.type === ProductType.FRESH && (
+                        <Link
+                          href={`/producer/delivery-slots/product/${product.id}`}
+                          className="p-1 lg:p-1.5 text-custom-text hover:text-custom-accent transition-colors rounded-md hover:bg-foreground/10"
+                          aria-label="Gérer les créneaux de livraison"
+                        >
+                          <Calendar className="h-4 w-4 lg:h-5 lg:w-5" />
+                        </Link>
+                      )}
+                      <button
+                        onClick={() => handleDeleteClick(product)}
+                        className="p-1 lg:p-1.5 text-custom-text hover:text-destructive transition-colors rounded-md hover:bg-foreground/10"
+                        aria-label="Supprimer le produit"
+                      >
+                        <Trash2 className="h-4 w-4 lg:h-5 lg:w-5" />
+                      </button>
+                    </div>
+                  </div>
+                </div>
               </div>
-              <div className="flex justify-between">
-                <span className="text-custom-text">Stock</span>
-                <span className="font-medium">
-                  {product.stock ? formatNumber(product.stock.quantity) : '0'} {product.unit}
-                </span>
-              </div>
-              {(product.minOrderQuantity !== undefined && product.minOrderQuantity > 0) && (
+
+              {/* Informations détaillées */}
+              <div className="space-y-2 text-sm">
                 <div className="flex justify-between">
-                  <span className="text-custom-text">Quantité min.</span>
+                  <span className="text-custom-text">Prix</span>
+                  <span className="font-medium">{formatNumber(product.price)} CHF/{product.unit}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-custom-text">Stock</span>
                   <span className="font-medium">
-                    {formatNumber(product.minOrderQuantity ?? 0)} {product.unit}
+                    {product.stock ? formatNumber(product.stock.quantity) : '0'} {product.unit}
                   </span>
                 </div>
-              )}
-              <div className="flex justify-between">
-                <span className="text-custom-text">Statut</span>
-                <span className={cn(
-                  "font-medium",
-                  product.available ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"
-                )}>
-                  {product.available ? 'Disponible' : 'Indisponible'}
-                </span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-custom-text">Paiement 30j</span>
-                <span className={cn(
-                  "font-medium",
-                  product.acceptDeferred ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"
-                )}>
-                  {product.acceptDeferred ? 'Accepté' : 'Non accepté'}
-                </span>
+                {(product.minOrderQuantity !== undefined && product.minOrderQuantity > 0) && (
+                  <div className="flex justify-between">
+                    <span className="text-custom-text">Quantité min.</span>
+                    <span className="font-medium">
+                      {formatNumber(product.minOrderQuantity ?? 0)} {product.unit}
+                    </span>
+                  </div>
+                )}
+                <div className="flex justify-between">
+                  <span className="text-custom-text">Statut</span>
+                  <span className={cn(
+                    "font-medium",
+                    product.available ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"
+                  )}>
+                    {product.available ? 'Disponible' : 'Indisponible'}
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-custom-text">Paiement 30j</span>
+                  <span className={cn(
+                    "font-medium",
+                    product.acceptDeferred ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"
+                  )}>
+                    {product.acceptDeferred ? 'Accepté' : 'Non accepté'}
+                  </span>
+                </div>
               </div>
             </div>
           </div>

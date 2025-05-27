@@ -1,4 +1,4 @@
-// components/layout/sidebar.tsx
+// components/layout/sidebar.tsx - Mise à jour de la détection mobile/tablette
 'use client'
 
 import { useState, useEffect } from 'react'
@@ -15,14 +15,20 @@ import AdminMenu from './admin-menu'
 export function Sidebar() {
   const { data: session } = useSession()
   const [isOpen, setIsOpen] = useState(true)
-  const [isMobile, setIsMobile] = useState(false)
+  const [isMobileOrTablet, setIsMobileOrTablet] = useState(false)
   const pathname = usePathname()
 
-  // Détecter le mobile
+  // Détecter mobile ET tablette (fermé par défaut jusqu'à 1024px)
   useEffect(() => {
     const handleResize = () => {
-      setIsMobile(window.innerWidth < 768)
-      setIsOpen(window.innerWidth >= 768)
+      const mobileOrTablet = window.innerWidth < 1024 // Changé de 768 à 1024
+      setIsMobileOrTablet(mobileOrTablet)
+      // Sur mobile/tablette, fermer par défaut
+      if (mobileOrTablet) {
+        setIsOpen(false)
+      } else {
+        setIsOpen(true)
+      }
     }
     
     handleResize()
@@ -30,30 +36,30 @@ export function Sidebar() {
     return () => window.removeEventListener('resize', handleResize)
   }, [])
 
-  // Fermer la sidebar sur mobile quand on change de page
+  // Fermer la sidebar sur mobile/tablette quand on change de page
   useEffect(() => {
-    if (isMobile) {
+    if (isMobileOrTablet) {
       setIsOpen(false)
     }
-  }, [pathname, isMobile])
+  }, [pathname, isMobileOrTablet])
 
   if (!session?.user) return null
   
   return (
     <>
-      {/* Overlay pour mobile */}
-      {isMobile && isOpen && (
+      {/* Overlay pour mobile/tablette */}
+      {isMobileOrTablet && isOpen && (
         <div 
           className="fixed inset-0 bg-black/40 z-20"
           onClick={() => setIsOpen(false)}
         />
       )}
       
-      {/* Bouton de toggle pour mobile */}
-      {isMobile && !isOpen && (
+      {/* Bouton de toggle pour mobile/tablette */}
+      {isMobileOrTablet && !isOpen && (
         <button
           onClick={() => setIsOpen(true)}
-          className="fixed bottom-4 left-4 z-20 p-3 bg-custom-accent text-white rounded-full shadow-lg"
+          className="fixed bottom-4 left-4 z-20 p-3 bg-custom-accent text-white rounded-full shadow-lg hover:bg-custom-accent/90 transition-colors"
           aria-label="Ouvrir le menu"
         >
           <Menu className="h-6 w-6" />
@@ -61,7 +67,7 @@ export function Sidebar() {
       )}
       
       {/* Bouton de toggle pour desktop lorsque la sidebar est fermée */}
-      {!isMobile && !isOpen && (
+      {!isMobileOrTablet && !isOpen && (
         <button
           onClick={() => setIsOpen(true)}
           className="fixed top-20 left-0 z-40 p-2 bg-custom-accent hover:bg-custom-accent/90 text-white rounded-r-md shadow-md transition-colors"
@@ -74,22 +80,22 @@ export function Sidebar() {
       {/* Sidebar container */}
       <div 
         className={cn(
-          "bg-background border-r border-foreground/10 h-full flex flex-col transition-all duration-300 ease-in-out",
-          isMobile ? "fixed top-0 left-0 bottom-0 z-30" : "relative",
+          "bg-background border-r border-foreground/10 h-full flex-shrink-0 transition-all duration-300 ease-in-out overflow-hidden",
+          isMobileOrTablet ? "fixed top-0 left-0 bottom-0 z-30" : "relative",
           isOpen ? "w-64" : "w-0"
         )}
       >
         {/* Contenu de la sidebar - visible uniquement quand isOpen est true */}
         {isOpen && (
-          <>
-            <div className="p-4 border-b border-foreground/10 flex items-center justify-between">
-              <Link href="/dashboard" className="font-montserrat font-bold text-custom-title">
+          <div className="w-64 h-full flex flex-col overflow-hidden">
+            <div className="p-4 border-b border-foreground/10 flex items-center justify-between flex-shrink-0">
+              <Link href="/dashboard" className="font-montserrat font-bold text-custom-title truncate">
                 Mushroom Market
               </Link>
-              {!isMobile && (
+              {!isMobileOrTablet && (
                 <button
                   onClick={() => setIsOpen(false)}
-                  className="p-1 rounded-md hover:bg-foreground/5 text-foreground/60"
+                  className="p-1 rounded-md hover:bg-foreground/5 text-foreground/60 flex-shrink-0"
                 >
                   <ChevronLeft className="h-5 w-5" />
                 </button>
@@ -104,18 +110,18 @@ export function Sidebar() {
               </div>
             </div>
             
-            <div className="p-4 border-t border-foreground/10">
+            <div className="p-4 border-t border-foreground/10 flex-shrink-0">
               <div className="flex items-center gap-2">
-                <div className="w-8 h-8 rounded-full bg-custom-accentLight text-custom-accent flex items-center justify-center font-medium">
+                <div className="w-8 h-8 rounded-full bg-custom-accentLight text-custom-accent flex items-center justify-center font-medium flex-shrink-0">
                   {session.user.name?.[0]?.toUpperCase() || 'U'}
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className="font-medium truncate">{session.user.name || 'Utilisateur'}</p>
+                  <p className="font-medium truncate text-sm">{session.user.name || 'Utilisateur'}</p>
                   <p className="text-xs text-muted-foreground truncate">{session.user.email}</p>
                 </div>
               </div>
             </div>
-          </>
+          </div>
         )}
       </div>
     </>
