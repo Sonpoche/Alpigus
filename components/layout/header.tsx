@@ -30,7 +30,7 @@ const producerNavItems = [
   { href: '/producer', label: 'Mes Produits', icon: Package },
   { href: '/producer/delivery-slots/overview', label: 'Livraisons', icon: Calendar },
   { href: '/producer/orders', label: 'Commandes', icon: ShoppingBag },
-  { href: '/producer/wallet', label: 'Portefeuille', icon: Wallet }, // Ajout du lien vers le portefeuille
+  // Retiré le portefeuille d'ici pour le mettre dans les icônes
 ]
 
 const adminNavItems = [
@@ -97,8 +97,8 @@ export function Header() {
                 </span>
               </Link>
 
-              {/* Navigation Desktop */}
-              <nav className="hidden md:flex items-center gap-6">
+              {/* Navigation Desktop SEULEMENT (à partir de xl:) */}
+              <nav className="hidden xl:flex items-center gap-6">
                 {navItems.map((item) => (
                   <Link
                     key={item.href}
@@ -113,8 +113,8 @@ export function Header() {
               </nav>
             </div>
 
-            {/* Actions Desktop */}
-            <div className="hidden md:flex items-center gap-4">
+            {/* Actions Desktop SEULEMENT */}
+            <div className="hidden xl:flex items-center gap-4">
               {/* Bouton de recherche */}
               <button 
                 onClick={() => setIsSearchOpen(true)}
@@ -126,10 +126,18 @@ export function Header() {
             
               {session?.user?.role === 'PRODUCER' && (
                 <>
-                  <Link href="/producer" className="text-custom-text hover:text-custom-accent">
+                  <Link 
+                    href="/producer" 
+                    className="p-2 rounded-md hover:bg-foreground/5 text-custom-text hover:text-custom-accent transition-colors"
+                    aria-label="Mon magasin"
+                  >
                     <Store className="h-5 w-5" />
                   </Link>
-                  <Link href="/producer/wallet" className="text-custom-text hover:text-custom-accent">
+                  <Link 
+                    href="/producer/wallet" 
+                    className="p-2 rounded-md hover:bg-foreground/5 text-custom-text hover:text-custom-accent transition-colors"
+                    aria-label="Portefeuille"
+                  >
                     <Wallet className="h-5 w-5" />
                   </Link>
                 </>
@@ -148,8 +156,8 @@ export function Header() {
               <UserMenu />
             </div>
 
-            {/* Menu Mobile */}
-            <div className="flex md:hidden items-center gap-4">
+            {/* Menu Mobile/Tablette (md et moins) */}
+            <div className="flex xl:hidden items-center gap-3">
               <button 
                 onClick={() => setIsSearchOpen(true)}
                 className="p-2 rounded-md hover:bg-foreground/5 text-custom-text hover:text-custom-accent transition-colors"
@@ -158,18 +166,38 @@ export function Header() {
                 <Search className="h-5 w-5" />
               </button>
               
+              {/* Icônes producteur sur mobile/tablette */}
+              {session?.user?.role === 'PRODUCER' && (
+                <>
+                  <Link 
+                    href="/producer" 
+                    className="p-2 rounded-md hover:bg-foreground/5 text-custom-text hover:text-custom-accent transition-colors"
+                    aria-label="Mon magasin"
+                  >
+                    <Store className="h-5 w-5" />
+                  </Link>
+                  <Link 
+                    href="/producer/wallet" 
+                    className="p-2 rounded-md hover:bg-foreground/5 text-custom-text hover:text-custom-accent transition-colors"
+                    aria-label="Portefeuille"
+                  >
+                    <Wallet className="h-5 w-5" />
+                  </Link>
+                </>
+              )}
+              
               {isClient && (
                 <CartButton />
               )}
 
-              {/* Notification pour mobile */}
+              {/* Notification pour mobile/tablette */}
               {session?.user && (
                 <NotificationBell />
               )}
               
               <button
                 onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-                className="text-custom-text hover:text-custom-accent"
+                className="text-custom-text hover:text-custom-accent p-1"
                 aria-label="Toggle menu"
               >
                 {isMobileMenuOpen ? (
@@ -181,14 +209,14 @@ export function Header() {
             </div>
           </div>
 
-          {/* Navigation Mobile */}
+          {/* Navigation Mobile/Tablette */}
           <AnimatePresence>
             {isMobileMenuOpen && (
               <motion.div 
                 initial={{ opacity: 0, height: 0 }}
                 animate={{ opacity: 1, height: 'auto' }}
                 exit={{ opacity: 0, height: 0 }}
-                className="md:hidden border-t border-foreground/10 overflow-hidden"
+                className="xl:hidden border-t border-foreground/10 overflow-hidden"
               >
                 <nav className="space-y-1 px-2 pb-3 pt-2">
                   {navItems.map((item) => (
@@ -206,7 +234,10 @@ export function Header() {
                       {item.label}
                     </Link>
                   ))}
+                  
+                  {/* PLUS d'actions spéciales dans le menu - tout est dans les icônes maintenant */}
                 </nav>
+                
                 <div className="border-t border-foreground/10 pb-3 pt-4">
                   <div className="flex items-center justify-between px-5">
                     <div className="flex items-center gap-2">

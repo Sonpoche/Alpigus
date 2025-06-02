@@ -206,7 +206,7 @@ export default function ProducerDashboard() {
   }
 
   return (
-    <div className="p-4 sm:p-8">
+    <div className="p-4 sm:p-6 lg:p-8">
       {/* Alerte pour les nouvelles commandes */}
       <NewOrdersAlert />
       
@@ -241,53 +241,53 @@ export default function ProducerDashboard() {
       )}
 
       {/* Statistiques */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 mb-6 sm:mb-8">
-        <div className="bg-background border border-foreground/10 rounded-lg p-4 sm:p-6 shadow-sm">
-          <div className="flex items-center gap-3 sm:gap-4">
-            <div className="p-2 sm:p-3 bg-custom-accent/10 rounded-full flex-shrink-0">
-              <Package className="h-5 w-5 sm:h-6 sm:w-6 text-custom-accent" />
+      <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 lg:gap-6 mb-6 sm:mb-8">
+        <div className="bg-background border border-foreground/10 rounded-lg p-3 sm:p-4 lg:p-6 shadow-sm">
+          <div className="flex items-center gap-2 sm:gap-3 lg:gap-4">
+            <div className="p-2 lg:p-3 bg-custom-accent/10 rounded-full flex-shrink-0">
+              <Package className="h-4 w-4 sm:h-5 sm:w-5 lg:h-6 lg:w-6 text-custom-accent" />
             </div>
             <div className="min-w-0 flex-1">
               <p className="text-xs sm:text-sm text-muted-foreground">Produits en ligne</p>
-              <p className="text-lg sm:text-2xl font-semibold text-custom-title">{stats.totalProducts}</p>
+              <p className="text-lg sm:text-xl lg:text-2xl font-semibold text-custom-title">{stats.totalProducts}</p>
             </div>
           </div>
         </div>
 
-        <div className="bg-background border border-foreground/10 rounded-lg p-4 sm:p-6 shadow-sm">
-          <div className="flex items-center gap-3 sm:gap-4">
-            <div className="p-2 sm:p-3 bg-blue-100 dark:bg-blue-900/20 rounded-full flex-shrink-0">
-              <LineChart className="h-5 w-5 sm:h-6 sm:w-6 text-blue-600 dark:text-blue-400" />
+        <div className="bg-background border border-foreground/10 rounded-lg p-3 sm:p-4 lg:p-6 shadow-sm">
+          <div className="flex items-center gap-2 sm:gap-3 lg:gap-4">
+            <div className="p-2 lg:p-3 bg-blue-100 dark:bg-blue-900/20 rounded-full flex-shrink-0">
+              <LineChart className="h-4 w-4 sm:h-5 sm:w-5 lg:h-6 lg:w-6 text-blue-600 dark:text-blue-400" />
             </div>
             <div className="min-w-0 flex-1">
               <p className="text-xs sm:text-sm text-muted-foreground">Stock total</p>
-              <p className="text-lg sm:text-2xl font-semibold text-custom-title">
+              <p className="text-lg sm:text-xl lg:text-2xl font-semibold text-custom-title">
                 {formatNumber(stats.totalStock)} kg
               </p>
             </div>
           </div>
         </div>
 
-        <div className="bg-background border border-foreground/10 rounded-lg p-4 sm:p-6 shadow-sm">
-          <div className="flex items-center gap-3 sm:gap-4">
-            <div className="p-2 sm:p-3 bg-orange-100 dark:bg-orange-900/20 rounded-full flex-shrink-0">
-              <ShoppingBag className="h-5 w-5 sm:h-6 sm:w-6 text-orange-600 dark:text-orange-400" />
+        <div className="bg-background border border-foreground/10 rounded-lg p-3 sm:p-4 lg:p-6 shadow-sm">
+          <div className="flex items-center gap-2 sm:gap-3 lg:gap-4">
+            <div className="p-2 lg:p-3 bg-orange-100 dark:bg-orange-900/20 rounded-full flex-shrink-0">
+              <ShoppingBag className="h-4 w-4 sm:h-5 sm:w-5 lg:h-6 lg:w-6 text-orange-600 dark:text-orange-400" />
             </div>
             <div className="min-w-0 flex-1">
               <p className="text-xs sm:text-sm text-muted-foreground">Commandes en attente</p>
-              <p className="text-lg sm:text-2xl font-semibold text-custom-title">{stats.pendingOrders}</p>
+              <p className="text-lg sm:text-xl lg:text-2xl font-semibold text-custom-title">{stats.pendingOrders}</p>
             </div>
           </div>
         </div>
 
-        <div className="bg-background border border-foreground/10 rounded-lg p-4 sm:p-6 shadow-sm">
-          <div className="flex items-center gap-3 sm:gap-4">
-            <div className="p-2 sm:p-3 bg-green-100 dark:bg-green-900/20 rounded-full flex-shrink-0">
-              <Truck className="h-5 w-5 sm:h-6 sm:w-6 text-green-600 dark:text-green-400" />
+        <div className="bg-background border border-foreground/10 rounded-lg p-3 sm:p-4 lg:p-6 shadow-sm">
+          <div className="flex items-center gap-2 sm:gap-3 lg:gap-4">
+            <div className="p-2 lg:p-3 bg-green-100 dark:bg-green-900/20 rounded-full flex-shrink-0">
+              <Truck className="h-4 w-4 sm:h-5 sm:w-5 lg:h-6 lg:w-6 text-green-600 dark:text-green-400" />
             </div>
             <div className="min-w-0 flex-1">
               <p className="text-xs sm:text-sm text-muted-foreground">Livraisons en cours</p>
-              <p className="text-lg sm:text-2xl font-semibold text-custom-title">{stats.pendingDeliveries}</p>
+              <p className="text-lg sm:text-xl lg:text-2xl font-semibold text-custom-title">{stats.pendingDeliveries}</p>
             </div>
           </div>
         </div>
@@ -318,15 +318,15 @@ export default function ProducerDashboard() {
         </Link>
       </div>
 
-      {/* Liste des produits - VERSION RESPONSIVE CORRIGÉE */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
+      {/* Liste des produits - VERSION RESPONSIVE AMÉLIORÉE */}
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 sm:gap-6">
         {products.map((product) => (
           <div
             key={product.id}
             className="bg-background border border-foreground/10 rounded-lg shadow-sm hover:shadow-md transition-shadow overflow-hidden"
           >
             {/* VERSION MOBILE : Layout vertical optimisé */}
-            <div className="block sm:hidden">
+            <div className="block md:hidden">
               {/* Image en haut */}
               <div className="w-full h-40 bg-foreground/5 relative">
                 {product.image ? (
@@ -432,106 +432,109 @@ export default function ProducerDashboard() {
               </div>
             </div>
 
-            {/* VERSION DESKTOP : Layout horizontal (inchangé) */}
-            <div className="hidden sm:block p-6">
-              {/* En-tête avec image */}
-              <div className="flex gap-4 mb-4">
-                <div className="w-20 h-20 lg:w-24 lg:h-24 flex-shrink-0">
-                  {product.image ? (
-                    <img
-                      src={product.image}
-                      alt={product.name}
-                      className="w-full h-full object-cover rounded-lg"
-                    />
-                  ) : (
-                    <div className="w-full h-full bg-foreground/5 rounded-lg flex items-center justify-center">
-                      <Package className="h-6 w-6 lg:h-8 lg:w-8 text-foreground/30" />
+            {/* VERSION TABLETTE/DESKTOP : Layout amélioré */}
+            <div className="hidden md:block">
+              <div className="p-4 lg:p-6">
+                {/* En-tête avec image et actions SÉPARÉES */}
+                <div className="flex flex-col gap-4">
+                  {/* Image et titre avec actions en dessous */}
+                  <div className="flex gap-3 lg:gap-4">
+                    <div className="w-16 h-16 lg:w-20 lg:h-20 xl:w-24 xl:h-24 flex-shrink-0">
+                      {product.image ? (
+                        <img
+                          src={product.image}
+                          alt={product.name}
+                          className="w-full h-full object-cover rounded-lg"
+                        />
+                      ) : (
+                        <div className="w-full h-full bg-foreground/5 rounded-lg flex items-center justify-center">
+                          <Package className="h-6 w-6 lg:h-8 lg:w-8 text-foreground/30" />
+                        </div>
+                      )}
                     </div>
-                  )}
-                </div>
 
-                {/* Info produit et actions */}
-                <div className="flex flex-col flex-1 min-w-0">
-                  <div className="flex justify-between items-start gap-2">
-                    <div className="min-w-0 flex-1">
-                      <h3 className="font-montserrat font-semibold text-custom-title text-base lg:text-lg leading-tight">
+                    {/* Info produit seulement */}
+                    <div className="flex flex-col flex-1 min-w-0">
+                      <h3 className="font-montserrat font-semibold text-custom-title text-sm lg:text-base xl:text-lg leading-tight">
                         {product.name}
                       </h3>
-                      <p className="text-sm text-muted-foreground">{product.type}</p>
-                    </div>
-                    <div className="flex gap-1 lg:gap-2 flex-shrink-0">
-                      <Link
-                        href={`/producer/inventory/${product.id}`}
-                        className="p-1 lg:p-1.5 text-custom-text hover:text-custom-accent transition-colors rounded-md hover:bg-foreground/10"
-                        aria-label="Gérer les stocks"
-                      >
-                        <BarChart2 className="h-4 w-4 lg:h-5 lg:w-5" />
-                      </Link>
-                      <button
-                        onClick={() => router.push(`/producer/${product.id}/edit`)}
-                        className="p-1 lg:p-1.5 text-custom-text hover:text-custom-accent transition-colors rounded-md hover:bg-foreground/10"
-                        aria-label="Modifier le produit"
-                      >
-                        <Edit className="h-4 w-4 lg:h-5 lg:w-5" />
-                      </button>
-                      {product.type === ProductType.FRESH && (
-                        <Link
-                          href={`/producer/delivery-slots/product/${product.id}`}
-                          className="p-1 lg:p-1.5 text-custom-text hover:text-custom-accent transition-colors rounded-md hover:bg-foreground/10"
-                          aria-label="Gérer les créneaux de livraison"
-                        >
-                          <Calendar className="h-4 w-4 lg:h-5 lg:w-5" />
-                        </Link>
-                      )}
-                      <button
-                        onClick={() => handleDeleteClick(product)}
-                        className="p-1 lg:p-1.5 text-custom-text hover:text-destructive transition-colors rounded-md hover:bg-foreground/10"
-                        aria-label="Supprimer le produit"
-                      >
-                        <Trash2 className="h-4 w-4 lg:h-5 lg:w-5" />
-                      </button>
+                      <p className="text-xs lg:text-sm text-muted-foreground">{product.type}</p>
                     </div>
                   </div>
-                </div>
-              </div>
 
-              {/* Informations détaillées */}
-              <div className="space-y-2 text-sm">
-                <div className="flex justify-between">
-                  <span className="text-custom-text">Prix</span>
-                  <span className="font-medium">{formatNumber(product.price)} CHF/{product.unit}</span>
+                  {/* Actions SÉPARÉES - en dessous */}
+                  <div className="flex justify-center gap-2 lg:gap-3 p-2 lg:p-3 bg-foreground/5 rounded-lg">
+                    <Link
+                      href={`/producer/inventory/${product.id}`}
+                      className="p-2 lg:p-2.5 text-custom-text hover:text-custom-accent transition-colors rounded-md hover:bg-foreground/10"
+                      aria-label="Gérer les stocks"
+                    >
+                      <BarChart2 className="h-4 w-4 lg:h-5 lg:w-5" />
+                    </Link>
+                    <button
+                      onClick={() => router.push(`/producer/${product.id}/edit`)}
+                      className="p-2 lg:p-2.5 text-custom-text hover:text-custom-accent transition-colors rounded-md hover:bg-foreground/10"
+                      aria-label="Modifier le produit"
+                    >
+                      <Edit className="h-4 w-4 lg:h-5 lg:w-5" />
+                    </button>
+                    {product.type === ProductType.FRESH && (
+                      <Link
+                        href={`/producer/delivery-slots/product/${product.id}`}
+                        className="p-2 lg:p-2.5 text-custom-text hover:text-custom-accent transition-colors rounded-md hover:bg-foreground/10"
+                        aria-label="Gérer les créneaux de livraison"
+                      >
+                        <Calendar className="h-4 w-4 lg:h-5 lg:w-5" />
+                      </Link>
+                    )}
+                    <button
+                      onClick={() => handleDeleteClick(product)}
+                      className="p-2 lg:p-2.5 text-custom-text hover:text-destructive transition-colors rounded-md hover:bg-foreground/10"
+                      aria-label="Supprimer le produit"
+                    >
+                      <Trash2 className="h-4 w-4 lg:h-5 lg:w-5" />
+                    </button>
+                  </div>
                 </div>
-                <div className="flex justify-between">
-                  <span className="text-custom-text">Stock</span>
-                  <span className="font-medium">
-                    {product.stock ? formatNumber(product.stock.quantity) : '0'} {product.unit}
-                  </span>
-                </div>
-                {(product.minOrderQuantity !== undefined && product.minOrderQuantity > 0) && (
+
+                {/* Informations détaillées */}
+                <div className="space-y-2 text-xs lg:text-sm mt-4">
                   <div className="flex justify-between">
-                    <span className="text-custom-text">Quantité min.</span>
+                    <span className="text-custom-text">Prix</span>
+                    <span className="font-medium">{formatNumber(product.price)} CHF/{product.unit}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-custom-text">Stock</span>
                     <span className="font-medium">
-                      {formatNumber(product.minOrderQuantity ?? 0)} {product.unit}
+                      {product.stock ? formatNumber(product.stock.quantity) : '0'} {product.unit}
                     </span>
                   </div>
-                )}
-                <div className="flex justify-between">
-                  <span className="text-custom-text">Statut</span>
-                  <span className={cn(
-                    "font-medium",
-                    product.available ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"
-                  )}>
-                    {product.available ? 'Disponible' : 'Indisponible'}
-                  </span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-custom-text">Paiement 30j</span>
-                  <span className={cn(
-                    "font-medium",
-                    product.acceptDeferred ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"
-                  )}>
-                    {product.acceptDeferred ? 'Accepté' : 'Non accepté'}
-                  </span>
+                  {(product.minOrderQuantity !== undefined && product.minOrderQuantity > 0) && (
+                    <div className="flex justify-between">
+                      <span className="text-custom-text">Quantité min.</span>
+                      <span className="font-medium">
+                        {formatNumber(product.minOrderQuantity ?? 0)} {product.unit}
+                      </span>
+                    </div>
+                  )}
+                  <div className="flex justify-between">
+                    <span className="text-custom-text">Statut</span>
+                    <span className={cn(
+                      "font-medium",
+                      product.available ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"
+                    )}>
+                      {product.available ? 'Disponible' : 'Indisponible'}
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-custom-text">Paiement 30j</span>
+                    <span className={cn(
+                      "font-medium",
+                      product.acceptDeferred ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"
+                    )}>
+                      {product.acceptDeferred ? 'Accepté' : 'Non accepté'}
+                    </span>
+                  </div>
                 </div>
               </div>
             </div>

@@ -286,49 +286,65 @@
   }
 }
 
-/* CORRECTIONS MINIMALES RESPONSIVE - AJOUT */
-@media (max-width: 768px) {
-  /* Réduction des paddings sur mobile */
-  .p-8 { padding: 1rem !important; }
-  .p-6 { padding: 1rem !important; }
-  .px-8 { padding-left: 1rem !important; padding-right: 1rem !important; }
-  .px-6 { padding-left: 1rem !important; padding-right: 1rem !important; }
+/* Masquer la scrollbar pour les éléments avec scrollbar-hide */
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+
+/* CORRECTIONS RESPONSIVE CIBLÉES - Sans !important sauf cas spéciaux */
+@media (max-width: 640px) {
+  /* Améliorations pour les grilles sur très petits écrans - UNIQUEMENT pour la page des commandes */
+  .order-stats-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
   
-  /* Titres plus petits sur mobile */
-  h1 { font-size: 1.25rem !important; }
-  h2 { font-size: 1.125rem !important; }
-  h3 { font-size: 1rem !important; }
+  .order-stats-grid > :nth-child(3) {
+    grid-column: span 2;
+  }
   
-  /* Grilles responsive automatiques */
-  .grid-cols-4 { grid-template-columns: repeat(1, 1fr) !important; }
-  .grid-cols-3 { grid-template-columns: repeat(1, 1fr) !important; }
-  .grid-cols-2 { grid-template-columns: repeat(1, 1fr) !important; }
-
-  /* Ajustements pour les grids sur mobile */
-  .grid {
-    gap: 1rem;
+  /* Filtres scrollables pour les commandes */
+  .order-filter-buttons {
+    overflow-x: auto;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
   }
-
-  /* Réductions d'espacement sur très petits écrans */
-  .p-6 {
-    padding: 1rem;
+  
+  .order-filter-buttons::-webkit-scrollbar {
+    display: none;
   }
-
-  .px-6 {
-    padding-left: 1rem;
-    padding-right: 1rem;
-  }
-
-  .py-6 {
-    padding-top: 1rem;
-    padding-bottom: 1rem;
+  
+  /* Boutons de filtre plus compacts */
+  .order-filter-button {
+    font-size: 0.75rem;
+    padding: 0.5rem 0.75rem;
+    white-space: nowrap;
+    flex-shrink: 0;
   }
 }
 
-@media (min-width: 640px) and (max-width: 1023px) {
-  /* Tablette */
-  .grid-cols-4 { grid-template-columns: repeat(2, 1fr) !important; }
-  .grid-cols-3 { grid-template-columns: repeat(2, 1fr) !important; }
+@media (max-width: 768px) {
+  /* Adaptations pour tablettes - plus conservatrices */
+  .grid-cols-4:not(.keep-cols) { 
+    grid-template-columns: repeat(2, 1fr); 
+  }
+  
+  .grid-cols-3:not(.keep-cols) { 
+    grid-template-columns: repeat(2, 1fr); 
+  }
+  
+  /* Réduction modérée des espacements seulement si nécessaire */
+  .responsive-spacing .p-8 { 
+    padding: 1.5rem; 
+  }
+  
+  .responsive-spacing .p-6 { 
+    padding: 1rem; 
+  }
 }
 
 /* Fix minimal pour les calendriers Mantine */

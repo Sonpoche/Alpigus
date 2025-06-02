@@ -120,13 +120,13 @@ export function NotificationBell() {
   const getNotificationIcon = (type: string) => {
     switch (type) {
       case 'NEW_ORDER':
-        return <div className="w-8 h-8 bg-blue-100 dark:bg-blue-900/20 rounded-full flex items-center justify-center"><Bell className="h-4 w-4 text-blue-600 dark:text-blue-400" /></div>
+        return <div className="w-6 h-6 sm:w-8 sm:h-8 bg-blue-100 dark:bg-blue-900/20 rounded-full flex items-center justify-center flex-shrink-0"><Bell className="h-3 w-3 sm:h-4 sm:w-4 text-blue-600 dark:text-blue-400" /></div>
       case 'ORDER_STATUS_CHANGED':
-        return <div className="w-8 h-8 bg-purple-100 dark:bg-purple-900/20 rounded-full flex items-center justify-center"><Bell className="h-4 w-4 text-purple-600 dark:text-purple-400" /></div>
+        return <div className="w-6 h-6 sm:w-8 sm:h-8 bg-purple-100 dark:bg-purple-900/20 rounded-full flex items-center justify-center flex-shrink-0"><Bell className="h-3 w-3 sm:h-4 sm:w-4 text-purple-600 dark:text-purple-400" /></div>
       case 'LOW_STOCK':
-        return <div className="w-8 h-8 bg-amber-100 dark:bg-amber-900/20 rounded-full flex items-center justify-center"><Bell className="h-4 w-4 text-amber-600 dark:text-amber-400" /></div>
+        return <div className="w-6 h-6 sm:w-8 sm:h-8 bg-amber-100 dark:bg-amber-900/20 rounded-full flex items-center justify-center flex-shrink-0"><Bell className="h-3 w-3 sm:h-4 sm:w-4 text-amber-600 dark:text-amber-400" /></div>
       default:
-        return <div className="w-8 h-8 bg-gray-100 dark:bg-gray-800 rounded-full flex items-center justify-center"><Bell className="h-4 w-4 text-gray-600 dark:text-gray-400" /></div>
+        return <div className="w-6 h-6 sm:w-8 sm:h-8 bg-gray-100 dark:bg-gray-800 rounded-full flex items-center justify-center flex-shrink-0"><Bell className="h-3 w-3 sm:h-4 sm:w-4 text-gray-600 dark:text-gray-400" /></div>
     }
   }
 
@@ -146,9 +146,9 @@ export function NotificationBell() {
       </button>
       
       {isOpen && (
-        <div className="absolute right-0 mt-2 w-80 bg-background border border-foreground/10 rounded-md shadow-lg z-50 overflow-hidden">
+        <div className="absolute right-0 mt-2 w-72 sm:w-80 bg-background border border-foreground/10 rounded-md shadow-lg z-50 overflow-hidden max-w-[calc(100vw-2rem)] sm:max-w-none">
           <div className="p-3 border-b border-foreground/10 flex justify-between items-center">
-            <h3 className="font-medium">Notifications</h3>
+            <h3 className="font-medium text-sm sm:text-base">Notifications</h3>
             <Link 
               href="/notifications" 
               className="text-xs text-custom-accent hover:underline"
@@ -158,7 +158,7 @@ export function NotificationBell() {
             </Link>
           </div>
           
-          <div className="max-h-[400px] overflow-y-auto">
+          <div className="max-h-[60vh] sm:max-h-[400px] overflow-y-auto">
             {isLoading ? (
               <div className="p-4 text-center">
                 <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-custom-accent mx-auto"></div>
@@ -175,11 +175,11 @@ export function NotificationBell() {
                     )}
                     onClick={() => markAsRead(notification)}
                   >
-                    <div className="flex gap-3">
+                    <div className="flex gap-2 sm:gap-3">
                       {getNotificationIcon(notification.type)}
                       <div className="flex-1 min-w-0">
                         <p className={cn(
-                          "text-sm font-medium truncate",
+                          "text-xs sm:text-sm font-medium line-clamp-2",
                           !notification.read && "font-semibold"
                         )}>
                           {notification.title}
@@ -195,7 +195,7 @@ export function NotificationBell() {
                         </p>
                       </div>
                       {!notification.read && (
-                        <div className="w-2 h-2 bg-custom-accent rounded-full self-start mt-2"></div>
+                        <div className="w-2 h-2 bg-custom-accent rounded-full self-start mt-1 sm:mt-2 flex-shrink-0"></div>
                       )}
                     </div>
                   </div>
