@@ -1,4 +1,4 @@
-// app/api/orders/[id]/producer-details/route.ts
+// app/api/orders/[id]/producer-details/route.ts (correction)
 import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { apiAuthMiddleware } from "@/lib/api-middleware"
@@ -12,12 +12,9 @@ export const GET = apiAuthMiddleware(async (
   try {
     const orderId = context.params.id
 
-    // Vérifier si la commande existe et appartient à l'utilisateur
+    // Récupérer la commande avec les informations du producteur
     const order = await prisma.order.findUnique({
-      where: { 
-        id: orderId,
-        userId: session.user.id
-      },
+      where: { id: orderId },
       include: {
         items: {
           include: {
@@ -27,7 +24,8 @@ export const GET = apiAuthMiddleware(async (
                   include: {
                     user: {
                       select: {
-                        phone: true
+                        phone: true,
+                        name: true
                       }
                     }
                   }
@@ -46,7 +44,8 @@ export const GET = apiAuthMiddleware(async (
                       include: {
                         user: {
                           select: {
-                            phone: true
+                            phone: true,
+                            name: true
                           }
                         }
                       }
@@ -64,6 +63,25 @@ export const GET = apiAuthMiddleware(async (
       return new NextResponse("Commande non trouvée", { status: 404 })
     }
 
+    // Récupérer les informations du producteur principal
+    let producer
+    if (order.items.length > 0) {
+      producer = order.items[0].product.producer
+    } else if (order.bookings.length > 0) {
+      producer = order.bookings[0].deliverySlot.product.producer
+    } else {
+      return new NextResponse('Aucun produit dans la commande', { status: 400 })
+    }
+
+    // Vérifier les autorisations (CLIENT qui a passé la commande OU producteur concerné OU admin)
+    const isAdmin = session.user.role === 'ADMIN'
+    const isOrderOwner = order.userId === session.user.id
+    const isProducer = producer.userId === session.user.id
+
+    if (!isAdmin && !isOrderOwner && !isProducer) {
+      return new NextResponse('Accès interdit', { status: 403 })
+    }
+
     // Vérifier si la commande est en mode "pickup" (retrait sur place)
     let deliveryType = "pickup"
     try {
@@ -79,24 +97,8 @@ export const GET = apiAuthMiddleware(async (
       return new NextResponse("Cette commande n'est pas en retrait sur place", { status: 400 })
     }
 
-    // Récupérer les détails du producteur
-    let producer = null
-
-    // Essayer d'abord avec les items standards
-    if (order.items && order.items.length > 0) {
-      producer = order.items[0].product.producer
-    }
-    // Si pas d'items, essayer avec les bookings
-    else if (order.bookings && order.bookings.length > 0) {
-      producer = order.bookings[0].deliverySlot.product.producer
-    }
-
-    if (!producer) {
-      return new NextResponse("Aucun producteur trouvé pour cette commande", { status: 404 })
-    }
-
     return NextResponse.json({
-      companyName: producer.companyName || "Producteur",
+      companyName: producer.companyName || producer.user.name || "Producteur",
       address: producer.address || "Adresse non disponible",
       phone: producer.user?.phone || "Téléphone non disponible"
     })

@@ -1,4 +1,16 @@
 // components/orders/order-detail-modal.tsx
+import React from 'react'
+import { useSession } from 'next-auth/react'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
 import { Order, DeliveryInfo } from '@/types/order'
 import { formatDateToFrench } from '@/lib/date-utils'
 import Link from 'next/link'
@@ -22,6 +34,7 @@ import OrderStatusBadge from './order-status-badge'
 import OrderStatusIcon from './order-status-icon'
 import PaymentStatusBadge from './payment-status-badge'
 import { useState, useEffect } from 'react'
+import { useToast } from '@/hooks/use-toast'
 
 interface OrderPickupAddressProps {
   orderId: string
@@ -81,8 +94,9 @@ function OrderPickupAddress({ orderId, deliveryType }: OrderPickupAddressProps) 
   }
 
   if (error || !producerDetails) {
-  return null; // Ou simplement ne rien afficher au lieu du message d'erreur
-}
+    return null; // Ou simplement ne rien afficher au lieu du message d'erreur
+  }
+  
   return (
     <div className="bg-background border border-foreground/10 rounded-lg p-4 mt-4">
       <h3 className="font-medium text-base mb-3 flex items-center gap-2">
@@ -254,40 +268,42 @@ export default function OrderDetailModal({
   onUpdateStatus,
   isUpdating
 }: OrderDetailModalProps) {
+  const { data: session } = useSession()
+  const { toast } = useToast()
+  
   // Parse delivery info from order metadata
   const getDeliveryInfo = (order: Order): DeliveryInfo | null => {
-  if (!order.metadata) return null;
-  
-  try {
-    const metadata = JSON.parse(order.metadata);
-    // Supprimer cette ligne : console.log('Metadata parsed:', metadata);
+    if (!order.metadata) return null;
     
-    // Essayer différentes structures possibles
-    let deliveryType = 'pickup'; // valeur par défaut
-    
-    if (metadata.deliveryType) {
-      deliveryType = metadata.deliveryType;
-    } else if (metadata.type) {
-      deliveryType = metadata.type;
-    } else if (metadata.deliveryInfo?.type) {
-      deliveryType = metadata.deliveryInfo.type;
+    try {
+      const metadata = JSON.parse(order.metadata);
+      
+      // Essayer différentes structures possibles
+      let deliveryType = 'pickup'; // valeur par défaut
+      
+      if (metadata.deliveryType) {
+        deliveryType = metadata.deliveryType;
+      } else if (metadata.type) {
+        deliveryType = metadata.type;
+      } else if (metadata.deliveryInfo?.type) {
+        deliveryType = metadata.deliveryInfo.type;
+      }
+      
+      return {
+        type: deliveryType,
+        fullName: metadata.deliveryInfo?.fullName || metadata.fullName,
+        company: metadata.deliveryInfo?.company || metadata.company,
+        address: metadata.deliveryInfo?.address || metadata.address,
+        postalCode: metadata.deliveryInfo?.postalCode || metadata.postalCode,
+        city: metadata.deliveryInfo?.city || metadata.city,
+        phone: metadata.deliveryInfo?.phone || metadata.phone,
+        notes: metadata.deliveryInfo?.notes || metadata.notes,
+        paymentMethod: metadata.paymentMethod
+      } as DeliveryInfo;
+    } catch (e) {
+      return null;
     }
-    
-    return {
-      type: deliveryType,
-      fullName: metadata.deliveryInfo?.fullName || metadata.fullName,
-      company: metadata.deliveryInfo?.company || metadata.company,
-      address: metadata.deliveryInfo?.address || metadata.address,
-      postalCode: metadata.deliveryInfo?.postalCode || metadata.postalCode,
-      city: metadata.deliveryInfo?.city || metadata.city,
-      phone: metadata.deliveryInfo?.phone || metadata.phone,
-      notes: metadata.deliveryInfo?.notes || metadata.notes,
-      paymentMethod: metadata.paymentMethod
-    } as DeliveryInfo;
-  } catch (e) {
-    return null; // Supprimer aussi le console.error
-  }
-};
+  };
   
   const deliveryInfo = getDeliveryInfo(order);
 
@@ -356,7 +372,7 @@ export default function OrderDetailModal({
         <div className="bg-background rounded-lg shadow-lg max-w-3xl w-full max-h-[90vh] overflow-y-auto">
           <div className="p-6 border-b border-foreground/10 flex justify-between items-center sticky top-0 bg-background z-10">
             <div className="flex items-center gap-2">
-            <OrderStatusIcon status={order.status as OrderStatus} />
+              <OrderStatusIcon status={order.status as OrderStatus} />
               <h3 className="font-medium text-lg">
                 Commande #{order.id.substring(0, 8).toUpperCase()}
               </h3>
@@ -417,7 +433,6 @@ export default function OrderDetailModal({
                         ? 'Livraison à domicile'
                         : deliveryInfo.type || 'Non spécifié'}
                     </p>
-                    {/* Supprimer cette ligne : <p className="text-xs text-gray-500">Debug: {deliveryInfo.type}</p> */}
                   </div>
                   <div>
                     <p className="text-sm text-muted-foreground">Paiement</p>
@@ -431,16 +446,16 @@ export default function OrderDetailModal({
               )}
             </div>
             
-            {/* Adresse de retrait sur place */}
-            {deliveryInfo?.type === 'pickup' && (
+            {/* Adresse de retrait sur place - SEULEMENT POUR LES CLIENTS */}
+            {deliveryInfo?.type === 'pickup' && session?.user?.role === 'CLIENT' && (
               <OrderPickupAddress 
                 orderId={order.id} 
                 deliveryType="pickup" 
               />
             )}
             
-            {/* Adresse de livraison à domicile */}
-            {deliveryInfo?.type === 'delivery' && (
+            {/* Adresse de livraison à domicile - SEULEMENT POUR LES CLIENTS */}
+            {deliveryInfo?.type === 'delivery' && session?.user?.role === 'CLIENT' && (
               <OrderDeliveryAddress 
                 orderId={order.id} 
                 deliveryType="delivery" 
@@ -628,11 +643,41 @@ export default function OrderDetailModal({
                   <p>15.00 CHF</p>
                 </div>
               )}
+
               <div className="flex justify-between font-semibold text-lg pt-2 border-t border-foreground/10">
                 <p>Total</p>
                 <p>{((deliveryInfo?.type === 'delivery' ? 15 : 0) + order.total).toFixed(2)} CHF</p>
               </div>
             </div>
+
+            {/* Affichage de la commission pour les producteurs */}
+            {session?.user?.role === 'PRODUCER' && (
+              <div className="bg-orange-50 dark:bg-orange-900/20 p-3 rounded-md mb-2 border border-orange-200 dark:border-orange-800">
+                <h4 className="font-medium text-orange-800 dark:text-orange-200 mb-2 flex items-center gap-2">
+                  💰 Détail de vos revenus
+                </h4>
+                <div className="space-y-1 text-sm">
+                  <div className="flex justify-between">
+                    <span>Vos ventes:</span>
+                    <span>{order.total.toFixed(2)} CHF</span>
+                  </div>
+                  <div className="flex justify-between text-orange-700 dark:text-orange-300">
+                    <span>Commission plateforme (5%):</span>
+                    <span>-{(order.total * 0.05).toFixed(2)} CHF</span>
+                  </div>
+                  <div className="flex justify-between font-semibold text-green-700 dark:text-green-300 pt-1 border-t border-orange-200">
+                    <span>Votre montant:</span>
+                    <span>{(order.total * 0.95).toFixed(2)} CHF</span>
+                  </div>
+                </div>
+              </div>
+            )}
+            
+            <div className="flex justify-between font-semibold text-lg pt-2 border-t border-foreground/10">
+              <p>Total commande</p>
+              <p>{((deliveryInfo?.type === 'delivery' ? 15 : 0) + order.total).toFixed(2)} CHF</p>
+            </div>
+
             
             {/* Actions */}
             <div className="flex gap-2 pt-4 justify-between">
@@ -688,16 +733,45 @@ export default function OrderDetailModal({
                 
                 {/* Télécharger la facture - pour tous les statuts */}
                 <button
+                  onClick={async () => {
+                    try {
+                      const response = await fetch(`/api/orders/${order.id}/invoice`)
+                      
+                      if (!response.ok) {
+                        throw new Error('Erreur lors de la génération de la facture')
+                      }
+                      
+                      // Ouvrir la facture HTML dans un nouvel onglet
+                      const html = await response.text()
+                      const newWindow = window.open('', '_blank')
+                      if (newWindow) {
+                        newWindow.document.write(html)
+                        newWindow.document.close()
+                      }
+                      
+                      toast({
+                        title: "Succès", 
+                        description: "Facture générée avec succès"
+                      })
+                    } catch (error) {
+                      console.error('Erreur:', error)
+                      toast({
+                        title: "Erreur",
+                        description: "Impossible de générer la facture",
+                        variant: "destructive"
+                      })
+                    }
+                  }}
                   className="bg-custom-accent text-white px-4 py-2 rounded-md hover:opacity-90 transition-opacity flex items-center gap-2"
                 >
-                  <ShoppingBag className="h-5 w-5" />
-                  Télécharger facture
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
+                  <FileText className="h-5 w-5" />
+                 Télécharger facture
+               </button>
+             </div>
+           </div>
+         </div>
+       </div>
+     </div>
+   </div>
+ );
 }
