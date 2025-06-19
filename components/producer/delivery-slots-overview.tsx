@@ -361,7 +361,7 @@ export default function DeliverySlotsOverview() {
                                   {slot.product.name}
                                 </h3>
                                 <p className="text-xs sm:text-sm text-muted-foreground">
-                                  {slot.reserved} / {slot.maxCapacity} {slot.product.unit} réservés
+                                    {slot.maxCapacity - slot.reserved} {slot.product.unit} disponible
                                 </p>
                               </div>
                               {!isPastSlot && (

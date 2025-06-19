@@ -25,6 +25,7 @@ import { LoadingButton } from '@/components/ui/loading-button'
 import { Badge } from '@/components/ui/badge'
 import { format } from 'date-fns'
 import { fr } from 'date-fns/locale'
+import { formatPrice } from '@/lib/number-utils'
 
 interface PageProps {
   params: {
@@ -179,11 +180,6 @@ export default function WalletDetailPage({ params }: PageProps) {
     withdrawal => withdrawal.status === 'PENDING'
   ) || []
 
-  // Formater les montants en CHF
-  const formatCHF = (amount: number) => {
-    return new Intl.NumberFormat('fr-CH', { style: 'currency', currency: 'CHF' }).format(amount)
-  }
-
   if (isLoading) {
     return (
       <div className="flex justify-center items-center min-h-[400px]">
@@ -250,7 +246,7 @@ export default function WalletDetailPage({ params }: PageProps) {
             </div>
             <span className="text-sm text-muted-foreground">Solde disponible</span>
           </div>
-          <p className="text-2xl font-semibold pl-12">{formatCHF(walletData.balance)}</p>
+          <p className="text-2xl font-semibold pl-12">{formatPrice(walletData.balance)}</p>
         </div>
         
         <div className="bg-background border border-foreground/10 rounded-lg p-6 shadow-sm">
@@ -260,7 +256,7 @@ export default function WalletDetailPage({ params }: PageProps) {
             </div>
             <span className="text-sm text-muted-foreground">En attente</span>
           </div>
-          <p className="text-2xl font-semibold pl-12">{formatCHF(walletData.pendingBalance)}</p>
+          <p className="text-2xl font-semibold pl-12">{formatPrice(walletData.pendingBalance)}</p>
         </div>
         
         <div className="bg-background border border-foreground/10 rounded-lg p-6 shadow-sm">
@@ -270,7 +266,7 @@ export default function WalletDetailPage({ params }: PageProps) {
             </div>
             <span className="text-sm text-muted-foreground">Total retiré</span>
           </div>
-          <p className="text-2xl font-semibold pl-12">{formatCHF(walletData.totalWithdrawn)}</p>
+          <p className="text-2xl font-semibold pl-12">{formatPrice(walletData.totalWithdrawn)}</p>
         </div>
         
         <div className="bg-background border border-foreground/10 rounded-lg p-6 shadow-sm">
@@ -280,7 +276,7 @@ export default function WalletDetailPage({ params }: PageProps) {
             </div>
             <span className="text-sm text-muted-foreground">Total gagné</span>
           </div>
-          <p className="text-2xl font-semibold pl-12">{formatCHF(walletData.totalEarned)}</p>
+          <p className="text-2xl font-semibold pl-12">{formatPrice(walletData.totalEarned)}</p>
         </div>
       </div>
       
@@ -349,7 +345,6 @@ export default function WalletDetailPage({ params }: PageProps) {
                 <div className="flex items-center gap-3">
                   <Wallet className="h-5 w-5 text-muted-foreground" />
                   <div>
-                    // app/(protected)/admin/wallets/[id]/page.tsx (suite)
                     <p className="text-sm text-muted-foreground">IBAN</p>
                     <p className="font-medium">{walletData.producer.iban}</p>
                   </div>
@@ -422,7 +417,7 @@ export default function WalletDetailPage({ params }: PageProps) {
                       </div>
                     </td>
                     <td className="px-4 py-4 text-right font-medium">
-                      {formatCHF(withdrawal.amount)}
+                      {formatPrice(withdrawal.amount)}
                     </td>
                     <td className="px-4 py-4">
                       {bankDetails.iban}
@@ -520,7 +515,7 @@ export default function WalletDetailPage({ params }: PageProps) {
                       </div>
                     </td>
                     <td className="px-4 py-4 text-right font-medium">
-                      {formatCHF(withdrawal.amount)}
+                      {formatPrice(withdrawal.amount)}
                     </td>
                     <td className="px-4 py-4 text-center">
                       <span className={`px-2 py-1 text-xs font-medium rounded-full ${statusStyle}`}>
@@ -643,7 +638,7 @@ export default function WalletDetailPage({ params }: PageProps) {
                       </span>
                     </td>
                     <td className="px-4 py-4 text-right font-medium">
-                      {formatCHF(transaction.amount)}
+                      {formatPrice(transaction.amount)}
                     </td>
                     <td className="px-4 py-4 text-center">
                       <span className={`px-2 py-1 text-xs font-medium rounded-full ${statusStyle}`}>
@@ -662,57 +657,57 @@ export default function WalletDetailPage({ params }: PageProps) {
       {isModalOpen && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
           <div className="bg-background rounded-lg max-w-md w-full p-6 shadow-lg">
-            <h3 className="text-lg font-semibold mb-4">
-              {modalAction === 'approve' ? 'Approuver le retrait' : 'Rejeter le retrait'}
-            </h3>
-            
-            <p className="mb-4">
-              {modalAction === 'approve' 
-                ? 'Êtes-vous sûr de vouloir approuver cette demande de retrait ? Cette action confirmera que le virement a été effectué.'
-                : 'Êtes-vous sûr de vouloir rejeter cette demande de retrait ? Veuillez indiquer la raison du rejet.'}
-            </p>
-            
-            <div className="mb-4">
-              <label htmlFor="note" className="block text-sm font-medium mb-1">
-                {modalAction === 'approve' ? 'Référence du virement (optionnel)' : 'Raison du rejet'}
-              </label>
-              <textarea
-                id="note"
-                value={withdrawalNote}
-                onChange={(e) => setWithdrawalNote(e.target.value)}
-                rows={3}
-                className="w-full border border-input rounded-md p-2"
-                placeholder={modalAction === 'approve' 
-                  ? 'Ex: Référence bancaire, numéro de transaction...'
-                  : 'Ex: Informations bancaires incorrectes...'}
-                required={modalAction === 'reject'}
-              />
-            </div>
-            
-            <div className="flex gap-4 justify-end">
-              <button
-                onClick={() => setIsModalOpen(false)}
-                className="px-4 py-2 border border-input rounded-md hover:bg-accent hover:text-accent-foreground"
-              >
-                Annuler
-              </button>
-              
-              <LoadingButton
-                onClick={() => handleWithdrawalAction(modalAction)}
-                isLoading={isProcessingWithdrawal}
-                disabled={modalAction === 'reject' && !withdrawalNote.trim()}
-                className={
-                  modalAction === 'approve'
-                    ? 'bg-green-600 hover:bg-green-700 text-white'
-                    : 'bg-red-600 hover:bg-red-700 text-white'
-                }
-              >
-                {modalAction === 'approve' ? 'Confirmer le paiement' : 'Rejeter la demande'}
-              </LoadingButton>
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
-  )
+           <h3 className="text-lg font-semibold mb-4">
+             {modalAction === 'approve' ? 'Approuver le retrait' : 'Rejeter le retrait'}
+           </h3>
+           
+           <p className="mb-4">
+             {modalAction === 'approve' 
+               ? 'Êtes-vous sûr de vouloir approuver cette demande de retrait ? Cette action confirmera que le virement a été effectué.'
+               : 'Êtes-vous sûr de vouloir rejeter cette demande de retrait ? Veuillez indiquer la raison du rejet.'}
+           </p>
+           
+           <div className="mb-4">
+             <label htmlFor="note" className="block text-sm font-medium mb-1">
+               {modalAction === 'approve' ? 'Référence du virement (optionnel)' : 'Raison du rejet'}
+             </label>
+             <textarea
+               id="note"
+               value={withdrawalNote}
+               onChange={(e) => setWithdrawalNote(e.target.value)}
+               rows={3}
+               className="w-full border border-input rounded-md p-2"
+               placeholder={modalAction === 'approve' 
+                 ? 'Ex: Référence bancaire, numéro de transaction...'
+                 : 'Ex: Informations bancaires incorrectes...'}
+               required={modalAction === 'reject'}
+             />
+           </div>
+           
+           <div className="flex gap-4 justify-end">
+             <button
+               onClick={() => setIsModalOpen(false)}
+               className="px-4 py-2 border border-input rounded-md hover:bg-accent hover:text-accent-foreground"
+             >
+               Annuler
+             </button>
+             
+             <LoadingButton
+               onClick={() => handleWithdrawalAction(modalAction)}
+               isLoading={isProcessingWithdrawal}
+               disabled={modalAction === 'reject' && !withdrawalNote.trim()}
+               className={
+                 modalAction === 'approve'
+                   ? 'bg-green-600 hover:bg-green-700 text-white'
+                   : 'bg-red-600 hover:bg-red-700 text-white'
+               }
+             >
+               {modalAction === 'approve' ? 'Confirmer le paiement' : 'Rejeter la demande'}
+             </LoadingButton>
+           </div>
+         </div>
+       </div>
+     )}
+   </div>
+ )
 }

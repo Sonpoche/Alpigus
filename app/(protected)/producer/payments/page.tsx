@@ -20,6 +20,7 @@ import Link from 'next/link'
 import { format } from 'date-fns'
 import { fr } from 'date-fns/locale'
 import { LoadingButton } from '@/components/ui/loading-button'
+import { formatPrice } from '@/lib/number-utils'
 
 interface Transaction {
   id: string
@@ -157,11 +158,6 @@ export default function ProducerPaymentsPage() {
     return orderId.includes(searchLower) || transaction.status.toLowerCase().includes(searchLower)
   })
 
-  // Formater les montants en CHF
-  const formatCHF = (amount: number) => {
-    return new Intl.NumberFormat('fr-CH', { style: 'currency', currency: 'CHF' }).format(amount)
-  }
-
   if (isLoading) {
     return (
       <div className="flex justify-center items-center min-h-[400px]">
@@ -215,7 +211,7 @@ export default function ProducerPaymentsPage() {
             </div>
             <div>
               <p className="text-sm text-muted-foreground">Revenu total</p>
-              <p className="text-2xl font-semibold text-custom-title">{formatCHF(transactionStats.totalRevenue)}</p>
+              <p className="text-2xl font-semibold text-custom-title">{formatPrice(transactionStats.totalRevenue)}</p>
             </div>
           </div>
         </div>
@@ -227,7 +223,7 @@ export default function ProducerPaymentsPage() {
             </div>
             <div>
               <p className="text-sm text-muted-foreground">Revenu net</p>
-              <p className="text-2xl font-semibold text-custom-title">{formatCHF(transactionStats.netRevenue)}</p>
+              <p className="text-2xl font-semibold text-custom-title">{formatPrice(transactionStats.netRevenue)}</p>
             </div>
           </div>
         </div>
@@ -239,7 +235,7 @@ export default function ProducerPaymentsPage() {
             </div>
             <div>
               <p className="text-sm text-muted-foreground">Commission totale</p>
-              <p className="text-2xl font-semibold text-custom-title">{formatCHF(transactionStats.totalFees)}</p>
+              <p className="text-2xl font-semibold text-custom-title">{formatPrice(transactionStats.totalFees)}</p>
             </div>
           </div>
         </div>
@@ -405,13 +401,13 @@ export default function ProducerPaymentsPage() {
                         </Link>
                       </td>
                       <td className="py-4 px-4 text-right whitespace-nowrap font-medium">
-                        {formatCHF(transaction.amount)}
+                        {formatPrice(transaction.amount)}
                       </td>
                       <td className="py-4 px-4 text-right whitespace-nowrap text-muted-foreground">
-                        -{formatCHF(transaction.fee)}
+                        -{formatPrice(transaction.fee)}
                       </td>
                       <td className="py-4 px-4 text-right whitespace-nowrap font-medium">
-                        {formatCHF(netAmount)}
+                        {formatPrice(netAmount)}
                       </td>
                       <td className="py-4 px-4 text-center whitespace-nowrap">
                         <span className={`px-3 py-1 text-xs font-medium rounded-full ${statusStyle}`}>

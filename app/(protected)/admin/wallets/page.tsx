@@ -18,6 +18,7 @@ import {
 import Link from 'next/link'
 import { Badge } from '@/components/ui/badge'
 import { LoadingButton } from '@/components/ui/loading-button'
+import { formatPrice } from '@/lib/number-utils'
 
 interface WalletData {
   id: string
@@ -97,11 +98,6 @@ export default function AdminWalletsPage() {
            email.includes(searchLower)
   })
 
-  // Formater les montants en CHF
-  const formatCHF = (amount: number) => {
-    return new Intl.NumberFormat('fr-CH', { style: 'currency', currency: 'CHF' }).format(amount)
-  }
-
   if (isLoading) {
     return (
       <div className="flex justify-center items-center min-h-[400px]">
@@ -171,7 +167,7 @@ export default function AdminWalletsPage() {
             <div>
               <p className="text-sm text-muted-foreground">Total disponible</p>
               <p className="text-2xl font-semibold">
-                {formatCHF(wallets.reduce((sum, wallet) => sum + wallet.balance, 0))}
+                {formatPrice(wallets.reduce((sum, wallet) => sum + wallet.balance, 0))}
               </p>
             </div>
           </div>
@@ -221,10 +217,10 @@ export default function AdminWalletsPage() {
                     </div>
                   </td>
                   <td className="px-4 py-4 text-right">
-                    <span className="font-medium">{formatCHF(wallet.balance)}</span>
+                    <span className="font-medium">{formatPrice(wallet.balance)}</span>
                   </td>
                   <td className="px-4 py-4 text-right">
-                    <span className="text-muted-foreground">{formatCHF(wallet.pendingBalance)}</span>
+                    <span className="text-muted-foreground">{formatPrice(wallet.pendingBalance)}</span>
                   </td>
                   <td className="px-4 py-4 text-center">
                     {wallet.pendingWithdrawals > 0 ? (

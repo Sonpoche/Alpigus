@@ -249,7 +249,7 @@ export default function DashboardPage() {
        id: `delivery-${slot.id}`,
        type: 'delivery',
        title: `Disponibilité produit frais`,
-       description: `${slot.product.name} - ${slot.reserved}/${slot.maxCapacity} ${slot.product.unit}`,
+       description: `${slot.product.name} - ${slot.maxCapacity - slot.reserved} ${slot.product.unit} disponible`,
        date: new Date(slot.date),
        status: 'pending'
      })
@@ -748,7 +748,7 @@ export default function DashboardPage() {
                  </div>
                  <p className="text-xs text-muted-foreground line-clamp-2">
                    {session?.user?.role === UserRole.PRODUCER
-                     ? `Produit frais: ${upcomingDeliveries[0].reserved}/${upcomingDeliveries[0].maxCapacity} ${upcomingDeliveries[0].product.unit} de ${upcomingDeliveries[0].product.name}`
+                     ? `Produit frais: ${upcomingDeliveries[0].maxCapacity - upcomingDeliveries[0].reserved} ${upcomingDeliveries[0].product.unit} disponible de ${upcomingDeliveries[0].product.name}`
                      : `Produit frais réservé: ${upcomingDeliveries[0].booking?.quantity || ''} ${upcomingDeliveries[0].product?.unit || ''} de ${upcomingDeliveries[0].product?.name || ''}`
                    }
                  </p>

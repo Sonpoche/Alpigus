@@ -18,6 +18,7 @@ import {
 import { format } from 'date-fns'
 import { fr } from 'date-fns/locale'
 import { LoadingButton } from '@/components/ui/loading-button'
+import { formatPrice } from '@/lib/number-utils'
 
 export default function ProducerWalletPage() {
   const router = useRouter()
@@ -123,11 +124,6 @@ export default function ProducerWalletPage() {
     return status.includes(searchLower)
   }) || []
 
-  // Formater les montants en CHF
-  const formatCHF = (amount: number) => {
-    return new Intl.NumberFormat('fr-CH', { style: 'currency', currency: 'CHF' }).format(amount)
-  }
-
   if (isLoading) {
     return (
       <div className="flex justify-center items-center min-h-[400px]">
@@ -155,7 +151,7 @@ export default function ProducerWalletPage() {
             <div>
               <p className="text-sm text-muted-foreground">Solde disponible (retirable)</p>
               <p className="text-2xl font-semibold text-custom-title">
-                {formatCHF(walletData?.balance || 0)}
+                {formatPrice(walletData?.balance || 0)}
               </p>
             </div>
           </div>
@@ -178,7 +174,7 @@ export default function ProducerWalletPage() {
             <div>
               <p className="text-sm text-muted-foreground">En attente (non retirable)</p>
               <p className="text-2xl font-semibold text-custom-title">
-                {formatCHF(walletData?.pendingBalance || 0)}
+                {formatPrice(walletData?.pendingBalance || 0)}
               </p>
             </div>
           </div>
@@ -195,7 +191,7 @@ export default function ProducerWalletPage() {
             <div>
               <p className="text-sm text-muted-foreground">Total gagné</p>
               <p className="text-2xl font-semibold text-custom-title">
-                {formatCHF(walletData?.totalEarned || 0)}
+                {formatPrice(walletData?.totalEarned || 0)}
               </p>
             </div>
           </div>
@@ -390,7 +386,7 @@ export default function ProducerWalletPage() {
                         <td className={`py-4 px-4 text-right whitespace-nowrap font-medium ${
                          isNegative ? 'text-red-600 dark:text-red-400' : 'text-green-600 dark:text-green-400'
                        }`}>
-                         {formatCHF(Math.abs(transaction.amount))}
+                         {formatPrice(Math.abs(transaction.amount))}
                        </td>
                        <td className="py-4 px-4 text-center whitespace-nowrap">
                          <span className={`px-2 py-1 text-xs font-medium rounded-full ${typeStyle}`}>
@@ -495,7 +491,7 @@ export default function ProducerWalletPage() {
                          {formattedRequestDate}
                        </td>
                        <td className="py-4 px-4 text-right whitespace-nowrap font-medium">
-                         {formatCHF(withdrawal.amount)}
+                         {formatPrice(withdrawal.amount)}
                        </td>
                        <td className="py-4 px-4 text-center whitespace-nowrap">
                          <span className={`px-3 py-1 text-xs font-medium rounded-full ${statusStyle}`}>
@@ -526,7 +522,6 @@ export default function ProducerWalletPage() {
            
            <div className="mb-4">
              <label htmlFor="amount" className="block text-sm font-medium mb-1">Montant (CHF)</label>
-             // app/(protected)/producer/wallet/page.tsx (fin)
              <input
                type="number"
                id="amount"
@@ -539,7 +534,7 @@ export default function ProducerWalletPage() {
                placeholder="0.00"
              />
              <p className="mt-1 text-xs text-muted-foreground">
-               Solde disponible: {formatCHF(walletData?.balance || 0)}
+               Solde disponible: {formatPrice(walletData?.balance || 0)}
              </p>
            </div>
            

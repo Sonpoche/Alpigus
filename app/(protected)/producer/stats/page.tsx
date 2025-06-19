@@ -16,6 +16,7 @@ import {
   Filter
 } from 'lucide-react'
 import { formatDateToFrench } from '@/lib/date-utils'
+import { formatPrice } from '@/lib/number-utils'
 import { OrderStatus, ProductType } from '@prisma/client'
 import { LineChart, Line, BarChart as RechartsBarChart, Bar, PieChart, Pie, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, Cell } from 'recharts'
 import { cn, containerClasses, gridClasses, cardClasses, spacingClasses } from '@/lib/utils'
@@ -109,10 +110,6 @@ export default function ProducerStatsPage() {
     }
   }
 
-  const formatCHF = (value: number) => {
-    return new Intl.NumberFormat('fr-CH', { style: 'currency', currency: 'CHF' }).format(value)
-  }
-
   // Fonction pour formatter les tooltips des graphiques
   const customTooltip = ({ active, payload, label }: any) => {
     if (active && payload && payload.length) {
@@ -120,7 +117,7 @@ export default function ProducerStatsPage() {
         <div className="bg-background border border-foreground/10 p-3 rounded-md shadow-sm">
           <p className="font-medium">{label}</p>
           <p className="text-custom-accent">
-            {formatCHF(payload[0].value)}
+            {formatPrice(payload[0].value)}
           </p>
         </div>
       );
@@ -214,7 +211,7 @@ export default function ProducerStatsPage() {
                 <div className="min-w-0 flex-1">
                   <p className="text-sm text-muted-foreground">Revenu total</p>
                   <p className="text-2xl sm:text-3xl font-bold mt-1 text-custom-title truncate">
-                    {formatCHF(statsData.totalStats.totalRevenue)}
+                    {formatPrice(statsData.totalStats.totalRevenue)}
                   </p>
                 </div>
                 <div className={`p-2 rounded-full flex-shrink-0 ml-2 ${
@@ -323,7 +320,7 @@ export default function ProducerStatsPage() {
                 <div className="min-w-0 flex-1">
                   <p className="text-sm text-muted-foreground">Panier moyen</p>
                   <p className="text-2xl sm:text-3xl font-bold mt-1 text-custom-title truncate">
-                    {formatCHF(statsData.totalStats.averageOrderValue)}
+                    {formatPrice(statsData.totalStats.averageOrderValue)}
                   </p>
                 </div>
                 <div className="p-2 bg-purple-100 text-purple-800 dark:bg-purple-900/20 dark:text-purple-300 rounded-full flex-shrink-0 ml-2">
@@ -476,7 +473,7 @@ export default function ProducerStatsPage() {
                           {product.quantity}
                         </td>
                         <td className="py-3 px-4 text-right font-medium text-custom-title">
-                          {formatCHF(product.revenue)}
+                          {formatPrice(product.revenue)}
                         </td>
                         <td className="py-3 px-4 text-right text-custom-text">
                           {Math.round((product.revenue / statsData.totalStats.totalRevenue) * 100)}%
@@ -521,7 +518,7 @@ export default function ProducerStatsPage() {
                       <div className="flex justify-between items-center">
                         <span className="text-sm text-muted-foreground">Revenu</span>
                         <span className="text-lg font-bold text-custom-accent">
-                          {formatCHF(product.revenue)}
+                          {formatPrice(product.revenue)}
                         </span>
                       </div>
                     </div>
