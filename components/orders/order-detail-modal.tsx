@@ -13,6 +13,7 @@ import {
 } from "@/components/ui/alert-dialog"
 import { Order, DeliveryInfo } from '@/types/order'
 import { formatDateToFrench } from '@/lib/date-utils'
+import { formatNumber } from '@/lib/number-utils'
 import Link from 'next/link'
 import { OrderStatus } from '@prisma/client'
 import { 
@@ -246,7 +247,7 @@ function OrderDeliveryAddress({ orderId, deliveryType }: OrderDeliveryAddressPro
       
       <div className="mt-4 text-xs text-foreground/60 bg-foreground/5 p-3 rounded-md">
         <p className="font-medium mb-1">Informations de livraison :</p>
-        <p>• Frais de livraison : 15.00 CHF</p>
+        <p>• Frais de livraison : {formatNumber(15)} CHF</p>
         <p>• Numéro de commande : #{orderId.substring(0, 8).toUpperCase()}</p>
       </div>
     </div>
@@ -566,14 +567,14 @@ export default function OrderDetailModal({
                         {item.product.name}
                       </Link>
                       <p className="text-sm text-muted-foreground">
-                        Quantité: {item.quantity} {item.product.unit}
+                        Quantité: {formatNumber(item.quantity)} {item.product.unit}
                       </p>
                       <p className="text-sm">
-                        Prix unitaire: {item.price.toFixed(2)} CHF
+                        Prix unitaire: {formatNumber(item.price)} CHF
                       </p>
                     </div>
                     <div className="ml-4 text-right">
-                      <p className="font-medium">{(item.price * item.quantity).toFixed(2)} CHF</p>
+                      <p className="font-medium">{formatNumber(item.price * item.quantity)} CHF</p>
                     </div>
                   </div>
                 ))}
@@ -587,6 +588,7 @@ export default function OrderDetailModal({
                 <div className="space-y-4 divide-y divide-foreground/10">
                   {order.bookings.map((booking) => {
                     const isPast = new Date(booking.deliverySlot.date) < new Date();
+                    const bookingPrice = booking.price || booking.deliverySlot.product.price || 0;
                     return (
                       <div key={booking.id} className="flex pt-4 first:pt-0">
                         <div className="w-16 h-16 rounded-md overflow-hidden flex-shrink-0">
@@ -616,12 +618,10 @@ export default function OrderDetailModal({
                             {formatDateToFrench(new Date(booking.deliverySlot.date))}
                           </p>
                           <p className="text-sm mt-1">
-                            Quantité: {booking.quantity} {booking.deliverySlot.product.unit}
+                            Quantité: {formatNumber(booking.quantity)} {booking.deliverySlot.product.unit}
                           </p>
                           <p className="text-sm font-medium mt-1">
-                            {(booking.price ? booking.price * booking.quantity : 
-                              booking.deliverySlot.product.price ? booking.deliverySlot.product.price * booking.quantity : 
-                              0).toFixed(2)} CHF
+                            {formatNumber(bookingPrice * booking.quantity)} CHF
                           </p>
                         </div>
                       </div>
@@ -635,18 +635,18 @@ export default function OrderDetailModal({
             <div className="border-t border-foreground/10 pt-4">
               <div className="flex justify-between mb-2">
                 <p>Sous-total</p>
-                <p>{order.total.toFixed(2)} CHF</p>
+                <p>{formatNumber(order.total)} CHF</p>
               </div>
               {deliveryInfo?.type === 'delivery' && (
                 <div className="flex justify-between mb-2">
                   <p>Frais de livraison</p>
-                  <p>15.00 CHF</p>
+                  <p>{formatNumber(15)} CHF</p>
                 </div>
               )}
 
               <div className="flex justify-between font-semibold text-lg pt-2 border-t border-foreground/10">
                 <p>Total</p>
-                <p>{((deliveryInfo?.type === 'delivery' ? 15 : 0) + order.total).toFixed(2)} CHF</p>
+                <p>{formatNumber((deliveryInfo?.type === 'delivery' ? 15 : 0) + order.total)} CHF</p>
               </div>
             </div>
 
@@ -659,15 +659,15 @@ export default function OrderDetailModal({
                 <div className="space-y-1 text-sm">
                   <div className="flex justify-between">
                     <span>Vos ventes:</span>
-                    <span>{order.total.toFixed(2)} CHF</span>
+                    <span>{formatNumber(order.total)} CHF</span>
                   </div>
                   <div className="flex justify-between text-orange-700 dark:text-orange-300">
                     <span>Commission plateforme (5%):</span>
-                    <span>-{(order.total * 0.05).toFixed(2)} CHF</span>
+                    <span>-{formatNumber(order.total * 0.05)} CHF</span>
                   </div>
                   <div className="flex justify-between font-semibold text-green-700 dark:text-green-300 pt-1 border-t border-orange-200">
                     <span>Votre montant:</span>
-                    <span>{(order.total * 0.95).toFixed(2)} CHF</span>
+                    <span>{formatNumber(order.total * 0.95)} CHF</span>
                   </div>
                 </div>
               </div>
@@ -675,7 +675,7 @@ export default function OrderDetailModal({
             
             <div className="flex justify-between font-semibold text-lg pt-2 border-t border-foreground/10">
               <p>Total commande</p>
-              <p>{((deliveryInfo?.type === 'delivery' ? 15 : 0) + order.total).toFixed(2)} CHF</p>
+              <p>{formatNumber((deliveryInfo?.type === 'delivery' ? 15 : 0) + order.total)} CHF</p>
             </div>
 
             

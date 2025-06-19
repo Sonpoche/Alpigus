@@ -2,6 +2,7 @@
 import { motion } from 'framer-motion'
 import { Order, OrderItem, Booking } from '@/types/order'
 import { formatDateToFrench } from '@/lib/date-utils'
+import { formatNumber } from '@/lib/number-utils'
 import { OrderStatus } from '@prisma/client'
 import Link from 'next/link'
 import { 
@@ -135,10 +136,10 @@ export default function OrderItemComponent({
                     <div className="flex-1 min-w-0">
                       <p className="font-medium text-sm truncate">{item.product.name}</p>
                       <p className="text-xs text-muted-foreground">
-                        {item.quantity} {item.product.unit}
+                        {formatNumber(item.quantity)} {item.product.unit}
                       </p>
                       <p className="text-xs font-medium text-custom-accent">
-                        {(item.price * item.quantity).toFixed(2)} CHF
+                        {formatNumber(item.price * item.quantity)} CHF
                       </p>
                     </div>
                   </div>
@@ -182,7 +183,7 @@ export default function OrderItemComponent({
                         {formatDateToFrench(new Date(booking.deliverySlot.date))}
                       </p>
                       <p className="text-xs text-blue-600 dark:text-blue-400">
-                        {booking.quantity} {booking.deliverySlot.product.unit}
+                        {formatNumber(booking.quantity)} {booking.deliverySlot.product.unit}
                       </p>
                     </div>
                   </div>
@@ -197,7 +198,7 @@ export default function OrderItemComponent({
           <div className="flex items-center justify-between mb-3">
             <div>
               <p className="text-sm text-muted-foreground">Total</p>
-              <p className="font-bold text-lg text-custom-accent">{order.total.toFixed(2)} CHF</p>
+              <p className="font-bold text-lg text-custom-accent">{formatNumber(order.total)} CHF</p>
               {paymentInfo?.paymentMethod && (
                 <p className="text-xs text-muted-foreground">
                   {paymentInfo.paymentMethod === 'invoice' ? 'Facture 30j' : 'Carte'}
@@ -263,7 +264,7 @@ export default function OrderItemComponent({
           <div className="sm:col-span-1 flex sm:flex-col justify-between sm:justify-start items-end sm:border-l sm:border-foreground/10 sm:pl-6">
             <div className="text-right sm:mb-4">
               <p className="text-sm text-muted-foreground">Total</p>
-              <p className="font-semibold text-lg">{order.total.toFixed(2)} CHF</p>
+              <p className="font-semibold text-lg">{formatNumber(order.total)} CHF</p>
               
               {paymentInfo?.paymentMethod && (
                 <p className="text-xs text-muted-foreground mt-1">
@@ -315,7 +316,7 @@ function renderOrderItems(items: OrderItem[]) {
             <div className="flex-1 min-w-0">
               <p className="font-medium truncate">{item.product.name}</p>
               <p className="text-sm text-muted-foreground">
-                {item.quantity} {item.product.unit} ({(item.price * item.quantity).toFixed(2)} CHF)
+                {formatNumber(item.quantity)} {item.product.unit} ({formatNumber(item.price * item.quantity)} CHF)
               </p>
             </div>
           </div>
@@ -364,7 +365,7 @@ function renderBookings(bookings: Booking[]) {
                 )}
               </p>
               <p className="text-xs text-muted-foreground">
-                Quantité: {booking.quantity} {booking.deliverySlot.product.unit}
+                Quantité: {formatNumber(booking.quantity)} {booking.deliverySlot.product.unit}
               </p>
             </div>
           </div>

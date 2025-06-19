@@ -1,5 +1,6 @@
 // components/invoices/invoice-template.tsx
 import React from 'react'
+import { formatNumber } from '@/lib/number-utils'
 
 interface InvoiceData {
   order: {
@@ -201,13 +202,13 @@ export default function InvoiceTemplate({ data }: { data: InvoiceData }) {
                 {item.product.name}
               </td>
               <td style={{ padding: '10px', textAlign: 'center', borderBottom: '1px solid #ddd' }}>
-                {item.quantity} {item.product.unit}
+                {formatNumber(item.quantity)} {item.product.unit}
               </td>
               <td style={{ padding: '10px', textAlign: 'right', borderBottom: '1px solid #ddd' }}>
-                {item.price.toFixed(2)} CHF
+                {formatNumber(item.price)} CHF
               </td>
               <td style={{ padding: '10px', textAlign: 'right', borderBottom: '1px solid #ddd' }}>
-                {(item.price * item.quantity).toFixed(2)} CHF
+                {formatNumber(item.price * item.quantity)} CHF
               </td>
             </tr>
           ))}
@@ -225,13 +226,13 @@ export default function InvoiceTemplate({ data }: { data: InvoiceData }) {
                   </small>
                 </td>
                 <td style={{ padding: '10px', textAlign: 'center', borderBottom: '1px solid #ddd' }}>
-                  {booking.quantity} {booking.deliverySlot.product.unit}
+                  {formatNumber(booking.quantity)} {booking.deliverySlot.product.unit}
                 </td>
                 <td style={{ padding: '10px', textAlign: 'right', borderBottom: '1px solid #ddd' }}>
-                  {price.toFixed(2)} CHF
+                  {formatNumber(price)} CHF
                 </td>
                 <td style={{ padding: '10px', textAlign: 'right', borderBottom: '1px solid #ddd' }}>
-                  {(price * booking.quantity).toFixed(2)} CHF
+                  {formatNumber(price * booking.quantity)} CHF
                 </td>
               </tr>
             )
@@ -247,10 +248,10 @@ export default function InvoiceTemplate({ data }: { data: InvoiceData }) {
                 1
               </td>
               <td style={{ padding: '10px', textAlign: 'right', borderBottom: '1px solid #ddd' }}>
-                {deliveryFee.toFixed(2)} CHF
+                {formatNumber(deliveryFee)} CHF
               </td>
               <td style={{ padding: '10px', textAlign: 'right', borderBottom: '1px solid #ddd' }}>
-                {deliveryFee.toFixed(2)} CHF
+                {formatNumber(deliveryFee)} CHF
               </td>
             </tr>
           )}
@@ -262,12 +263,12 @@ export default function InvoiceTemplate({ data }: { data: InvoiceData }) {
         <div style={{ width: '300px' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', padding: '10px 0', borderBottom: '1px solid #ddd' }}>
             <span>Sous-total:</span>
-            <span>{subtotal.toFixed(2)} CHF</span>
+            <span>{formatNumber(subtotal)} CHF</span>
           </div>
           {deliveryFee > 0 && (
             <div style={{ display: 'flex', justifyContent: 'space-between', padding: '10px 0', borderBottom: '1px solid #ddd' }}>
               <span>Frais de livraison:</span>
-              <span>{deliveryFee.toFixed(2)} CHF</span>
+              <span>{formatNumber(deliveryFee)} CHF</span>
             </div>
           )}
           <div style={{ 
@@ -280,7 +281,7 @@ export default function InvoiceTemplate({ data }: { data: InvoiceData }) {
             color: '#FF5A5F'
           }}>
             <span>TOTAL:</span>
-            <span>{total.toFixed(2)} CHF</span>
+            <span>{formatNumber(total)} CHF</span>
           </div>
         </div>
       </div>

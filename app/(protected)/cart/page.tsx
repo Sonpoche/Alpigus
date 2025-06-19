@@ -9,6 +9,7 @@ import { useToast } from '@/hooks/use-toast'
 import Link from 'next/link'
 import { formatDateToFrench } from '@/lib/date-utils'
 import { LoadingButton } from '@/components/ui/loading-button'
+import { formatNumber } from '@/lib/number-utils'
 
 interface CartItem {
   id: string
@@ -416,7 +417,7 @@ export default function CartPage() {
                           {item.product.name}
                         </Link>
                         <div className="text-sm text-muted-foreground">
-                          {item.price.toFixed(2)} CHF / {item.product.unit}
+                          {formatNumber(item.price)} CHF / {item.product.unit}
                         </div>
                       </div>
                       
@@ -432,7 +433,7 @@ export default function CartPage() {
                         </button>
                         <input
                           type="number"
-                          value={item.quantity}
+                          value={formatNumber(item.quantity)}
                           onChange={(e) => {
                             const value = parseFloat(e.target.value);
                             if (!isNaN(value) && value > 0) {
@@ -454,7 +455,7 @@ export default function CartPage() {
                         
                         {/* Sous-total */}
                         <div className="w-24 text-right">
-                          {(item.price * item.quantity).toFixed(2)} CHF
+                          {formatNumber(item.price * item.quantity)} CHF
                         </div>
                         
                         {/* Bouton supprimer */}
@@ -530,9 +531,9 @@ export default function CartPage() {
                               Livraison le {formatDateToFrench(deliveryDate)}
                             </div>
                             <div className="text-sm">
-                              Quantité: {booking.quantity} {booking.deliverySlot.product.unit}
+                              Quantité: {formatNumber(booking.quantity)} {booking.deliverySlot.product.unit}
                               <span className="ml-1 font-medium">
-                                ({bookingTotal.toFixed(2)} CHF)
+                                ({formatNumber(bookingTotal)} CHF)
                               </span>
                             </div>
                             
@@ -574,7 +575,7 @@ export default function CartPage() {
               <div className="space-y-2 mb-4">
                 <div className="flex justify-between">
                   <span>Sous-total</span>
-                  <span>{(regularItemsTotal + bookingsTotal).toFixed(2)} CHF</span>
+                  <span>{formatNumber(regularItemsTotal + bookingsTotal)} CHF</span>
                 </div>
                 {/* Vous pouvez ajouter d'autres éléments comme les frais de livraison, taxes, etc. */}
               </div>
@@ -582,7 +583,7 @@ export default function CartPage() {
               <div className="border-t border-foreground/10 pt-2 mb-6">
                 <div className="flex justify-between font-semibold">
                   <span>Total</span>
-                  <span>{grandTotal.toFixed(2)} CHF</span>
+                  <span>{formatNumber(grandTotal)} CHF</span>
                 </div>
               </div>
               

@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { apiAuthMiddleware } from '@/lib/api-middleware'
 import { Session } from 'next-auth'
 import { prisma } from '@/lib/prisma'
+import { formatNumber } from '@/lib/number-utils'
 
 export const GET = apiAuthMiddleware(async (
   req: NextRequest,
@@ -423,9 +424,9 @@ export const GET = apiAuthMiddleware(async (
             ${order.items.map(item => `
                 <tr>
                     <td><span class="product-name">${item.product.name}</span></td>
-                    <td style="text-align: center;">${item.quantity} ${item.product.unit}</td>
-                    <td style="text-align: right;">${item.price.toFixed(2)} CHF</td>
-                    <td style="text-align: right;"><strong>${(item.price * item.quantity).toFixed(2)} CHF</strong></td>
+                    <td style="text-align: center;">${formatNumber(item.quantity)} ${item.product.unit}</td>
+                    <td style="text-align: right;">${formatNumber(item.price)} CHF</td>
+                    <td style="text-align: right;"><strong>${formatNumber(item.price * item.quantity)} CHF</strong></td>
                 </tr>
             `).join('')}
             
@@ -437,9 +438,9 @@ export const GET = apiAuthMiddleware(async (
                         <span class="product-name">${booking.deliverySlot.product.name}</span>
                         <div class="delivery-info">Livraison programmée: ${booking.deliverySlot.date.toLocaleDateString('fr-FR')}</div>
                     </td>
-                    <td style="text-align: center;">${booking.quantity} ${booking.deliverySlot.product.unit}</td>
-                    <td style="text-align: right;">${price.toFixed(2)} CHF</td>
-                    <td style="text-align: right;"><strong>${(price * booking.quantity).toFixed(2)} CHF</strong></td>
+                    <td style="text-align: center;">${formatNumber(booking.quantity)} ${booking.deliverySlot.product.unit}</td>
+                    <td style="text-align: right;">${formatNumber(price)} CHF</td>
+                    <td style="text-align: right;"><strong>${formatNumber(price * booking.quantity)} CHF</strong></td>
                 </tr>
               `
             }).join('')}
@@ -454,17 +455,17 @@ export const GET = apiAuthMiddleware(async (
             <div>
                 <div class="commission-item">
                     <span>Total des ventes:</span>
-                    <span><strong>${subtotal.toFixed(2)} CHF</strong></span>
+                    <span><strong>${formatNumber(subtotal)} CHF</strong></span>
                 </div>
                 <div class="commission-item">
                     <span>Commission plateforme (5%):</span>
-                    <span><strong>-${platformCommission.toFixed(2)} CHF</strong></span>
+                    <span><strong>-${formatNumber(platformCommission)} CHF</strong></span>
                 </div>
             </div>
             <div>
                 <div class="producer-amount">
                     <div class="producer-amount-label">Montant Producteur</div>
-                    <div>${producerAmount.toFixed(2)} CHF</div>
+                    <div>${formatNumber(producerAmount)} CHF</div>
                 </div>
             </div>
         </div>
@@ -474,17 +475,17 @@ export const GET = apiAuthMiddleware(async (
         <div class="total-box">
             <div class="total-row">
                 <span>Sous-total produits:</span>
-                <span>${subtotal.toFixed(2)} CHF</span>
+                <span>${formatNumber(subtotal)} CHF</span>
             </div>
             ${deliveryFee > 0 ? `
                 <div class="total-row">
                     <span>Frais de livraison:</span>
-                    <span>${deliveryFee.toFixed(2)} CHF</span>
+                    <span>${formatNumber(deliveryFee)} CHF</span>
                 </div>
             ` : ''}
             <div class="total-row grand-total">
                 <span>Total Commande:</span>
-                <span>${totalWithDelivery.toFixed(2)} CHF</span>
+                <span>${formatNumber(totalWithDelivery)} CHF</span>
             </div>
         </div>
     </div>

@@ -15,6 +15,7 @@ import {
   PieChart as PieChartIcon
 } from 'lucide-react'
 import { formatDateToFrench } from '@/lib/date-utils'
+import { formatPrice } from '@/lib/number-utils'
 import { OrderStatus, ProductType } from '@prisma/client'
 import { LineChart, Line, PieChart, Pie, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, Cell } from 'recharts'
 import { cn } from '@/lib/utils'
@@ -74,10 +75,6 @@ export default function ClientReportsPage() {
     }
   }
 
-  const formatCHF = (value: number) => {
-    return new Intl.NumberFormat('fr-CH', { style: 'currency', currency: 'CHF' }).format(value)
-  }
-
   // Fonction pour formatter les tooltips des graphiques
   const customTooltip = ({ active, payload, label }: any) => {
     if (active && payload && payload.length) {
@@ -85,7 +82,7 @@ export default function ClientReportsPage() {
         <div className="bg-background border border-foreground/10 p-3 rounded-md shadow-sm">
           <p className="font-medium">{label}</p>
           <p className="text-custom-accent">
-            {formatCHF(payload[0].value)}
+            {formatPrice(payload[0].value)}
           </p>
         </div>
       );
@@ -170,7 +167,7 @@ export default function ClientReportsPage() {
             <div className="flex justify-between items-start">
               <div>
                 <p className="text-sm text-muted-foreground">Total dépensé</p>
-                <p className="text-3xl font-bold mt-1">{formatCHF(reportsData.totalStats.totalSpent)}</p>
+                <p className="text-3xl font-bold mt-1">{formatPrice(reportsData.totalStats.totalSpent)}</p>
               </div>
               <div className="p-2 bg-custom-accentLight rounded-full">
                 <ShoppingBag className="h-5 w-5 text-custom-accent" />
@@ -224,7 +221,7 @@ export default function ClientReportsPage() {
             <div className="flex justify-between items-start">
               <div>
                 <p className="text-sm text-muted-foreground">Panier moyen</p>
-                <p className="text-3xl font-bold mt-1">{formatCHF(reportsData.totalStats.averageOrderValue)}</p>
+                <p className="text-3xl font-bold mt-1">{formatPrice(reportsData.totalStats.averageOrderValue)}</p>
               </div>
               <div className="p-2 bg-green-100 dark:bg-green-900/20 rounded-full">
                 <ShoppingBag className="h-5 w-5 text-green-600 dark:text-green-400" />
@@ -292,7 +289,7 @@ export default function ClientReportsPage() {
                     <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                   ))}
                 </Pie>
-                <Tooltip formatter={(value) => formatCHF(value as number)} />
+                <Tooltip formatter={(value) => formatPrice(value as number)} />
                 <Legend />
               </PieChart>
             </ResponsiveContainer>
@@ -338,7 +335,7 @@ export default function ClientReportsPage() {
                         {getOrderStatusLabel(order.status)}
                       </span>
                     </td>
-                    <td className="py-3 px-4 text-right font-medium">{formatCHF(order.total)}</td>
+                    <td className="py-3 px-4 text-right font-medium">{formatPrice(order.total)}</td>
                   </tr>
                 ))}
               </tbody>

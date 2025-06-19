@@ -5,6 +5,7 @@ import { ProductType } from '@prisma/client'
 import { ShoppingCart, Info, Truck, Tag, Plus, Minus } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
 import { useCart } from '@/hooks/use-cart'
+import { formatNumber } from '@/lib/number-utils'
 import { Badge } from '@/components/ui/badge'
 import { LoadingButton } from '@/components/ui/loading-button'
 import { AddToCartAnimation } from '@/components/cart/add-to-cart-animation'
@@ -61,7 +62,7 @@ export function ProductCard({ product }: ProductCardProps) {
         
         toast({
           title: "Produit ajouté",
-          description: `${quantity} ${product.unit} de ${product.name} ajouté au panier`
+          description: `${formatNumber(quantity)} ${product.unit} de ${product.name} ajouté au panier`
         })
       } else {
         throw new Error('Erreur lors de l\'ajout au panier')
@@ -101,10 +102,6 @@ export function ProductCard({ product }: ProductCardProps) {
     if (!isNaN(value) && value >= minQty) {
       setQuantity(value)
     }
-  }
-  
-  const formatPrice = (price: number): string => {
-    return price.toFixed(2).replace(/\.00$/, '')
   }
   
   return (
@@ -186,7 +183,7 @@ export function ProductCard({ product }: ProductCardProps) {
           <div className="flex-1 min-h-[24px] flex items-center">
             {(product.minOrderQuantity !== undefined && product.minOrderQuantity > 0) ? (
               <div className="text-xs bg-amber-50 dark:bg-amber-900/20 text-amber-800 dark:text-amber-300 p-2 rounded-md w-full">
-                Minimum: {product.minOrderQuantity} {product.unit}
+                Minimum: {formatNumber(product.minOrderQuantity)} {product.unit}
               </div>
             ) : null}
           </div>
@@ -196,11 +193,11 @@ export function ProductCard({ product }: ProductCardProps) {
             <div className="flex justify-between items-center mb-3">
               <div className="flex flex-col min-w-0 flex-1">
                 <span className="font-medium text-sm sm:text-lg text-custom-title truncate">
-                  {formatPrice(product.price)} CHF/{product.unit}
+                  {formatNumber(product.price)} CHF/{product.unit}
                 </span>
                 {product.stock && (
                   <span className="text-xs text-muted-foreground truncate">
-                    Stock: {formatPrice(product.stock.quantity)} {product.unit}
+                    Stock: {formatNumber(product.stock.quantity)} {product.unit}
                   </span>
                 )}
               </div>
@@ -221,7 +218,7 @@ export function ProductCard({ product }: ProductCardProps) {
                     </button>
                     <input 
                       type="number" 
-                      value={quantity} 
+                      value={formatNumber(quantity)} 
                       onChange={handleQuantityChange}
                       min={product.minOrderQuantity || 1}
                       className="w-10 sm:w-14 text-center bg-background border border-foreground/10 rounded-md px-1 sm:px-2 py-1 text-xs sm:text-sm"
@@ -263,7 +260,7 @@ export function ProductCard({ product }: ProductCardProps) {
                           <ShoppingCart className="h-3 w-3 sm:h-4 sm:w-4" />
                           <span className="hidden sm:inline">
                             {(product.minOrderQuantity !== undefined && product.minOrderQuantity > 0)
-                              ? `${product.minOrderQuantity} ${product.unit}`
+                              ? `${formatNumber(product.minOrderQuantity)} ${product.unit}`
                               : 'Ajouter'}
                           </span>
                           <span className="sm:hidden">+</span>

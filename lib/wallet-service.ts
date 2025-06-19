@@ -1,6 +1,7 @@
 // lib/wallet-service.ts
 import { prisma } from './prisma';
 import { OrderStatus } from '@prisma/client';
+import { formatNumber } from './number-utils';
 
 // Pourcentage de commission de la plateforme
 const PLATFORM_FEE_PERCENTAGE = Number(process.env.NEXT_PUBLIC_PLATFORM_FEE_PERCENTAGE || 10);
@@ -115,7 +116,7 @@ export class WalletService {
 
     // Créer une transaction pour chaque producteur
     for (const [producerId, data] of Object.entries(producerAmounts)) {
-      console.log(`Traitement du producteur ${producerId} - Montant: ${data.amount}`);
+      console.log(`Traitement du producteur ${producerId} - Montant: ${formatNumber(data.amount)}`);
       
       // S'assurer que le producteur a un portefeuille
       await this.ensureWalletExists(producerId);
@@ -135,7 +136,7 @@ export class WalletService {
       const netAmount = data.amount - fee;
       totalFee += fee;
 
-      console.log(`Commission: ${fee}, Montant net: ${netAmount}`);
+      console.log(`Commission: ${formatNumber(fee)}, Montant net: ${formatNumber(netAmount)}`);
 
       // Vérifier si une transaction existe déjà pour cette commande et ce portefeuille
       const existingTransaction = await prisma.walletTransaction.findFirst({
@@ -275,7 +276,7 @@ export class WalletService {
    * Crée une demande de retrait
    */
   static async createWithdrawalRequest(producerId: string, amount: number, bankDetails: any): Promise<any> {
-    console.log(`Début createWithdrawalRequest pour le producteur ${producerId}, montant: ${amount}`);
+    console.log(`Début createWithdrawalRequest pour le producteur ${producerId}, montant: ${formatNumber(amount)}`);
     
     // Vérifier que le producteur a un portefeuille
     const wallet = await prisma.wallet.findUnique({
@@ -289,7 +290,7 @@ export class WalletService {
 
     // Vérifier que le solde disponible est suffisant
     if (wallet.balance < amount) {
-      console.error(`Solde disponible insuffisant: ${wallet.balance} < ${amount}`);
+      console.error(`Solde disponible insuffisant: ${formatNumber(wallet.balance)} < ${formatNumber(amount)}`);
       throw new Error('Solde disponible insuffisant. Seul le solde disponible peut être retiré, pas le solde en attente.');
     }
 
@@ -332,7 +333,7 @@ export class WalletService {
         }
       }
     });
-    console.log(`Portefeuille mis à jour, balance: -${amount}, pendingBalance: +${amount}`);
+    console.log(`Portefeuille mis à jour, balance: -${formatNumber(amount)}, pendingBalance: +${formatNumber(amount)}`);
 
     console.log(`Demande de retrait complétée avec succès`);
     return withdrawal;
@@ -409,7 +410,7 @@ export class WalletService {
           }
         }
       });
-      console.log(`Retrait validé, pendingBalance: -${withdrawal.amount}, totalWithdrawn: +${withdrawal.amount}`);
+      console.log(`Retrait validé, pendingBalance: -${formatNumber(withdrawal.amount)}, totalWithdrawn: +${formatNumber(withdrawal.amount)}`);
     } else {
       // Si le retrait est rejeté, remettre le montant dans le solde disponible
       await prisma.wallet.update({
@@ -423,7 +424,7 @@ export class WalletService {
           }
         }
       });
-      console.log(`Retrait rejeté, pendingBalance: -${withdrawal.amount}, balance: +${withdrawal.amount}`);
+      console.log(`Retrait rejeté, pendingBalance: -${formatNumber(withdrawal.amount)}, balance: +${formatNumber(withdrawal.amount)}`);
     }
     
     console.log(`Traitement de la demande de retrait terminé`);
@@ -460,7 +461,7 @@ export class WalletService {
         userId: withdrawal.wallet.producer.user.id,
         type: 'WITHDRAWAL_APPROVED',
         title: 'Retrait approuvé',
-        message: `Votre demande de retrait de ${withdrawal.amount} CHF a été approuvée et le virement est en cours.`,
+        message: `Votre demande de retrait de ${formatNumber(withdrawal.amount)} CHF a été approuvée et le virement est en cours.`,
         link: '/producer/wallet',
         data: { withdrawalId, amount: withdrawal.amount }
       });
@@ -504,7 +505,7 @@ export class WalletService {
         userId: withdrawal.wallet.producer.user.id,
         type: 'WITHDRAWAL_REJECTED',
         title: 'Retrait rejeté',
-        message: `Votre demande de retrait de ${withdrawal.amount} CHF a été rejetée. Raison: ${reason}`,
+        message: `Votre demande de retrait de ${formatNumber(withdrawal.amount)} CHF a été rejetée. Raison: ${reason}`,
         link: '/producer/wallet',
         data: { withdrawalId, amount: withdrawal.amount, reason }
       });
@@ -536,7 +537,7 @@ export class WalletService {
       }
     });
     
-    console.log(`Détails du portefeuille récupérés: balance=${wallet?.balance}, pendingBalance=${wallet?.pendingBalance}`);
+    console.log(`Détails du portefeuille récupérés: balance=${formatNumber(wallet?.balance || 0)}, pendingBalance=${formatNumber(wallet?.pendingBalance || 0)}`);
 
     return wallet;
   }

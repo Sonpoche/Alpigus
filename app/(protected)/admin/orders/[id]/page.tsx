@@ -4,6 +4,7 @@
 import { useState, useEffect } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { useToast } from '@/hooks/use-toast'
+import { formatNumber } from '@/lib/number-utils'
 import { 
     ArrowLeft, 
     Clock, 
@@ -272,13 +273,13 @@ export default function AdminOrderDetailPage() {
                               </div>
                             </td>
                             <td className="px-4 py-3 text-center">
-                              {item.quantity} {item.product.unit}
+                              {formatNumber(item.quantity)} {item.product.unit}
                             </td>
                             <td className="px-4 py-3 text-right">
-                              {item.price.toFixed(2)} CHF
+                              {formatNumber(item.price)} CHF
                             </td>
                             <td className="px-4 py-3 text-right font-medium">
-                              {(item.price * item.quantity).toFixed(2)} CHF
+                              {formatNumber(item.price * item.quantity)} CHF
                             </td>
                           </tr>
                         ))}
@@ -289,7 +290,7 @@ export default function AdminOrderDetailPage() {
                             Sous-total ({items.length} article{items.length > 1 ? 's' : ''})
                           </td>
                           <td className="px-4 py-2 text-right font-medium">
-                            {items.reduce((sum: number, item: any) => sum + (item.price * item.quantity), 0).toFixed(2)} CHF
+                            {formatNumber(items.reduce((sum: number, item: any) => sum + (item.price * item.quantity), 0))} CHF
                           </td>
                         </tr>
                       </tbody>
@@ -305,15 +306,15 @@ export default function AdminOrderDetailPage() {
                 <div className="w-full max-w-xs">
                   <div className="flex justify-between py-1">
                     <span className="text-sm">Sous-total</span>
-                    <span className="font-medium">{order.total.toFixed(2)} CHF</span>
+                    <span className="font-medium">{formatNumber(order.total)} CHF</span>
                   </div>
                   <div className="flex justify-between py-1">
                     <span className="text-sm">Livraison</span>
-                    <span className="font-medium">0.00 CHF</span>
+                    <span className="font-medium">{formatNumber(0)} CHF</span>
                   </div>
                   <div className="flex justify-between py-2 border-t border-foreground/10 mt-2">
                     <span className="text-base font-medium">Total</span>
-                    <span className="text-lg font-bold">{order.total.toFixed(2)} CHF</span>
+                    <span className="text-lg font-bold">{formatNumber(order.total)} CHF</span>
                   </div>
                 </div>
               </div>
@@ -512,7 +513,7 @@ export default function AdminOrderDetailPage() {
                     </div>
                     <div className="flex justify-between">
                       <span>Montant:</span>
-                      <span className="font-medium">{order.invoice.amount.toFixed(2)} CHF</span>
+                      <span className="font-medium">{formatNumber(order.invoice.amount)} CHF</span>
                     </div>
                     <div className="flex justify-between">
                       <span>Échéance:</span>
