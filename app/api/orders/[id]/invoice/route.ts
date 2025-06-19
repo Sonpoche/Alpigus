@@ -132,32 +132,54 @@ export const GET = apiAuthMiddleware(async (
     <title>Récapitulatif de vente ${invoiceNumber}</title>
     <style>
         body { 
-            font-family: Arial, sans-serif; 
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
             margin: 0; 
             padding: 40px; 
-            line-height: 1.6; 
-            color: #333;
+            line-height: 1.5; 
+            color: #2c3e50;
+            background: #fff;
         }
         .header { 
-            border-bottom: 3px solid #FF5A5F; 
-            padding-bottom: 20px; 
+            border-bottom: 2px solid #34495e; 
+            padding-bottom: 30px; 
             margin-bottom: 40px; 
             display: flex; 
             justify-content: space-between; 
             align-items: flex-start;
         }
-        .logo { color: #FF5A5F; font-size: 28px; font-weight: bold; margin: 0; }
-        .invoice-info { text-align: right; }
-        .invoice-info h2 { margin: 0; font-size: 24px; color: #333; }
+        .logo { 
+            color: #2c3e50; 
+            font-size: 28px; 
+            font-weight: 300; 
+            margin: 0; 
+            letter-spacing: 1px;
+        }
+        .invoice-info { 
+            text-align: right; 
+        }
+        .invoice-info h2 { 
+            margin: 0; 
+            font-size: 24px; 
+            color: #2c3e50; 
+            font-weight: 300;
+        }
         .producer-badge {
-            background: linear-gradient(135deg, #FF5A5F, #FF7B7F);
+            background: #34495e;
             color: white;
-            padding: 8px 16px;
-            border-radius: 20px;
-            font-size: 14px;
-            font-weight: bold;
-            margin-bottom: 10px;
+            padding: 6px 14px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: 500;
+            margin-bottom: 15px;
             display: inline-block;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        .company-tagline {
+            color: #7f8c8d; 
+            margin: 8px 0 0 0;
+            font-size: 14px;
+            font-weight: 300;
         }
         .info-section { 
             display: flex; 
@@ -167,99 +189,177 @@ export const GET = apiAuthMiddleware(async (
         }
         .info-box { 
             flex: 1; 
-            background: #f9f9f9; 
-            padding: 20px; 
-            border-radius: 8px;
+            background: #f8f9fa; 
+            padding: 25px; 
+            border: 1px solid #e9ecef;
+            border-radius: 4px;
         }
-        .info-box h3 { color: #FF5A5F; margin-top: 0; }
+        .info-box h3 { 
+            color: #2c3e50; 
+            margin-top: 0; 
+            font-size: 16px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            border-bottom: 1px solid #dee2e6;
+            padding-bottom: 10px;
+            margin-bottom: 20px;
+        }
         .producer-info { 
-            background: linear-gradient(135deg, #fff5f5, #ffe8e8); 
-            border: 2px solid #FF5A5F; 
+            background: #f8f9fa; 
+            border: 1px solid #34495e; 
         }
         .order-info { 
-            background: #f0f0f0; 
-            padding: 20px; 
-            border-radius: 8px; 
+            background: #f8f9fa; 
+            padding: 25px; 
+            border: 1px solid #e9ecef;
+            border-radius: 4px; 
             margin-bottom: 30px;
+        }
+        .order-info h3 {
+            color: #2c3e50; 
+            margin-top: 0;
+            font-size: 16px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            border-bottom: 1px solid #dee2e6;
+            padding-bottom: 10px;
+            margin-bottom: 20px;
+        }
+        .order-details {
+            display: grid; 
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); 
+            gap: 20px;
+        }
+        .order-details p {
+            margin: 8px 0;
+            font-size: 14px;
         }
         table { 
             width: 100%; 
             border-collapse: collapse; 
             margin-bottom: 30px;
+            border: 1px solid #dee2e6;
+            border-radius: 4px;
+            overflow: hidden;
         }
         th { 
-            background: #FF5A5F; 
+            background: #34495e; 
             color: white; 
-            padding: 15px; 
+            padding: 18px 15px; 
             text-align: left;
+            font-weight: 500;
+            font-size: 14px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
         }
         td { 
-            padding: 12px 15px; 
-            border-bottom: 1px solid #ddd;
+            padding: 15px; 
+            border-bottom: 1px solid #dee2e6;
+            font-size: 14px;
         }
-        tr:nth-child(even) { background: #f9f9f9; }
+        tr:nth-child(even) { 
+            background: #f8f9fa; 
+        }
+        .product-name {
+            font-weight: 600;
+            color: #2c3e50;
+        }
+        .delivery-info {
+            color: #6c757d;
+            font-size: 12px;
+            margin-top: 4px;
+        }
         .commission-section {
-            background: linear-gradient(135deg, #fff9c4, #ffeaa7);
-            border: 2px solid #fdcb6e;
-            border-radius: 8px;
-            padding: 20px;
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 4px;
+            padding: 25px;
             margin: 30px 0;
         }
         .commission-title {
-            color: #e17055;
-            font-size: 18px;
-            font-weight: bold;
-            margin-bottom: 15px;
-            display: flex;
-            align-items: center;
-            gap: 10px;
+            color: #2c3e50;
+            font-size: 16px;
+            font-weight: 600;
+            margin-bottom: 20px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            border-bottom: 1px solid #dee2e6;
+            padding-bottom: 10px;
         }
         .commission-details {
             display: grid;
             grid-template-columns: 1fr 1fr;
-            gap: 20px;
+            gap: 30px;
+            align-items: center;
         }
         .commission-item {
             display: flex;
             justify-content: space-between;
-            padding: 10px 0;
-            border-bottom: 1px solid #ddd;
+            padding: 12px 0;
+            border-bottom: 1px solid #dee2e6;
+            font-size: 14px;
+        }
+        .commission-item:last-child {
+            border-bottom: none;
         }
         .producer-amount {
-            background: linear-gradient(135deg, #00b894, #00cec9);
+            background: #2c3e50;
             color: white;
-            padding: 15px;
-            border-radius: 8px;
+            padding: 20px;
+            border-radius: 4px;
             text-align: center;
-            font-size: 20px;
-            font-weight: bold;
-            margin: 20px 0;
+            font-size: 18px;
+            font-weight: 600;
+        }
+        .producer-amount-label {
+            font-size: 12px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 8px;
+            opacity: 0.8;
         }
         .total-section { 
             display: flex; 
             justify-content: flex-end; 
             margin-bottom: 40px;
         }
-        .total-box { width: 400px; }
+        .total-box { 
+            width: 350px;
+            border: 1px solid #dee2e6;
+            border-radius: 4px;
+            overflow: hidden;
+        }
         .total-row { 
             display: flex; 
             justify-content: space-between; 
-            padding: 10px 0; 
-            border-bottom: 1px solid #ddd;
+            padding: 15px 20px; 
+            border-bottom: 1px solid #dee2e6;
+            font-size: 14px;
+        }
+        .total-row:last-child {
+            border-bottom: none;
         }
         .grand-total { 
-            font-size: 18px; 
-            font-weight: bold; 
-            color: #FF5A5F; 
-            border-top: 2px solid #FF5A5F; 
-            padding-top: 15px;
+            font-size: 16px; 
+            font-weight: 600; 
+            color: #2c3e50; 
+            background: #f8f9fa;
         }
         .footer { 
             text-align: center; 
             font-size: 12px; 
-            color: #666; 
-            border-top: 1px solid #ddd; 
-            padding-top: 20px;
+            color: #6c757d; 
+            border-top: 1px solid #dee2e6; 
+            padding-top: 30px;
+            margin-top: 50px;
+        }
+        .footer p {
+            margin: 8px 0;
+        }
+        .footer strong {
+            color: #2c3e50;
         }
         @media print {
             body { margin: 0; padding: 20px; }
@@ -270,39 +370,39 @@ export const GET = apiAuthMiddleware(async (
 <body>
     <div class="header">
         <div>
-            <h1 class="logo">🍄 Mushroom Marketplace</h1>
-            <div class="producer-badge">📊 RÉCAPITULATIF PRODUCTEUR</div>
-            <p style="color: #666; margin: 5px 0 0 0;">Marketplace B2B Champignons</p>
+            <h1 class="logo">alpigus</h1>
+            <div class="producer-badge">Récapitulatif Producteur</div>
+            <p class="company-tagline">Plateforme spécialisée dans les champignons de qualité</p>
         </div>
         <div class="invoice-info">
             <h2>RÉCAPITULATIF DE VENTE</h2>
-            <p style="margin: 5px 0; font-size: 16px; font-weight: bold;">N° ${invoiceNumber}</p>
-            <p style="margin: 0; color: #666;">Date: ${invoiceDate}</p>
+            <p style="margin: 5px 0; font-size: 16px; font-weight: 600;">N° ${invoiceNumber}</p>
+            <p style="margin: 0; color: #6c757d;">Date: ${invoiceDate}</p>
         </div>
     </div>
 
     <div class="info-section">
         <div class="info-box producer-info">
-            <h3>VOS INFORMATIONS</h3>
+            <h3>Informations Producteur</h3>
             <p><strong>${producer.companyName || producer.user.name || 'N/A'}</strong></p>
             ${producer.address ? `<p>${producer.address.replace(/\n/g, '<br>')}</p>` : ''}
-            <p>Tél: ${producer.user.phone || 'N/A'}</p>
+            <p>Téléphone: ${producer.user.phone || 'Non renseigné'}</p>
             <p>Email: ${producer.user.email}</p>
         </div>
         
         <div class="info-box">
-            <h3>CLIENT</h3>
+            <h3>Informations Client</h3>
             <p><strong>${deliveryInfo?.fullName || order.user.name || 'N/A'}</strong></p>
             ${deliveryInfo?.company ? `<p>${deliveryInfo.company}</p>` : ''}
             ${deliveryInfo?.address ? `<p>${deliveryInfo.address}<br>${deliveryInfo.postalCode} ${deliveryInfo.city}</p>` : ''}
-            <p>Tél: ${deliveryInfo?.phone || order.user.phone || 'N/A'}</p>
+            <p>Téléphone: ${deliveryInfo?.phone || order.user.phone || 'Non renseigné'}</p>
             <p>Email: ${order.user.email}</p>
         </div>
     </div>
 
     <div class="order-info">
-        <h3 style="color: #FF5A5F; margin-top: 0;">DÉTAILS DE LA COMMANDE</h3>
-        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px;">
+        <h3>Détails de la Commande</h3>
+        <div class="order-details">
             <p><strong>N° Commande:</strong> #${order.id.substring(0, 8).toUpperCase()}</p>
             <p><strong>Date:</strong> ${order.createdAt.toLocaleDateString('fr-FR')}</p>
             <p><strong>Mode de livraison:</strong> ${deliveryInfo?.type === 'pickup' ? 'Retrait sur place' : 'Livraison à domicile'}</p>
@@ -313,16 +413,16 @@ export const GET = apiAuthMiddleware(async (
     <table>
         <thead>
             <tr>
-                <th>Vos produits vendus</th>
+                <th>Produits Vendus</th>
                 <th style="text-align: center;">Quantité</th>
-                <th style="text-align: right;">Prix unitaire</th>
+                <th style="text-align: right;">Prix Unitaire</th>
                 <th style="text-align: right;">Total</th>
             </tr>
         </thead>
         <tbody>
             ${order.items.map(item => `
                 <tr>
-                    <td><strong>${item.product.name}</strong></td>
+                    <td><span class="product-name">${item.product.name}</span></td>
                     <td style="text-align: center;">${item.quantity} ${item.product.unit}</td>
                     <td style="text-align: right;">${item.price.toFixed(2)} CHF</td>
                     <td style="text-align: right;"><strong>${(item.price * item.quantity).toFixed(2)} CHF</strong></td>
@@ -334,8 +434,8 @@ export const GET = apiAuthMiddleware(async (
               return `
                 <tr>
                     <td>
-                        <strong>${booking.deliverySlot.product.name}</strong><br>
-                        <small style="color: #666;">📅 Livraison programmée: ${booking.deliverySlot.date.toLocaleDateString('fr-FR')}</small>
+                        <span class="product-name">${booking.deliverySlot.product.name}</span>
+                        <div class="delivery-info">Livraison programmée: ${booking.deliverySlot.date.toLocaleDateString('fr-FR')}</div>
                     </td>
                     <td style="text-align: center;">${booking.quantity} ${booking.deliverySlot.product.unit}</td>
                     <td style="text-align: right;">${price.toFixed(2)} CHF</td>
@@ -348,12 +448,12 @@ export const GET = apiAuthMiddleware(async (
 
     <div class="commission-section">
         <div class="commission-title">
-            💰 DÉTAIL DE VOS REVENUS
+            Détail des Revenus
         </div>
         <div class="commission-details">
             <div>
                 <div class="commission-item">
-                    <span>Total de vos ventes:</span>
+                    <span>Total des ventes:</span>
                     <span><strong>${subtotal.toFixed(2)} CHF</strong></span>
                 </div>
                 <div class="commission-item">
@@ -361,9 +461,9 @@ export const GET = apiAuthMiddleware(async (
                     <span><strong>-${platformCommission.toFixed(2)} CHF</strong></span>
                 </div>
             </div>
-            <div style="display: flex; align-items: center;">
-                <div class="producer-amount" style="width: 100%;">
-                    <div>💵 VOTRE MONTANT</div>
+            <div>
+                <div class="producer-amount">
+                    <div class="producer-amount-label">Montant Producteur</div>
                     <div>${producerAmount.toFixed(2)} CHF</div>
                 </div>
             </div>
@@ -378,38 +478,29 @@ export const GET = apiAuthMiddleware(async (
             </div>
             ${deliveryFee > 0 ? `
                 <div class="total-row">
-                    <span>Frais de livraison (client):</span>
+                    <span>Frais de livraison:</span>
                     <span>${deliveryFee.toFixed(2)} CHF</span>
                 </div>
             ` : ''}
             <div class="total-row grand-total">
-                <span>TOTAL COMMANDE CLIENT:</span>
+                <span>Total Commande:</span>
                 <span>${totalWithDelivery.toFixed(2)} CHF</span>
             </div>
         </div>
     </div>
 
-    <div style="background: #e8f5e8; border: 2px solid #00b894; border-radius: 8px; padding: 20px; margin: 30px 0;">
-        <h3 style="color: #00b894; margin-top: 0; display: flex; align-items: center; gap: 10px;">
-            💳 PAIEMENT DE VOS REVENUS
-        </h3>
-        <p style="margin-bottom: 10px;"><strong>Montant qui vous sera versé :</strong> ${producerAmount.toFixed(2)} CHF</p>
-        <p style="margin-bottom: 10px;"><strong>Modalités :</strong> Paiement sous 7 jours après livraison confirmée</p>
-        <p style="margin-bottom: 0;"><strong>Méthode :</strong> Virement bancaire sur le compte renseigné dans votre profil</p>
-    </div>
-
     <div class="footer">
-        <p><strong>Mushroom Marketplace - Votre partenaire B2B champignons</strong></p>
-        <p>Ce récapitulatif vous permet de suivre vos ventes et revenus sur notre plateforme</p>
-        <p>Questions ? Contactez-nous à producteurs@mushroom-marketplace.com</p>
+        <p><strong>alpigus</strong></p>
+        <p>Plateforme spécialisée dans les champignons de qualité</p>
+        <p>Pour toute question concernant cette vente, contactez-nous à info@alpigus.ch</p>
     </div>
 
     <script>
         document.addEventListener('DOMContentLoaded', function() {
             const printBtn = document.createElement('button');
-            printBtn.textContent = '🖨️ Imprimer / Sauvegarder en PDF';
+            printBtn.textContent = 'Imprimer / Sauvegarder PDF';
             printBtn.className = 'no-print';
-            printBtn.style.cssText = 'position:fixed;top:10px;right:10px;padding:12px 20px;background:#FF5A5F;color:white;border:none;border-radius:25px;cursor:pointer;z-index:1000;font-weight:bold;box-shadow:0 4px 12px rgba(0,0,0,0.2);';
+            printBtn.style.cssText = 'position:fixed;top:20px;right:20px;padding:12px 24px;background:#34495e;color:white;border:none;border-radius:4px;cursor:pointer;z-index:1000;font-weight:500;box-shadow:0 2px 8px rgba(0,0,0,0.15);font-size:14px;';
             printBtn.onclick = () => window.print();
             document.body.appendChild(printBtn);
         });
