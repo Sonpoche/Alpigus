@@ -5,6 +5,7 @@ import { useState, useEffect } from 'react'
 import { Calendar } from '@/components/ui/calendar'
 import { useToast } from "@/hooks/use-toast"
 import { LoadingButton } from '@/components/ui/loading-button'
+import { formatNumber, formatInputValue, parseToTwoDecimals } from '@/lib/number-utils'
 
 interface DeliverySlot {
   id: string
@@ -38,7 +39,7 @@ export default function ProductDeliveryCalendar({
   const [isLoading, setIsLoading] = useState(true)
   const [selectedDate, setSelectedDate] = useState<Date | null>(null)
   const [selectedSlot, setSelectedSlot] = useState<DeliverySlot | null>(null)
-  const [quantity, setQuantity] = useState<string>(minQuantity > 0 ? minQuantity.toString() : "1")
+  const [quantity, setQuantity] = useState<string>(minQuantity > 0 ? formatNumber(minQuantity) : "1")
   const [isReserving, setIsReserving] = useState(false)
 
   // Charger les créneaux disponibles et les informations du produit
@@ -92,11 +93,6 @@ export default function ProductDeliveryCalendar({
     setSelectedSlot(slotForDate || null)
   }, [selectedDate, slots])
 
-  // Fonction pour formater les nombres à maximum 2 décimales sans zéros inutiles
-  const formatNumber = (num: number): string => {
-    return parseFloat(num.toFixed(2)).toString();
-  }
-
   // Fonction pour réserver un créneau
   const handleReserve = async () => {
     if (!selectedSlot) return
@@ -104,14 +100,14 @@ export default function ProductDeliveryCalendar({
     setIsReserving(true)
     
     try {
-      const qtyNum = parseFloat(quantity)
+      const qtyNum = parseToTwoDecimals(parseFloat(quantity))
       if (isNaN(qtyNum) || qtyNum <= 0) {
         throw new Error('Quantité invalide')
       }
       
       // Vérifier la quantité minimale
       if (minQuantity > 0 && qtyNum < minQuantity) {
-        throw new Error(`La quantité minimale pour ce produit est de ${minQuantity} ${product?.unit}`)
+        throw new Error(`La quantité minimale pour ce produit est de ${formatNumber(minQuantity)} ${product?.unit}`)
       }
       
       // Vérifier si une commande en cours existe, sinon en créer une
@@ -127,69 +123,62 @@ export default function ProductDeliveryCalendar({
             finalOrderId = storedOrderId
           } else {
             // La commande n'existe pas ou n'appartient pas à l'utilisateur
-            localStorage.removeItem('currentOrderId')
-            throw new Error("Commande stockée invalide")
+            throw new Error('Invalid order')
           }
         } else {
-          // Pas de commande stockée
-          throw new Error("Aucune commande en cours")
+          throw new Error('No order found')
         }
       } catch (error) {
         // Créer une nouvelle commande
-        console.log("Création d'une nouvelle commande...")
-        const orderResponse = await fetch('/api/orders', {
+        const createOrderResponse = await fetch('/api/orders', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ items: [] })
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            type: 'client_order'
+          })
         })
         
-        if (!orderResponse.ok) {
-          throw new Error("Erreur lors de la création de la commande")
+        if (!createOrderResponse.ok) {
+          throw new Error('Impossible de créer une commande')
         }
         
-        const orderData = await orderResponse.json()
-        finalOrderId = orderData.id
+        const newOrder = await createOrderResponse.json()
+        finalOrderId = newOrder.id
         localStorage.setItem('currentOrderId', finalOrderId)
       }
       
-      // Faire la réservation
-      const response = await fetch(`/api/delivery-slots/${selectedSlot.id}/book`, {
+      // Réserver le créneau
+      const reserveResponse = await fetch(`/api/delivery-slots/${selectedSlot.id}/book`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+        },
         body: JSON.stringify({
           quantity: qtyNum,
           orderId: finalOrderId
         })
       })
       
-      if (!response.ok) {
-        const errorData = await response.text()
-        throw new Error(errorData || 'Erreur lors de la réservation')
+      if (!reserveResponse.ok) {
+        const errorData = await reserveResponse.json()
+        throw new Error(errorData.message || 'Erreur lors de la réservation')
       }
       
-      const bookingData = await response.json()
-      
-      // Calculer le temps restant avant expiration
-      const expiresAt = bookingData.expiresAt ? new Date(bookingData.expiresAt) : null
-      let expirationMessage = ''
-      
-      if (expiresAt) {
-        const minutesRemaining = Math.floor((expiresAt.getTime() - Date.now()) / (1000 * 60))
-        expirationMessage = ` La réservation expirera dans ${minutesRemaining} minutes si la commande n'est pas finalisée.`
-      }
-      
-      // Appeler le callback
-      onReservationComplete(selectedSlot.id, qtyNum)
-      
+      // Succès
       toast({
         title: "Réservation confirmée",
-        description: `Votre réservation a été ajoutée au panier.${expirationMessage}`
+        description: `${formatNumber(qtyNum)} ${product?.unit} réservé(s) pour le ${selectedSlot.date.toLocaleDateString('fr-FR')}`
       })
       
-      // Réinitialiser l'état
+      // Notifier le parent
+      onReservationComplete(selectedSlot.id, qtyNum)
+      
+      // Réinitialiser la sélection
       setSelectedDate(null)
       setSelectedSlot(null)
-      setQuantity(minQuantity > 0 ? minQuantity.toString() : "1")
+      setQuantity(minQuantity > 0 ? formatNumber(minQuantity) : "1")
       
     } catch (error: any) {
       console.error("Erreur de réservation:", error)
@@ -200,6 +189,18 @@ export default function ProductDeliveryCalendar({
       })
     } finally {
       setIsReserving(false)
+    }
+  }
+
+  const handleQuantityChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const formatted = formatInputValue(e.target.value)
+    setQuantity(formatted)
+  }
+
+  const handleQuantityBlur = (e: React.FocusEvent<HTMLInputElement>) => {
+    if (e.target.value) {
+      const parsed = parseToTwoDecimals(parseFloat(e.target.value))
+      setQuantity(formatNumber(parsed))
     }
   }
 
@@ -234,7 +235,7 @@ export default function ProductDeliveryCalendar({
           </h4>
           
           <p className="text-sm text-muted-foreground mb-4">
-            Capacité disponible: {formatNumber(selectedSlot.maxCapacity - selectedSlot.reserved)} {product?.unit || ''}
+            Quantité disponible: {formatNumber(selectedSlot.maxCapacity - selectedSlot.reserved)} {product?.unit || ''}
           </p>
           
           <div className="flex gap-4 items-end mb-4">
@@ -251,15 +252,10 @@ export default function ProductDeliveryCalendar({
                 id="quantity"
                 type="number"
                 value={quantity}
-                onChange={(e) => {
-                  const val = e.target.value;
-                  // Permettre d'effacer l'input, mais pas de descendre en dessous du minimum
-                  if (val === "" || parseFloat(val) >= (minQuantity || 0)) {
-                    setQuantity(val);
-                  }
-                }}
-                min={minQuantity || 0.1}
-                step="0.1"
+                onChange={handleQuantityChange}
+                onBlur={handleQuantityBlur}
+                min={minQuantity || 0.01}
+                step="0.01"
                 max={selectedSlot.maxCapacity - selectedSlot.reserved}
                 className="w-24 rounded-md border border-foreground/10 bg-background px-3 py-2"
               />
@@ -268,35 +264,24 @@ export default function ProductDeliveryCalendar({
             <LoadingButton
               onClick={handleReserve}
               isLoading={isReserving}
-              disabled={!selectedSlot || parseFloat(quantity) <= 0 || (minQuantity > 0 && parseFloat(quantity) < minQuantity)}
+              disabled={!quantity || parseFloat(quantity) <= 0}
+              className="bg-custom-accent text-white hover:bg-custom-accentHover"
             >
-              Réserver ce créneau
+              Réserver
             </LoadingButton>
           </div>
           
           <div className="text-xs text-muted-foreground">
-            <p className="mb-1">
-              Notes importantes:
-            </p>
-            <ul className="list-disc pl-4 space-y-1">
-              <li>La réservation sera temporairement ajoutée à votre panier</li>
-              <li>Vous avez 2 heures pour finaliser votre commande</li>
-              <li>La réservation sera automatiquement annulée si la commande n'est pas confirmée dans ce délai</li>
-            </ul>
+            <p>• La réservation sera confirmée après finalisation de votre commande</p>
+            <p>• Vous avez 2 heures pour finaliser votre commande</p>
           </div>
         </div>
       )}
       
-      {!selectedDate && (
-        <p className="text-center text-muted-foreground">
-          Sélectionnez une date pour voir les disponibilités
-        </p>
-      )}
-      
-      {selectedDate && !selectedSlot && (
-        <p className="text-center text-muted-foreground">
-          Aucun créneau disponible pour cette date
-        </p>
+      {slots.length === 0 && (
+        <div className="text-center py-8 text-muted-foreground">
+          <p>Aucun créneau de livraison disponible pour ce produit.</p>
+        </div>
       )}
     </div>
   )

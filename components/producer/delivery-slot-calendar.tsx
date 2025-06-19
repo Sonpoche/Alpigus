@@ -3,7 +3,8 @@ import { useState, useEffect } from 'react'
 import { useToast } from "@/hooks/use-toast"
 import { Calendar } from '@/components/ui/calendar'
 import { LoadingButton } from '@/components/ui/loading-button'
-import { Plus, X, AlertTriangle, Edit2, Copy } from 'lucide-react'
+import { Plus, X, AlertTriangle, Edit2, Copy, Trash2, Square, CheckSquare, Eye, EyeOff } from 'lucide-react'
+import { formatNumber, formatInputValue, parseToTwoDecimals } from '@/lib/number-utils'
 
 interface DeliverySlot {
   id: string
@@ -48,6 +49,20 @@ export default function DeliverySlotCalendar({ productId }: { productId: string 
     weeks: 1,
     daysOfWeek: []
   })
+
+  // Nouveaux états pour la sélection multiple
+  const [selectedSlots, setSelectedSlots] = useState<string[]>([])
+  const [isPerformingBulkAction, setIsPerformingBulkAction] = useState(false)
+
+  // Fonction pour calculer la quantité disponible
+  const getAvailableQuantity = (slot: DeliverySlot) => {
+    return slot.maxCapacity - slot.reserved
+  }
+
+  // Fonction pour calculer le pourcentage de disponibilité
+  const getAvailabilityPercentage = (slot: DeliverySlot) => {
+    return (getAvailableQuantity(slot) / slot.maxCapacity) * 100
+  }
 
   useEffect(() => {
     fetchData()
@@ -218,6 +233,93 @@ export default function DeliverySlotCalendar({ productId }: { productId: string 
     }
   }
 
+  // Nouvelles fonctions pour la sélection multiple
+  const toggleSlotSelection = (slotId: string) => {
+    setSelectedSlots(prev => 
+      prev.includes(slotId) 
+        ? prev.filter(id => id !== slotId)
+        : [...prev, slotId]
+    )
+  }
+
+  const selectAllSlots = () => {
+    setSelectedSlots(slots.map(slot => slot.id))
+  }
+
+  const deselectAllSlots = () => {
+    setSelectedSlots([])
+  }
+
+  // Actions groupées
+  const handleBulkDelete = async () => {
+    if (selectedSlots.length === 0) return
+
+    setIsPerformingBulkAction(true)
+    try {
+      await Promise.all(
+        selectedSlots.map(slotId => 
+          fetch(`/api/delivery-slots/${slotId}`, { method: 'DELETE' })
+        )
+      )
+
+      setSlots(prev => prev.filter(slot => !selectedSlots.includes(slot.id)))
+      setSelectedSlots([])
+      
+      toast({
+        title: "Succès",
+        description: `${selectedSlots.length} créneau(x) supprimé(s) avec succès`
+      })
+    } catch (error) {
+      toast({
+        title: "Erreur",
+        description: "Erreur lors de la suppression des créneaux",
+        variant: "destructive"
+      })
+    } finally {
+      setIsPerformingBulkAction(false)
+    }
+  }
+
+  const handleBulkToggleAvailability = async () => {
+    if (selectedSlots.length === 0) return
+
+    setIsPerformingBulkAction(true)
+    try {
+      const selectedSlotsData = slots.filter(slot => selectedSlots.includes(slot.id))
+      const allAvailable = selectedSlotsData.every(slot => slot.isAvailable)
+      const newAvailability = !allAvailable
+
+      await Promise.all(
+        selectedSlots.map(slotId => 
+          fetch(`/api/delivery-slots/${slotId}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ isAvailable: newAvailability })
+          })
+        )
+      )
+
+      setSlots(prev => prev.map(slot => 
+        selectedSlots.includes(slot.id) 
+          ? { ...slot, isAvailable: newAvailability }
+          : slot
+      ))
+      
+      toast({
+        title: "Succès",
+        description: `${selectedSlots.length} créneau(x) ${newAvailability ? 'activé(s)' : 'désactivé(s)'} avec succès`
+      })
+    } catch (error) {
+      toast({
+        title: "Erreur",
+        description: "Erreur lors de la modification des créneaux",
+        variant: "destructive"
+      })
+    } finally {
+      setIsPerformingBulkAction(false)
+    }
+  }
+
   const formatDate = (date: Date) => {
     return new Intl.DateTimeFormat('fr-FR', { 
       weekday: 'long', 
@@ -281,9 +383,20 @@ export default function DeliverySlotCalendar({ productId }: { productId: string 
                     <input
                       type="number"
                       value={newSlotCapacity}
-                      onChange={(e) => setNewSlotCapacity(e.target.value)}
+                      onChange={(e) => {
+                        const formatted = formatInputValue(e.target.value)
+                        setNewSlotCapacity(formatted)
+                        if (formatted) validateNewSlot()
+                      }}
+                      onBlur={(e) => {
+                        if (e.target.value) {
+                          const parsed = parseToTwoDecimals(e.target.value)
+                          setNewSlotCapacity(formatNumber(parsed))
+                        }
+                      }}
                       min="0"
-                      step="0.1"
+                      step="0.01"
+                      max="999999.99"
                       className="w-full rounded-md border border-foreground/10 bg-background px-3 py-2"
                     />
                   </div>
@@ -379,9 +492,61 @@ export default function DeliverySlotCalendar({ productId }: { productId: string 
             </div>
           )}
 
+          {/* En-tête avec actions de sélection */}
+          <div className="flex justify-between items-center">
+            <div>
+              <h3 className="font-medium">Créneaux configurés</h3>
+              <p className="text-sm text-muted-foreground">
+                {slots.length} créneau(x) • {selectedSlots.length} sélectionné(s)
+              </p>
+            </div>
+            
+            {/* Actions de sélection */}
+            <div className="flex gap-2 text-sm">
+              <button
+                onClick={selectAllSlots}
+                className="px-3 py-1 bg-custom-accent/10 text-custom-accent rounded-md hover:bg-custom-accent/20 transition-colors"
+              >
+                Tout sélectionner
+              </button>
+              <button
+                onClick={deselectAllSlots}
+                className="px-3 py-1 bg-foreground/5 text-foreground rounded-md hover:bg-foreground/10 transition-colors"
+              >
+                Désélectionner
+              </button>
+            </div>
+          </div>
+
+          {/* Actions groupées */}
+          {selectedSlots.length > 0 && (
+            <div className="flex gap-2 p-3 bg-custom-accent/5 border border-custom-accent/20 rounded-lg">
+              <LoadingButton
+                onClick={handleBulkToggleAvailability}
+                isLoading={isPerformingBulkAction}
+                variant="outline"
+                size="sm"
+              >
+                {selectedSlots.length > 0 && slots.filter(s => selectedSlots.includes(s.id)).every(s => s.isAvailable) ? (
+                  <><EyeOff className="h-4 w-4 mr-1" /> Désactiver</>
+                ) : (
+                  <><Eye className="h-4 w-4 mr-1" /> Activer</>
+                )}
+              </LoadingButton>
+              <LoadingButton
+                onClick={handleBulkDelete}
+                isLoading={isPerformingBulkAction}
+                variant="destructive"
+                size="sm"
+              >
+                <Trash2 className="h-4 w-4 mr-1" />
+                Supprimer
+              </LoadingButton>
+            </div>
+          )}
+
           {/* Liste des créneaux */}
           <div className="space-y-2">
-            <h3 className="font-medium mb-2">Créneaux configurés</h3>
             {slots.length === 0 ? (
               <p className="text-muted-foreground text-sm">
                 Aucun créneau défini. Sélectionnez une date pour en créer un.
@@ -391,34 +556,89 @@ export default function DeliverySlotCalendar({ productId }: { productId: string 
                 .sort((a, b) => a.date.getTime() - b.date.getTime())
                 .map(slot => {
                   const isPastSlot = isDateBeforeToday(slot.date);
+                  const available = getAvailableQuantity(slot);
+                  const availabilityPercentage = getAvailabilityPercentage(slot);
+                  const isSelected = selectedSlots.includes(slot.id);
                   
                   return (
                     <div
                       key={slot.id}
-                      className={`flex items-center justify-between bg-background border border-foreground/10 rounded-lg p-4 ${
+                      className={`flex items-center gap-3 p-4 border rounded-lg transition-colors ${
                         isPastSlot ? 'opacity-50' : ''
+                      } ${
+                        isSelected ? 'border-custom-accent bg-custom-accent/5' : 'border-foreground/10'
                       }`}
                     >
-                      <div>
-                        <p className="font-medium">
-                          {formatDate(slot.date)}
-                        </p>
-                        <p className="text-sm text-muted-foreground">
-                          {slot.reserved} / {slot.maxCapacity} {product.unit} réservés
-                        </p>
+                      {/* Checkbox de sélection */}
+                      <button
+                        onClick={() => toggleSlotSelection(slot.id)}
+                        className="flex-shrink-0"
+                        disabled={isPastSlot}
+                      >
+                        {isSelected ? (
+                          <CheckSquare className="h-5 w-5 text-custom-accent" />
+                        ) : (
+                          <Square className="h-5 w-5 text-foreground/40" />
+                        )}
+                      </button>
+
+                      {/* Contenu du créneau */}
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center justify-between mb-2">
+                          <p className="font-medium">
+                            {formatDate(slot.date)}
+                          </p>
+                          <div className="flex items-center gap-2">
+                            {!slot.isAvailable && (
+                              <span className="px-2 py-1 bg-red-100 text-red-700 text-xs rounded-full">
+                                Désactivé
+                              </span>
+                            )}
+                            <span className={`px-2 py-1 text-xs rounded-full font-medium ${
+                              availabilityPercentage > 70 
+                                ? 'bg-green-100 text-green-700'
+                                : availabilityPercentage > 30
+                                ? 'bg-orange-100 text-orange-700'
+                                : 'bg-red-100 text-red-700'
+                            }`}>
+                              {formatNumber(available)} / {formatNumber(slot.maxCapacity)} {product.unit} disponible
+                            </span>
+                          </div>
+                        </div>
+                        
+                        {/* Barre de progression de disponibilité */}
+                        <div className="w-full bg-foreground/10 rounded-full h-2">
+                          <div
+                            className={`h-2 rounded-full transition-all ${
+                              availabilityPercentage > 70 
+                                ? 'bg-green-500'
+                                : availabilityPercentage > 30
+                                ? 'bg-orange-500'
+                                : 'bg-red-500'
+                            }`}
+                            style={{ width: `${availabilityPercentage}%` }}
+                          />
+                        </div>
                       </div>
+
+                      {/* Actions */}
                       <div className="flex gap-2">
                         {editingSlot?.id === slot.id ? (
                           <div className="flex items-center gap-2">
                             <input
                               type="number"
                               value={editingSlot.maxCapacity}
-                              onChange={(e) => setEditingSlot({
-                                ...editingSlot,
-                                maxCapacity: parseFloat(e.target.value)
-                              })}
+                              onChange={(e) => {
+                                const formatted = formatInputValue(e.target.value)
+                                const numValue = parseToTwoDecimals(parseFloat(formatted))
+                                setEditingSlot({
+                                  ...editingSlot,
+                                  maxCapacity: numValue
+                                })
+                              }}
                               min={slot.reserved}
-                              step="0.1"
+                              step="0.01"
+                              max="999999.99"
                               className="w-24 rounded-md border border-foreground/10 bg-background px-2 py-1"
                             />
                             <button

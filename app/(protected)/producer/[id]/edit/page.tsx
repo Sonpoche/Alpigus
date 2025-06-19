@@ -1,3 +1,4 @@
+// app/(protected)/producer/[id]/edit/page.tsx
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
@@ -8,6 +9,7 @@ import { LoadingButton } from '@/components/ui/loading-button'
 import { ImageSelector } from '@/components/ui/image-selector'
 import { cn } from '@/lib/utils'
 import { PRESET_IMAGES } from '@/types/images'
+import { formatNumber, formatInputValue, parseToTwoDecimals } from '@/lib/number-utils'
 
 interface Product {
   id: string
@@ -149,13 +151,16 @@ export default function EditProductPage({ params }: PageProps) {
     try {
       const formData = new FormData(event.currentTarget)
       const name = formData.get('name') as string
-      const price = parseFloat(formData.get('price') as string)
+      const priceStr = formData.get('price') as string
+      const price = parseToTwoDecimals(parseFloat(priceStr))
       const type = formData.get('type') as string
-      const quantity = parseFloat(formData.get('stock') as string)
+      const quantityStr = formData.get('stock') as string
+      const quantity = parseToTwoDecimals(parseFloat(quantityStr))
       const description = formData.get('description') as string || ''
       const available = (formData.get('available') as string) === 'true'
       const acceptDeferred = formData.has('acceptDeferred')
-      const minOrderQuantity = parseFloat(formData.get('minOrderQuantity') as string || '0')
+      const minOrderQuantityStr = formData.get('minOrderQuantity') as string || '0'
+      const minOrderQuantity = parseToTwoDecimals(parseFloat(minOrderQuantityStr))
 
       // Validations
       const errors: FieldErrors = {}
@@ -165,7 +170,7 @@ export default function EditProductPage({ params }: PageProps) {
         errors.name = true
         hasErrors = true
       }
-      if (!price || price <= 0 || isNaN(price)) {
+      if (!priceStr || price <= 0 || isNaN(price)) {
         errors.price = true
         hasErrors = true
       }
@@ -173,7 +178,7 @@ export default function EditProductPage({ params }: PageProps) {
         errors.type = true
         hasErrors = true
       }
-      if (!quantity || quantity < 0 || isNaN(quantity)) {
+      if (!quantityStr || quantity < 0 || isNaN(quantity)) {
         errors.stock = true
         hasErrors = true
       }
@@ -269,11 +274,6 @@ export default function EditProductPage({ params }: PageProps) {
     )
   }
 
-  // Fonction pour formater les nombres à maximum 2 décimales sans zéros inutiles
-  const formatNumber = (num: number): string => {
-    return parseFloat(num.toFixed(2)).toString();
-  };
-
   return (
     <div className="min-h-screen p-6">
       <div className="max-w-2xl mx-auto bg-background border border-foreground/10 rounded-lg p-6 shadow-sm">
@@ -322,9 +322,20 @@ export default function EditProductPage({ params }: PageProps) {
               type="number"
               id="price"
               name="price"
-              defaultValue={product.price}
+              defaultValue={formatNumber(product.price)}
               step="0.01"
               min="0"
+              max="999999.99"
+              onChange={(e) => {
+                const formatted = formatInputValue(e.target.value)
+                e.target.value = formatted
+              }}
+              onBlur={(e) => {
+                if (e.target.value) {
+                  const parsed = parseToTwoDecimals(parseFloat(e.target.value))
+                  e.target.value = formatNumber(parsed)
+                }
+              }}
               className={cn(
                 "mt-1 block w-full rounded-md border border-foreground/10 bg-background px-3 py-2",
                 fieldErrors.price && "border-destructive"
@@ -408,9 +419,20 @@ export default function EditProductPage({ params }: PageProps) {
                 type="number"
                 id="stock"
                 name="stock"
-                defaultValue={product.stock?.quantity || 0}
+                defaultValue={product.stock ? formatNumber(product.stock.quantity) : '0'}
                 min="0"
-                step={selectedUnit === 'kg' ? "0.01" : "1"}
+                max="999999.99"
+                step="0.01"
+                onChange={(e) => {
+                  const formatted = formatInputValue(e.target.value)
+                  e.target.value = formatted
+                }}
+                onBlur={(e) => {
+                  if (e.target.value) {
+                    const parsed = parseToTwoDecimals(parseFloat(e.target.value))
+                    e.target.value = formatNumber(parsed)
+                  }
+                }}
                 className={cn(
                   "block w-full rounded-md border border-foreground/10 bg-background px-3 py-2 pr-12",
                   fieldErrors.stock && "border-destructive"
@@ -433,9 +455,20 @@ export default function EditProductPage({ params }: PageProps) {
                 type="number"
                 id="minOrderQuantity"
                 name="minOrderQuantity"
-                defaultValue={product.minOrderQuantity || 0}
+                defaultValue={product.minOrderQuantity ? formatNumber(product.minOrderQuantity) : '0'}
                 min="0"
-                step={selectedUnit === 'kg' ? "0.1" : "1"}
+                max="999999.99"
+                step="0.01"
+                onChange={(e) => {
+                  const formatted = formatInputValue(e.target.value)
+                  e.target.value = formatted
+                }}
+                onBlur={(e) => {
+                  if (e.target.value) {
+                    const parsed = parseToTwoDecimals(parseFloat(e.target.value))
+                    e.target.value = formatNumber(parsed)
+                  }
+                }}
                 className={cn(
                   "block w-full rounded-md border border-foreground/10 bg-background px-3 py-2 pr-12",
                   fieldErrors.minOrderQuantity && "border-destructive"

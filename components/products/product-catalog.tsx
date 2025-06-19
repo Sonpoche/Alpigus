@@ -878,14 +878,14 @@ export default function ProductCatalog() {
                     // Applique immédiatement le filtre de tri
                     setTimeout(() => fetchProducts(1), 0);
                   }}
-                  className="pl-3 pr-10 py-2 bg-background border border-foreground/10 rounded-md appearance-none"
+                  className="pl-3 pr-8 py-2 bg-background border border-foreground/10 rounded-md appearance-none min-w-[180px]"
                 >
                   <option value="newest">Plus récents</option>
                   <option value="price_asc">Prix (par unité) croissant</option>
                   <option value="price_desc">Prix (par unité) décroissant</option>
                   <option value="popular">Popularité</option>
                 </select>
-                <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 pointer-events-none" />
+                <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 h-4 w-4 pointer-events-none text-foreground/60" />
               </div>
             </div>
           </div>

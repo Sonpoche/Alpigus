@@ -4,12 +4,13 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { ProductType } from '@prisma/client'
-import { Edit, Trash2, Plus, Package, ShoppingBag, Truck, LineChart, Calendar, AlertTriangle, BarChart2 } from 'lucide-react'
+import { Edit, Trash2, Plus, Package, ShoppingBag, Truck, LineChart, Calendar, AlertTriangle, BarChart2, ChevronDown } from 'lucide-react'
 import { useToast } from "@/hooks/use-toast"
 import Link from 'next/link'
 import { cn } from '@/lib/utils'
 import { DeleteConfirmationModal } from '@/components/ui/delete-confirmation-modal'
 import { NewOrdersAlert } from '@/components/producer/new-orders-alert'
+import { formatNumber } from '@/lib/number-utils'
 
 interface Product {
   id: string
@@ -59,12 +60,6 @@ export default function ProducerDashboard() {
   const [isDeleting, setIsDeleting] = useState(false)
   const [productToDelete, setProductToDelete] = useState<{ id: string, name: string } | null>(null)
   const [freshProductsWithoutSlots, setFreshProductsWithoutSlots] = useState<FreshProductWithoutSlots[]>([])
-
-  // Fonction pour formater les nombres décimaux proprement
-  const formatNumber = (num: number): string => {
-    // On garde 2 décimales maximum et on supprime les zéros inutiles en fin de nombre
-    return parseFloat(num.toFixed(2)).toString();
-  };
 
   // Fonction pour vérifier si une date est aujourd'hui ou dans le futur (ignorant l'heure)
   const isDateTodayOrFuture = (date: Date): boolean => {
@@ -299,15 +294,23 @@ export default function ProducerDashboard() {
           <h2 className="text-xl sm:text-2xl font-montserrat font-bold text-custom-title">
             Mes Produits
           </h2>
-          <select
-            value={availabilityFilter ?? ''}
-            onChange={(e) => setAvailabilityFilter(e.target.value || null)}
-            className="rounded-md border border-foreground/10 bg-background px-3 py-2 text-sm w-full sm:w-auto"
-          >
-            <option value="">Tous les produits</option>
-            <option value="true">Disponibles</option>
-            <option value="false">Indisponibles</option>
-          </select>
+          <div className="relative">
+            <select
+              value={availabilityFilter ?? ''}
+              onChange={(e) => setAvailabilityFilter(e.target.value || null)}
+              className="rounded-md border border-foreground/10 bg-background pl-3 pr-8 py-2 text-sm w-full sm:w-auto appearance-none"
+              style={{
+                backgroundImage: 'none',
+                WebkitAppearance: 'none',
+                MozAppearance: 'none'
+              }}
+            >
+              <option value="">Tous les produits</option>
+              <option value="true">Disponibles</option>
+              <option value="false">Indisponibles</option>
+            </select>
+            <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 h-4 w-4 pointer-events-none text-foreground/60" />
+          </div>
         </div>
         <Link
           href="/producer/new"
