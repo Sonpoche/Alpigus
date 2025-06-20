@@ -1261,3 +1261,13 @@
   "itemsCount": 0,
   "bookingsCount": 0
 }
+[2025-06-20T12:13:33.793Z] Notification créée avec succès {
+  "id": "cmc4ru19a00092cvijyv9achh",
+  "userId": "cm87c7hvh00006aia2k26zc26",
+  "type": "ORDER_STATUS"
+}
+[2025-06-20T12:27:55.587Z] Notification créée avec succès {
+  "id": "cmc4sci7b000f2cviy1h1yu42",
+  "userId": "cm87c7hvh00006aia2k26zc26",
+  "type": "ORDER_STATUS"
+}

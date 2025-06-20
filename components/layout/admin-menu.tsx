@@ -64,11 +64,7 @@ export default function AdminMenu() {
       label: 'Statistiques',
       icon: <BarChart4 className="h-5 w-5" />
     },
-    {
-      href: '/admin/settings',
-      label: 'Paramètres',
-      icon: <Settings className="h-5 w-5" />
-    }
+    
   ]
 
   return (

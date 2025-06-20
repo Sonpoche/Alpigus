@@ -168,15 +168,36 @@ export class EmailService {
             <p style="margin: 10px 0;"><strong>Email :</strong> ${email}</p>
             <p style="margin: 10px 0;"><strong>Mot de passe temporaire :</strong> <code style="background: #f8f9fa; padding: 4px 8px; border-radius: 4px; font-family: monospace;">${tempPassword}</code></p>
             <p style="color: #856404; font-size: 14px; margin-top: 15px;">
-              ⚠️ <strong>Important :</strong> Ce mot de passe est temporaire. Nous vous recommandons fortement de le changer dès votre première connexion.
+              ⚠️ <strong>Important :</strong> Ce mot de passe est temporaire. Lors de votre première connexion, vous serez guidé pour changer votre mot de passe et compléter votre profil.
             </p>
           </div>
 
           <div style="text-align: center; margin: 30px 0;">
             <a href="${loginUrl}" 
-               style="background-color: #FF5A5F; color: white; padding: 12px 30px; text-decoration: none; border-radius: 5px; font-weight: bold; display: inline-block;">
+              style="background-color: #FF5A5F; color: white; padding: 12px 30px; text-decoration: none; border-radius: 5px; font-weight: bold; display: inline-block;">
               Se connecter maintenant
             </a>
+          </div>
+
+          <!-- ✅ NOUVEAU : Section spécifique sur le processus d'onboarding -->
+          <div style="background-color: #e8f4fd; border: 1px solid #bee5eb; padding: 20px; border-radius: 8px; margin: 20px 0;">
+            <h3 style="color: #0c5460; margin-top: 0;">🚀 Après votre première connexion</h3>
+            <p style="color: #0c5460; margin-bottom: 15px;">
+              Nous vous guiderons à travers quelques étapes simples pour finaliser votre profil :
+            </p>
+            <ol style="color: #0c5460; line-height: 1.6; margin: 0; padding-left: 20px;">
+              <li><strong>Changement de mot de passe</strong> - Choisissez un mot de passe sécurisé</li>
+              <li><strong>Informations personnelles</strong> - Confirmez vos coordonnées</li>
+              ${role === UserRole.PRODUCER ? `
+              <li><strong>Informations d'entreprise</strong> - Détails de votre exploitation</li>
+              <li><strong>Coordonnées bancaires</strong> - Pour recevoir vos paiements</li>
+              ` : `
+              <li><strong>Préférences</strong> - Personnalisez votre expérience</li>
+              `}
+            </ol>
+            <p style="color: #0c5460; margin-top: 15px; font-size: 14px;">
+              💡 Ce processus ne prend que quelques minutes et vous permet d'accéder à toutes les fonctionnalités de la plateforme.
+            </p>
           </div>
 
           ${role === UserRole.PRODUCER ? `

@@ -126,7 +126,8 @@ export const POST = apiAuthMiddleware(async (
         name: name?.trim() || null,
         password: hashedPassword,
         role: role as UserRole,
-        phone: normalizedPhone, // ✅ Téléphone flexible tous pays
+        phone: normalizedPhone,
+        profileCompleted: false, // ✅ NOUVEAU - Forcer l'onboarding pour les utilisateurs invités
         // Si c'est un producteur, créer aussi l'entrée Producer
         ...(role === UserRole.PRODUCER && {
           producer: {

@@ -68,29 +68,29 @@ export async function POST(req: Request) {
 
     // Créer l'utilisateur avec un producer si nécessaire
     const user = await prisma.user.create({
-      data: {
-        email,
-        password: hashedPassword,
-        name,
-        phone,
-        role,
-        // Si c'est un producteur, créer aussi l'entrée dans la table Producer
-        ...(role === 'PRODUCER' && {
-          producer: {
-            create: {
-              companyName: companyName || '',
-              description: '',
-              address: ''
-            }
+    data: {
+      email,
+      password: hashedPassword,
+      name,
+      phone,
+      role,
+      profileCompleted: true, // ✅ NOUVEAU - Les utilisateurs qui s'inscrivent ont déjà complété leur profil
+      // Si c'est un producteur, créer aussi l'entrée dans la table Producer
+      ...(role === 'PRODUCER' && {
+        producer: {
+          create: {
+            companyName: companyName || '',
+            description: '',
+            address: ''
           }
-        })
-      },
-      // Inclure les données du producer dans la réponse
-      include: {
-        producer: role === 'PRODUCER'
-      }
-    })
-
+        }
+      })
+    },
+    // Inclure les données du producer dans la réponse
+    include: {
+      producer: role === 'PRODUCER'
+    }
+  })
     // Envoyer l'email de bienvenue
     try {
       await EmailService.sendWelcomeEmail(email, name, role);

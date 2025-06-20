@@ -1,4 +1,5 @@
-// middleware.ts
+// middleware.ts - Version corrigée
+
 import { getToken } from 'next-auth/jwt'
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
@@ -20,36 +21,52 @@ export async function middleware(request: NextRequest) {
     secret: process.env.NEXTAUTH_SECRET
   })
 
-  // Routes publiques
-  if (path === '/' || path === '/login' || path === '/register') {
+  // Routes publiques (accessibles sans authentification)
+  if (path === '/' || path === '/login' || path === '/register' || path.startsWith('/reset-password')) {
     if (token) {
+      // ✅ CORRECTION : Ne pas rediriger les admins vers onboarding
+      if (token.role === 'ADMIN') {
+        return NextResponse.redirect(new URL('/admin', request.url))
+      }
+      
+      // Si connecté, vérifier si le profil est complété
+      if (!token.profileCompleted) {
+        return NextResponse.redirect(new URL('/onboarding', request.url))
+      }
       return NextResponse.redirect(new URL('/dashboard', request.url))
     }
     return NextResponse.next()
   }
 
-  // Vérification de l'authentification
+  // Vérification de l'authentification pour toutes les autres routes
   if (!token) {
     const url = new URL('/login', request.url)
     url.searchParams.set('callbackUrl', encodeURI(path))
     return NextResponse.redirect(url)
   }
 
-  // Gestion de la page de complétion du profil
-  if (path === '/profile/complete') {
-    // Si l'utilisateur a déjà un numéro de téléphone (profil complet)
-    if (token.phone && token.phone !== '') {
+  // ✅ Gestion de la page d'onboarding
+  if (path === '/onboarding') {
+    // ✅ CORRECTION : Empêcher les admins d'accéder à l'onboarding
+    if (token.role === 'ADMIN') {
+      return NextResponse.redirect(new URL('/admin', request.url))
+    }
+    
+    // Si le profil est déjà complété, rediriger vers dashboard
+    if (token.profileCompleted) {
       return NextResponse.redirect(new URL('/dashboard', request.url))
     }
+    // Sinon, permettre l'accès à l'onboarding
     return NextResponse.next()
   }
 
-  // Si le profil est incomplet (pas de téléphone), rediriger vers la page de complétion
-  if (!token.phone || token.phone === '') {
-    return NextResponse.redirect(new URL('/profile/complete', request.url))
+  // ✅ CORRECTION : Ne forcer l'onboarding que pour les non-admins
+  if (!token.profileCompleted && token.role !== 'ADMIN') {
+    console.log('Redirection vers onboarding pour:', token.email)
+    return NextResponse.redirect(new URL('/onboarding', request.url))
   }
 
-  // Protection des routes par rôle
+  // Protection des routes par rôle (uniquement si profil complété)
   if (path.startsWith('/admin') && token.role !== 'ADMIN') {
     return NextResponse.redirect(new URL('/dashboard', request.url))
   }
@@ -66,14 +83,15 @@ export const config = {
     '/',
     '/login',
     '/register',
+    '/onboarding',
     '/dashboard/:path*',
     '/admin/:path*',
     '/producer/:path*',
     '/profile/:path*',
-    '/invoices/:path*',     // Ajout du chemin des factures
-    '/orders/:path*',       // S'assurer que les commandes sont aussi protégées
-    '/checkout/:path*',     // Protection du checkout
-    '/cart',               // Protection du panier
-    '/invoices'            // Protection de la page des factures (chemin direct)
+    '/invoices/:path*',
+    '/orders/:path*',
+    '/checkout/:path*',
+    '/cart',
+    '/invoices'
   ]
 }

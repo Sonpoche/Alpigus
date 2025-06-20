@@ -19,10 +19,16 @@ import {
     CreditCard,
     ReceiptText,
     MessageSquare,
-    CheckCircle
+    CheckCircle,
+    Bell,
+    Save
   } from 'lucide-react' 
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import { LoadingButton } from '@/components/ui/loading-button'
+import { Label } from '@/components/ui/label'
+import { Textarea } from '@/components/ui/textarea'
+import { EmailModal } from '@/components/admin/email-modal'  // ✅ NOUVEAU
 import { format } from 'date-fns'
 import { fr } from 'date-fns/locale'
 import Link from 'next/link'
@@ -35,6 +41,21 @@ export default function AdminOrderDetailPage() {
   const [order, setOrder] = useState<any>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [isSendingNotification, setIsSendingNotification] = useState(false)
+  
+  // États pour les notes d'administration
+  const [adminNote, setAdminNote] = useState('')
+  const [noteHistory, setNoteHistory] = useState([])
+  const [isSavingNote, setIsSavingNote] = useState(false)
+
+  // ✅ NOUVEAUX États pour la modal d'email
+  const [isEmailModalOpen, setIsEmailModalOpen] = useState(false)
+  const [emailModalData, setEmailModalData] = useState({
+    recipientEmail: '',
+    recipientName: '',
+    defaultSubject: '',
+    defaultMessage: '',
+    type: 'client' as 'client' | 'producer'
+  })
 
   useEffect(() => {
     fetchOrder()
@@ -51,6 +72,10 @@ export default function AdminOrderDetailPage() {
       
       const data = await response.json()
       setOrder(data)
+      
+      // Récupérer les notes d'administration
+      setNoteHistory(data.adminNotesHistory || [])
+      
     } catch (error) {
       console.error('Erreur:', error)
       toast({
@@ -63,27 +88,72 @@ export default function AdminOrderDetailPage() {
     }
   }
 
-  const handleContactClient = async () => {
-    // Cette fonction pourrait ouvrir une interface de message ou envoyer un email préconfiguré
-    toast({
-      title: "En développement",
-      description: "Cette fonctionnalité est en cours de développement"
+  // ✅ MISE À JOUR: Contacter le client avec modal
+  const handleContactClient = () => {
+    if (!order?.user?.email) {
+      toast({
+        title: "Erreur",
+        description: "Email du client non disponible",
+        variant: "destructive"
+      })
+      return
+    }
+
+    const subject = `Concernant votre commande #${order.id.substring(0, 8)}`
+    const defaultMessage = `Bonjour ${order.user.name || 'Client'},
+
+Concernant votre commande #${order.id.substring(0, 8)} du ${new Date(order.createdAt).toLocaleDateString('fr-FR')}...
+
+Cordialement,
+L'équipe Mushroom Marketplace`
+
+    setEmailModalData({
+      recipientEmail: order.user.email,
+      recipientName: order.user.name || 'Client',
+      defaultSubject: subject,
+      defaultMessage: defaultMessage,
+      type: 'client'
     })
+    setIsEmailModalOpen(true)
   }
 
-  const handleContactProducer = async (producerId: string) => {
-    // Cette fonction pourrait ouvrir une interface de message ou envoyer un email préconfiguré
-    toast({
-      title: "En développement",
-      description: "Cette fonctionnalité est en cours de développement"
+  // ✅ MISE À JOUR: Contacter le producteur avec modal
+  const handleContactProducer = (producerId: string) => {
+    const producer = Object.values(itemsByProducer).flat()
+      .find((item: any) => item.product.producer.id === producerId)?.product.producer
+
+    if (!producer?.user?.email) {
+      toast({
+        title: "Erreur",
+        description: "Email du producteur non disponible",
+        variant: "destructive"
+      })
+      return
+    }
+
+    const subject = `Concernant la commande #${order.id.substring(0, 8)}`
+    const defaultMessage = `Bonjour ${producer.user.name || 'Producteur'},
+
+Concernant la commande #${order.id.substring(0, 8)} du ${new Date(order.createdAt).toLocaleDateString('fr-FR')}...
+
+Cordialement,
+L'équipe Mushroom Marketplace`
+
+    setEmailModalData({
+      recipientEmail: producer.user.email,
+      recipientName: producer.user.name || producer.companyName || 'Producteur',
+      defaultSubject: subject,
+      defaultMessage: defaultMessage,
+      type: 'producer'
     })
+    setIsEmailModalOpen(true)
   }
 
+  // Envoyer un rappel (notification push au producteur)
   const handleSendReminder = async () => {
     try {
       setIsSendingNotification(true)
       
-      // Envoyer une notification au producteur et/ou au client
       const response = await fetch(`/api/admin/orders/${params.id}/send-reminder`, {
         method: 'POST'
       })
@@ -94,7 +164,8 @@ export default function AdminOrderDetailPage() {
       
       toast({
         title: "Rappel envoyé",
-        description: "Le rappel a été envoyé avec succès"
+        description: "Une notification push a été envoyée au(x) producteur(s) concerné(s)",
+        duration: 5000
       })
     } catch (error) {
       console.error('Erreur:', error)
@@ -105,6 +176,50 @@ export default function AdminOrderDetailPage() {
       })
     } finally {
       setIsSendingNotification(false)
+    }
+  }
+
+  // Sauvegarder les notes d'administration
+  const handleSaveAdminNote = async () => {
+    if (!adminNote.trim()) {
+      toast({
+        title: "Attention",
+        description: "Veuillez saisir une note avant de sauvegarder",
+        variant: "destructive"
+      })
+      return
+    }
+
+    try {
+      setIsSavingNote(true)
+      
+      const response = await fetch(`/api/admin/orders/${params.id}/admin-notes`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ note: adminNote })
+      })
+      
+      if (!response.ok) {
+        throw new Error('Erreur lors de la sauvegarde')
+      }
+      
+      // Recharger les données pour avoir l'historique à jour
+      await fetchOrder()
+      setAdminNote('') // Vider le champ après sauvegarde
+      
+      toast({
+        title: "Note sauvegardée",
+        description: "La note d'administration a été ajoutée avec succès"
+      })
+    } catch (error) {
+      console.error('Erreur:', error)
+      toast({
+        title: "Erreur",
+        description: "Impossible de sauvegarder la note",
+        variant: "destructive"
+      })
+    } finally {
+      setIsSavingNote(false)
     }
   }
 
@@ -182,9 +297,11 @@ export default function AdminOrderDetailPage() {
             </p>
           </div>
         </div>
-        <Badge variant={getStatusBadgeVariant(order.status)} className="text-base px-3 py-1">
-          {order.status}
-        </Badge>
+        <div className="flex items-center gap-3">
+          <Badge variant={getStatusBadgeVariant(order.status)} className="text-base px-3 py-1">
+            {order.status}
+          </Badge>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -193,27 +310,17 @@ export default function AdminOrderDetailPage() {
           <div className="bg-background border border-foreground/10 rounded-lg shadow-sm overflow-hidden">
             <div className="p-4 border-b border-foreground/10 flex justify-between items-center">
               <h2 className="font-semibold">Détails de la commande</h2>
-              <div>
-                {/* Actions administratives */}
-                <Button 
+              <div className="flex gap-2">
+                {/* Action: Envoyer un rappel */}
+                <LoadingButton
+                  onClick={handleSendReminder}
+                  isLoading={isSendingNotification}
                   variant="outline"
                   size="sm"
-                  onClick={handleSendReminder}
-                  disabled={isSendingNotification}
-                  className="text-xs"
+                  icon={<Bell className="h-4 w-4" />}
                 >
-                  {isSendingNotification ? (
-                    <>
-                      <Clock className="h-3 w-3 mr-1 animate-spin" />
-                      Envoi en cours...
-                    </>
-                  ) : (
-                    <>
-                      <MessageSquare className="h-3 w-3 mr-1" />
-                      Envoyer un rappel
-                    </>
-                  )}
-                </Button>
+                  Envoyer un rappel
+                </LoadingButton>
               </div>
             </div>
             
@@ -342,7 +449,6 @@ export default function AdminOrderDetailPage() {
                 </div>
               </div>
               
-              {/* Vous pouvez ajouter d'autres étapes en fonction du statut de la commande */}
               {order.status !== 'PENDING' && (
                 <div className="flex items-start">
                   <div className="mr-3 bg-green-500/10 p-2 rounded-full">
@@ -528,22 +634,66 @@ export default function AdminOrderDetailPage() {
           {/* Notes d'administration */}
           <div className="bg-background border border-foreground/10 rounded-lg shadow-sm overflow-hidden">
             <div className="p-4 border-b border-foreground/10">
-              <h2 className="font-semibold">Notes d'administration</h2>
+              <h2 className="font-semibold flex items-center gap-2">
+                <MessageSquare className="h-5 w-5" />
+                Notes d'administration
+              </h2>
             </div>
-            <div className="p-4">
-              <textarea
-                className="w-full border border-foreground/10 rounded-md p-3 text-sm resize-none h-32"
-                placeholder="Ajouter des notes concernant cette commande (visibles uniquement par les administrateurs)"
-              ></textarea>
-              <div className="mt-2 flex justify-end">
-                <Button size="sm">
+            <div className="p-4 space-y-4">
+              
+              {/* Historique des notes */}
+              {noteHistory.length > 0 && (
+                <div className="space-y-3 max-h-48 overflow-y-auto">
+                  <h4 className="text-sm font-medium text-muted-foreground">Historique:</h4>
+                  {noteHistory.map((note: any, index: number) => (
+                    <div key={index} className="bg-muted/30 p-3 rounded-md border-l-2 border-custom-accent">
+                      <p className="text-sm">{note.content}</p>
+                      <div className="flex justify-between text-xs text-muted-foreground mt-2">
+                        <span>{note.adminName}</span>
+                        <span>{new Date(note.createdAt).toLocaleDateString()}</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Nouvelle note */}
+              <div className="space-y-3">
+                <Label htmlFor="adminNote">Ajouter une note:</Label>
+                <Textarea
+                  id="adminNote"
+                  value={adminNote}
+                  onChange={(e) => setAdminNote(e.target.value)}
+                  placeholder="Note interne pour l'équipe admin..."
+                  rows={3}
+                  className="form-textarea"
+                />
+                <LoadingButton
+                  onClick={handleSaveAdminNote}
+                  isLoading={isSavingNote}
+                  disabled={!adminNote.trim()}
+                  size="sm"
+                  className="w-full"
+                  icon={<Save className="h-4 w-4" />}
+                >
                   Enregistrer
-                </Button>
+                </LoadingButton>
               </div>
             </div>
           </div>
         </div>
       </div>
+
+      {/* ✅ NOUVEAU: Modal d'envoi d'email */}
+      <EmailModal
+        isOpen={isEmailModalOpen}
+        onClose={() => setIsEmailModalOpen(false)}
+        recipientEmail={emailModalData.recipientEmail}
+        recipientName={emailModalData.recipientName}
+        defaultSubject={emailModalData.defaultSubject}
+        defaultMessage={emailModalData.defaultMessage}
+        type={emailModalData.type}
+      />
     </div>
   )
 }

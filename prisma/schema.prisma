@@ -17,6 +17,7 @@ model User {
  image            String?
  password         String?
  role             UserRole       @default(CLIENT)
+ profileCompleted Boolean        @default(false)  // ✅ NOUVEAU CHAMP
  resetToken       String?        // Ajout pour la réinitialisation du mot de passe
  resetTokenExpiry DateTime?      // Ajout pour la réinitialisation du mot de passe
  createdAt        DateTime       @default(now())
@@ -25,9 +26,9 @@ model User {
  orders           Order[]
  accounts         Account[]
  sessions         Session[]
- notifications Notification[]
+ notifications    Notification[]
  invoices         Invoice[]
- adminLogs   AdminLog[]
+ adminLogs        AdminLog[]
 }
 
 model Account {

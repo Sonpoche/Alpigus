@@ -8,6 +8,7 @@ declare module 'next-auth' {
       id: string
       role: UserRole | null
       phone: string | null
+      profileCompleted: boolean // ✅ NOUVEAU
     } & DefaultSession['user']
   }
 
@@ -15,6 +16,7 @@ declare module 'next-auth' {
     id: string
     role: UserRole | null
     phone: string | null
+    profileCompleted: boolean // ✅ NOUVEAU
   }
 }
 
@@ -23,5 +25,6 @@ declare module 'next-auth/jwt' {
     id: string
     role: UserRole | null
     phone: string | null
+    profileCompleted: boolean // ✅ NOUVEAU
   }
 }
