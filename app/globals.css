@@ -441,3 +441,46 @@ option {
 .PhoneInputCountrySelectArrow {
   @apply text-foreground;
 }
+
+/* app/globals.css - Ajouter à la fin du fichier */
+
+/* Réduction des paddings UNIQUEMENT sur mobile (écrans < 640px) */
+@media (max-width: 639px) {
+  /* Override des paddings couramment utilisés */
+  .p-8 { padding: 1rem !important; }          /* au lieu de 2rem */
+  .p-6 { padding: 0.75rem !important; }       /* au lieu de 1.5rem */
+  .p-4 { padding: 0.5rem !important; }        /* au lieu de 1rem */
+  
+  .px-8 { padding-left: 1rem !important; padding-right: 1rem !important; }
+  .px-6 { padding-left: 0.75rem !important; padding-right: 0.75rem !important; }
+  .px-4 { padding-left: 0.5rem !important; padding-right: 0.5rem !important; }
+  
+  .py-8 { padding-top: 1rem !important; padding-bottom: 1rem !important; }
+  .py-6 { padding-top: 0.75rem !important; padding-bottom: 0.75rem !important; }
+  .py-4 { padding-top: 0.5rem !important; padding-bottom: 0.5rem !important; }
+  
+  /* Marges aussi si besoin */
+  .mb-8 { margin-bottom: 1rem !important; }
+  .mb-6 { margin-bottom: 0.75rem !important; }
+  .mb-4 { margin-bottom: 0.5rem !important; }
+  
+  /* Gaps pour les grilles */
+  .gap-6 { gap: 0.75rem !important; }
+  .gap-4 { gap: 0.5rem !important; }
+}
+
+/* Alternative plus ciblée - Juste pour les pages admin */
+@media (max-width: 639px) {
+  /* Cibler spécifiquement les conteneurs de pages */
+  .page-container .p-8,
+  [class*="admin"] .p-8,
+  [class*="wallet"] .p-8 {
+    padding: 1rem !important;
+  }
+  
+  .page-container .p-6,
+  [class*="admin"] .p-6,
+  [class*="wallet"] .p-6 {
+    padding: 0.75rem !important;
+  }
+}
