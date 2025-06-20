@@ -12,6 +12,7 @@ import { cn, containerClasses, gridClasses, cardClasses, spacingClasses } from '
 import SlotsCalendar from '@/components/ui/slots-calendar'
 import { UserRole, ProductType } from '@prisma/client'
 import { motion } from 'framer-motion'
+import { formatNumber } from '@/lib/number-utils' // Ajout de l'import
 
 interface Product {
   id: string
@@ -361,7 +362,7 @@ export default function DeliverySlotsOverview() {
                                   {slot.product.name}
                                 </h3>
                                 <p className="text-xs sm:text-sm text-muted-foreground">
-                                    {slot.maxCapacity - slot.reserved} {slot.product.unit} disponible
+                                  {formatNumber(slot.maxCapacity - slot.reserved)} {slot.product.unit} disponible
                                 </p>
                               </div>
                               {!isPastSlot && (

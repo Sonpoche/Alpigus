@@ -110,7 +110,7 @@ export default function DeliverySlotCalendar({ productId }: { productId: string 
     if (product.stock && capacity > product.stock.quantity) {
       messages.push({
         type: 'error',
-        message: `La capacité ne peut pas dépasser le stock disponible (${product.stock.quantity} ${product.unit})`
+        message: `La capacité ne peut pas dépasser le stock disponible (${formatNumber(product.stock.quantity)} ${product.unit})`
       })
     }
 
@@ -138,41 +138,72 @@ export default function DeliverySlotCalendar({ productId }: { productId: string 
     try {
       const dates = isRepeating 
         ? generateRepeatedDates(selectedDate, repeatConfig.weeks, repeatConfig.daysOfWeek)
-        : [selectedDate];
+        : [selectedDate]
 
-      const createdSlots = await Promise.all(
-        dates.map(date => 
-          fetch('/api/delivery-slots', {
+      const capacity = parseFloat(newSlotCapacity)
+      
+      // Créer tous les créneaux
+      const results = await Promise.allSettled(
+        dates.map(async (date) => {
+          const response = await fetch('/api/delivery-slots', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
               productId,
-              date,
-              maxCapacity: parseFloat(newSlotCapacity)
+              date: date.toISOString(),
+              maxCapacity: capacity
             })
-          }).then(res => res.json())
-        )
-      );
+          })
 
-      setSlots(prev => [
-        ...prev,
-        ...createdSlots.map(slot => ({ ...slot, date: new Date(slot.date) }))
-      ]);
+          if (!response.ok) {
+            // Lire le message d'erreur depuis la réponse
+            const errorText = await response.text()
+            throw new Error(errorText || `Erreur ${response.status}`)
+          }
+          
+          return response.json()
+        })
+      )
 
-      setSelectedDate(null)
-      setNewSlotCapacity('')
-      setValidationMessages([])
-      setIsRepeating(false)
-      setRepeatConfig({ weeks: 1, daysOfWeek: [] })
-      
-      toast({
-        title: "Succès",
-        description: `${createdSlots.length} créneau(x) créé(s) avec succès`
-      })
-    } catch (error) {
+      // Analyser les résultats
+      const successful = results.filter(r => r.status === 'fulfilled').length
+      const failed = results.filter(r => r.status === 'rejected')
+
+      if (successful > 0) {
+        toast({
+          title: "Créneaux créés",
+          description: `${successful} créneau${successful > 1 ? 'x' : ''} créé${successful > 1 ? 's' : ''} avec succès`
+        })
+        
+        // Réinitialiser le formulaire
+        setSelectedDate(null)
+        setNewSlotCapacity('')
+        setIsRepeating(false)
+        setRepeatConfig({ weeks: 1, daysOfWeek: [] })
+        setValidationMessages([])
+        
+        // Rafraîchir les données
+        await fetchData()
+      }
+
+      // Afficher les erreurs spécifiques
+      if (failed.length > 0) {
+        failed.forEach(failure => {
+          if (failure.status === 'rejected') {
+            toast({
+              title: "Erreur lors de la création",
+              description: failure.reason.message || "Erreur inconnue",
+              variant: "destructive"
+            })
+          }
+        })
+      }
+
+    } catch (error: any) {
+      console.error('Erreur lors de la création du créneau:', error)
       toast({
         title: "Erreur",
-        description: "Impossible de créer le(s) créneau(x)",
+        description: error.message || "Impossible de créer le créneau",
         variant: "destructive"
       })
     } finally {
@@ -190,7 +221,11 @@ export default function DeliverySlotCalendar({ productId }: { productId: string 
         })
       })
 
-      if (!response.ok) throw new Error('Erreur lors de la mise à jour du créneau')
+      if (!response.ok) {
+        // 🔧 CORRECTION : Lire le message d'erreur depuis la réponse
+        const errorText = await response.text()
+        throw new Error(errorText || `Erreur ${response.status}`)
+      }
 
       const updatedSlot = await response.json()
       setSlots(prev => prev.map(s => 
@@ -202,10 +237,11 @@ export default function DeliverySlotCalendar({ productId }: { productId: string 
         title: "Succès",
         description: "Créneau mis à jour avec succès"
       })
-    } catch (error) {
+    } catch (error: any) {
+      console.error('Erreur lors de la mise à jour:', error)
       toast({
-        title: "Erreur",
-        description: "Impossible de mettre à jour le créneau",
+        title: "Erreur lors de la modification",
+        description: error.message || "Impossible de mettre à jour le créneau",
         variant: "destructive"
       })
     }
@@ -217,17 +253,22 @@ export default function DeliverySlotCalendar({ productId }: { productId: string 
         method: 'DELETE'
       })
 
-      if (!response.ok) throw new Error('Erreur lors de la suppression du créneau')
+      if (!response.ok) {
+        // 🔧 CORRECTION : Lire le message d'erreur
+        const errorText = await response.text()
+        throw new Error(errorText || `Erreur ${response.status}`)
+      }
 
       setSlots(prev => prev.filter(slot => slot.id !== slotId))
       toast({
         title: "Succès",
         description: "Créneau supprimé avec succès"
       })
-    } catch (error) {
+    } catch (error: any) {
+      console.error('Erreur lors de la suppression:', error)
       toast({
-        title: "Erreur",
-        description: "Impossible de supprimer le créneau",
+        title: "Erreur lors de la suppression",
+        description: error.message || "Impossible de supprimer le créneau",
         variant: "destructive"
       })
     }
@@ -250,29 +291,55 @@ export default function DeliverySlotCalendar({ productId }: { productId: string 
     setSelectedSlots([])
   }
 
-  // Actions groupées
+  // Actions groupées avec gestion d'erreur améliorée
   const handleBulkDelete = async () => {
     if (selectedSlots.length === 0) return
 
     setIsPerformingBulkAction(true)
     try {
-      await Promise.all(
-        selectedSlots.map(slotId => 
-          fetch(`/api/delivery-slots/${slotId}`, { method: 'DELETE' })
-        )
+      const results = await Promise.allSettled(
+        selectedSlots.map(async (slotId) => {
+          const response = await fetch(`/api/delivery-slots/${slotId}`, { method: 'DELETE' })
+          if (!response.ok) {
+            const errorText = await response.text()
+            throw new Error(errorText || `Erreur ${response.status}`)
+          }
+          return response
+        })
       )
 
-      setSlots(prev => prev.filter(slot => !selectedSlots.includes(slot.id)))
-      setSelectedSlots([])
-      
-      toast({
-        title: "Succès",
-        description: `${selectedSlots.length} créneau(x) supprimé(s) avec succès`
-      })
-    } catch (error) {
+      // Analyser les résultats
+      const successful = results.filter(r => r.status === 'fulfilled').length
+      const failed = results.filter(r => r.status === 'rejected')
+
+      if (successful > 0) {
+        setSlots(prev => prev.filter(slot => !selectedSlots.includes(slot.id)))
+        setSelectedSlots([])
+        
+        toast({
+          title: "Succès",
+          description: `${successful} créneau(x) supprimé(s) avec succès`
+        })
+      }
+
+      // Afficher les erreurs spécifiques
+      if (failed.length > 0) {
+        failed.forEach(failure => {
+          if (failure.status === 'rejected') {
+            toast({
+              title: "Erreur lors de la suppression",
+              description: failure.reason.message || "Erreur inconnue",
+              variant: "destructive"
+            })
+          }
+        })
+      }
+
+    } catch (error: any) {
+      console.error('Erreur lors de la suppression groupée:', error)
       toast({
         title: "Erreur",
-        description: "Erreur lors de la suppression des créneaux",
+        description: error.message || "Erreur lors de la suppression des créneaux",
         variant: "destructive"
       })
     } finally {
@@ -289,30 +356,57 @@ export default function DeliverySlotCalendar({ productId }: { productId: string 
       const allAvailable = selectedSlotsData.every(slot => slot.isAvailable)
       const newAvailability = !allAvailable
 
-      await Promise.all(
-        selectedSlots.map(slotId => 
-          fetch(`/api/delivery-slots/${slotId}`, {
+      const results = await Promise.allSettled(
+        selectedSlots.map(async (slotId) => {
+          const response = await fetch(`/api/delivery-slots/${slotId}`, {
             method: 'PATCH',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ isAvailable: newAvailability })
           })
-        )
+          
+          if (!response.ok) {
+            const errorText = await response.text()
+            throw new Error(errorText || `Erreur ${response.status}`)
+          }
+          return response
+        })
       )
 
-      setSlots(prev => prev.map(slot => 
-        selectedSlots.includes(slot.id) 
-          ? { ...slot, isAvailable: newAvailability }
-          : slot
-      ))
-      
-      toast({
-        title: "Succès",
-        description: `${selectedSlots.length} créneau(x) ${newAvailability ? 'activé(s)' : 'désactivé(s)'} avec succès`
-      })
-    } catch (error) {
+      // Analyser les résultats
+      const successful = results.filter(r => r.status === 'fulfilled').length
+      const failed = results.filter(r => r.status === 'rejected')
+
+      if (successful > 0) {
+        setSlots(prev => prev.map(slot => 
+          selectedSlots.includes(slot.id) 
+            ? { ...slot, isAvailable: newAvailability }
+            : slot
+        ))
+        
+        toast({
+          title: "Succès",
+          description: `${successful} créneau(x) ${newAvailability ? 'activé(s)' : 'désactivé(s)'} avec succès`
+        })
+      }
+
+      // Afficher les erreurs spécifiques
+      if (failed.length > 0) {
+        failed.forEach(failure => {
+          if (failure.status === 'rejected') {
+            toast({
+              title: "Erreur lors de la modification",
+              description: failure.reason.message || "Erreur inconnue",
+              variant: "destructive"
+            })
+          }
+        })
+      }
+
+    } catch (error: any) {
+      console.error('Erreur lors de la modification groupée:', error)
       toast({
         title: "Erreur",
-        description: "Erreur lors de la modification des créneaux",
+        description: error.message || "Erreur lors de la modification des créneaux",
         variant: "destructive"
       })
     } finally {
@@ -356,7 +450,7 @@ export default function DeliverySlotCalendar({ productId }: { productId: string 
         </p>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 lg:gap-8">
         {/* Calendrier */}
         <div>
           <Calendar
@@ -492,45 +586,48 @@ export default function DeliverySlotCalendar({ productId }: { productId: string 
             </div>
           )}
 
-          {/* En-tête avec actions de sélection */}
-          <div className="flex justify-between items-center">
+          {/* En-tête avec actions de sélection - VERSION RESPONSIVE */}
+          <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3">
             <div>
               <h3 className="font-medium">Créneaux configurés</h3>
               <p className="text-sm text-muted-foreground">
-                {slots.length} créneau(x) • {selectedSlots.length} sélectionné(s)
+                {slots.length} créneau{slots.length > 1 ? 'x' : ''} • {selectedSlots.length} sélectionné{selectedSlots.length > 1 ? 's' : ''}
               </p>
             </div>
             
-            {/* Actions de sélection */}
+            {/* Actions de sélection - Responsive */}
             <div className="flex gap-2 text-sm">
               <button
                 onClick={selectAllSlots}
-                className="px-3 py-1 bg-custom-accent/10 text-custom-accent rounded-md hover:bg-custom-accent/20 transition-colors"
+                className="px-2 sm:px-3 py-1 bg-custom-accent/10 text-custom-accent rounded-md hover:bg-custom-accent/20 transition-colors text-xs sm:text-sm"
               >
-                Tout sélectionner
+                <span className="hidden sm:inline">Tout sélectionner</span>
+                <span className="sm:hidden">Tout</span>
               </button>
               <button
                 onClick={deselectAllSlots}
-                className="px-3 py-1 bg-foreground/5 text-foreground rounded-md hover:bg-foreground/10 transition-colors"
+                className="px-2 sm:px-3 py-1 bg-foreground/5 text-foreground rounded-md hover:bg-foreground/10 transition-colors text-xs sm:text-sm"
               >
-                Désélectionner
+                <span className="hidden sm:inline">Désélectionner</span>
+                <span className="sm:hidden">Aucun</span>
               </button>
             </div>
           </div>
 
-          {/* Actions groupées */}
+          {/* Actions groupées - VERSION RESPONSIVE */}
           {selectedSlots.length > 0 && (
-            <div className="flex gap-2 p-3 bg-custom-accent/5 border border-custom-accent/20 rounded-lg">
+            <div className="flex flex-col sm:flex-row gap-2 p-3 bg-custom-accent/5 border border-custom-accent/20 rounded-lg">
               <LoadingButton
                 onClick={handleBulkToggleAvailability}
                 isLoading={isPerformingBulkAction}
                 variant="outline"
                 size="sm"
+                className="w-full sm:w-auto text-xs sm:text-sm"
               >
                 {selectedSlots.length > 0 && slots.filter(s => selectedSlots.includes(s.id)).every(s => s.isAvailable) ? (
-                  <><EyeOff className="h-4 w-4 mr-1" /> Désactiver</>
+                  <><EyeOff className="h-3 w-3 sm:h-4 sm:w-4 mr-1" /> Désactiver</>
                 ) : (
-                  <><Eye className="h-4 w-4 mr-1" /> Activer</>
+                  <><Eye className="h-3 w-3 sm:h-4 sm:w-4 mr-1" /> Activer</>
                 )}
               </LoadingButton>
               <LoadingButton
@@ -538,17 +635,18 @@ export default function DeliverySlotCalendar({ productId }: { productId: string 
                 isLoading={isPerformingBulkAction}
                 variant="destructive"
                 size="sm"
+                className="w-full sm:w-auto text-xs sm:text-sm"
               >
-                <Trash2 className="h-4 w-4 mr-1" />
+                <Trash2 className="h-3 w-3 sm:h-4 sm:w-4 mr-1" />
                 Supprimer
               </LoadingButton>
             </div>
           )}
 
-          {/* Liste des créneaux */}
+          {/* Liste des créneaux - VERSION RESPONSIVE */}
           <div className="space-y-2">
             {slots.length === 0 ? (
-              <p className="text-muted-foreground text-sm">
+              <p className="text-muted-foreground text-sm p-4 text-center">
                 Aucun créneau défini. Sélectionnez une date pour en créer un.
               </p>
             ) : (
@@ -563,32 +661,94 @@ export default function DeliverySlotCalendar({ productId }: { productId: string 
                   return (
                     <div
                       key={slot.id}
-                      className={`flex items-center gap-3 p-4 border rounded-lg transition-colors ${
+                      className={`flex flex-col sm:flex-row sm:items-center gap-3 p-3 sm:p-4 border rounded-lg transition-colors ${
                         isPastSlot ? 'opacity-50' : ''
                       } ${
                         isSelected ? 'border-custom-accent bg-custom-accent/5' : 'border-foreground/10'
                       }`}
                     >
-                      {/* Checkbox de sélection */}
-                      <button
-                        onClick={() => toggleSlotSelection(slot.id)}
-                        className="flex-shrink-0"
-                        disabled={isPastSlot}
-                      >
-                        {isSelected ? (
-                          <CheckSquare className="h-5 w-5 text-custom-accent" />
-                        ) : (
-                          <Square className="h-5 w-5 text-foreground/40" />
-                        )}
-                      </button>
+                      {/* Header mobile avec checkbox et date */}
+                      <div className="flex items-center justify-between sm:justify-start sm:gap-3 w-full sm:w-auto">
+                        {/* Checkbox de sélection */}
+                        <button
+                          onClick={() => toggleSlotSelection(slot.id)}
+                          className="flex-shrink-0"
+                          disabled={isPastSlot}
+                        >
+                          {isSelected ? (
+                            <CheckSquare className="h-4 w-4 sm:h-5 sm:w-5 text-custom-accent" />
+                          ) : (
+                            <Square className="h-4 w-4 sm:h-5 sm:w-5 text-foreground/40" />
+                          )}
+                        </button>
+
+                        {/* Date - plus compacte sur mobile */}
+                        <div className="flex-1 sm:flex-none min-w-0">
+                          <p className="font-medium text-sm sm:text-base truncate">
+                            <span className="sm:hidden">
+                              {new Intl.DateTimeFormat('fr-FR', { 
+                                day: 'numeric', 
+                                month: 'short' 
+                              }).format(slot.date)}
+                            </span>
+                            <span className="hidden sm:inline">
+                              {formatDate(slot.date)}
+                            </span>
+                          </p>
+                        </div>
+
+                        {/* Actions sur mobile */}
+                        <div className="flex gap-1 sm:hidden">
+                          {editingSlot?.id === slot.id ? (
+                            <>
+                              <button
+                                onClick={() => handleUpdateSlot(slot, editingSlot.maxCapacity)}
+                                className="p-2 text-custom-accent hover:bg-custom-accent/10 rounded-full transition-colors"
+                              >
+                                <Plus className="h-3 w-3" />
+                              </button>
+                              <button
+                                onClick={() => setEditingSlot(null)}
+                                className="p-2 text-destructive hover:bg-destructive/10 rounded-full transition-colors"
+                              >
+                                <X className="h-3 w-3" />
+                              </button>
+                            </>
+                          ) : (
+                            <>
+                              <button
+                                onClick={() => setEditingSlot(slot)}
+                                className="p-2 hover:bg-foreground/5 rounded-full transition-colors text-custom-text hover:text-custom-accent"
+                                title="Modifier le créneau"
+                                disabled={isPastSlot}
+                              >
+                                <Edit2 className="h-3 w-3" />
+                              </button>
+                              <button
+                                onClick={() => handleDeleteSlot(slot.id)}
+                                className="p-2 hover:bg-foreground/5 rounded-full transition-colors text-custom-text hover:text-destructive"
+                                title="Supprimer le créneau"
+                                disabled={slot.reserved > 0 || isPastSlot}
+                              >
+                                <X className="h-3 w-3" />
+                              </button>
+                            </>
+                          )}
+                        </div>
+                      </div>
 
                       {/* Contenu du créneau */}
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center justify-between mb-2">
-                          <p className="font-medium">
-                            {formatDate(slot.date)}
-                          </p>
-                          <div className="flex items-center gap-2">
+                      <div className="flex-1 min-w-0 space-y-2">
+                        {/* Statuts et capacité */}
+                        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                          {/* Date complète sur mobile (masquée sur desktop car déjà affichée) */}
+                          <div className="sm:hidden">
+                            <p className="text-xs text-muted-foreground">
+                              {formatDate(slot.date)}
+                            </p>
+                          </div>
+                          
+                          <div className="flex items-center gap-2 flex-wrap">
                             {!slot.isAvailable && (
                               <span className="px-2 py-1 bg-red-100 text-red-700 text-xs rounded-full">
                                 Désactivé
@@ -601,15 +761,15 @@ export default function DeliverySlotCalendar({ productId }: { productId: string 
                                 ? 'bg-orange-100 text-orange-700'
                                 : 'bg-red-100 text-red-700'
                             }`}>
-                              {formatNumber(available)} / {formatNumber(slot.maxCapacity)} {product.unit} disponible
+                              {formatNumber(available)} / {formatNumber(slot.maxCapacity)} {product.unit}
                             </span>
                           </div>
                         </div>
                         
                         {/* Barre de progression de disponibilité */}
-                        <div className="w-full bg-foreground/10 rounded-full h-2">
+                        <div className="w-full bg-foreground/10 rounded-full h-1.5 sm:h-2">
                           <div
-                            className={`h-2 rounded-full transition-all ${
+                            className={`h-1.5 sm:h-2 rounded-full transition-all ${
                               availabilityPercentage > 70 
                                 ? 'bg-green-500'
                                 : availabilityPercentage > 30
@@ -619,10 +779,33 @@ export default function DeliverySlotCalendar({ productId }: { productId: string 
                             style={{ width: `${availabilityPercentage}%` }}
                           />
                         </div>
+
+                        {/* Input d'édition sur mobile */}
+                        {editingSlot?.id === slot.id && (
+                          <div className="sm:hidden">
+                            <input
+                              type="number"
+                              value={editingSlot.maxCapacity}
+                              onChange={(e) => {
+                                const formatted = formatInputValue(e.target.value)
+                                const numValue = parseToTwoDecimals(parseFloat(formatted))
+                                setEditingSlot({
+                                  ...editingSlot,
+                                  maxCapacity: numValue
+                                })
+                              }}
+                              min={slot.reserved}
+                              step="0.01"
+                              max="999999.99"
+                              className="w-full rounded-md border border-foreground/10 bg-background px-3 py-2 text-sm"
+                              placeholder="Nouvelle capacité"
+                            />
+                          </div>
+                        )}
                       </div>
 
-                      {/* Actions */}
-                      <div className="flex gap-2">
+                      {/* Actions desktop */}
+                      <div className="hidden sm:flex gap-2">
                         {editingSlot?.id === slot.id ? (
                           <div className="flex items-center gap-2">
                             <input

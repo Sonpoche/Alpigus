@@ -123,9 +123,21 @@ export const POST = apiAuthMiddleware(
       const body = await req.json()
       const { productId, date, maxCapacity } = body
 
-      // Vérifier que le produit appartient bien au producteur
+      // Validation des données
+      if (!productId || !date || !maxCapacity) {
+        return new NextResponse("Tous les champs sont requis", { status: 400 })
+      }
+
+      if (maxCapacity <= 0) {
+        return new NextResponse("La capacité doit être positive", { status: 400 })
+      }
+
+      // Vérifier que le produit appartient bien au producteur ET récupérer le stock
       const product = await prisma.product.findUnique({
-        where: { id: productId }
+        where: { id: productId },
+        include: {
+          stock: true
+        }
       })
 
       if (!product) {
@@ -136,11 +148,33 @@ export const POST = apiAuthMiddleware(
         return new NextResponse("Non autorisé", { status: 403 })
       }
 
+      // 🔧 VALIDATION MANQUANTE AJOUTÉE :
+      // Vérifier que la capacité ne dépasse pas le stock
+      if (!product.stock) {
+        return new NextResponse("Stock non configuré pour ce produit", { status: 400 })
+      }
+
+      if (maxCapacity > product.stock.quantity) {
+        return new NextResponse(
+          `La capacité ne peut pas dépasser le stock disponible (${product.stock.quantity} ${product.unit})`, 
+          { status: 400 }
+        )
+      }
+
+      // Vérifier que la date n'est pas dans le passé
+      const slotDate = new Date(date)
+      const today = new Date()
+      today.setHours(0, 0, 0, 0)
+      
+      if (slotDate < today) {
+        return new NextResponse("Impossible de créer un créneau dans le passé", { status: 400 })
+      }
+
       // Créer le créneau
       const slot = await prisma.deliverySlot.create({
         data: {
           productId,
-          date: new Date(date),
+          date: slotDate,
           maxCapacity,
           reserved: 0,
           isAvailable: true
