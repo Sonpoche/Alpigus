@@ -1,10 +1,13 @@
-// app/(protected)/checkout/[id]/page.tsx
+// app/(protected)/checkout/[id]/page.tsx - VERSION COMPLÈTE AVEC PAIEMENTS
 'use client'
 
 import { useState, useEffect, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import { useToast } from '@/hooks/use-toast'
 import { LoadingButton } from '@/components/ui/loading-button'
+import { StripePaymentForm } from '@/components/checkout/stripe-payment-form'
+import { BankTransferForm } from '@/components/checkout/bank-transfer-form'
+import { getCommissionBreakdown, type CommissionBreakdown } from '@/lib/commission-utils'
 import { formatDateToFrench } from '@/lib/date-utils'
 import { 
   CreditCard, 
@@ -19,7 +22,11 @@ import {
   Loader2,
   CreditCard as CardIcon,
   Clock,
-  AlertCircle
+  AlertCircle,
+  Info,
+  DollarSign,
+  Receipt,
+  Banknote
 } from 'lucide-react'
 import Link from 'next/link'
 
@@ -28,6 +35,8 @@ interface CheckoutProps {
     id: string
   }
 }
+
+type PaymentMethodType = 'invoice' | 'card' | 'bank_transfer'
 
 interface CartItem {
   id: string
@@ -92,34 +101,55 @@ export default function CheckoutPage({ params }: CheckoutProps) {
     phone: '',
     notes: ''
   })
-  const [paymentMethod, setPaymentMethod] = useState<'invoice' | 'card'>('invoice')
+  const [paymentMethod, setPaymentMethod] = useState<PaymentMethodType>('invoice')
   const [updatingItemId, setUpdatingItemId] = useState<string | null>(null)
   const [isUpdating, setIsUpdating] = useState(false)
   const [formErrors, setFormErrors] = useState<Record<string, string>>({})
   
+  // Calculs de commission avec frais de livraison
+  const commissionBreakdown = useMemo((): (CommissionBreakdown & { deliveryFee: number; grandTotal: number }) | null => {
+    if (!order) return null
+    
+    const itemsTotal = order.items.reduce((sum, item) => sum + (item.price * item.quantity), 0)
+    const bookingsTotal = order.bookings.reduce((sum, booking) => {
+      const price = booking.price || booking.deliverySlot.product.price || 0
+      return sum + (price * booking.quantity)
+    }, 0)
+    
+    const subtotal = itemsTotal + bookingsTotal
+    const deliveryFee = deliveryType === 'delivery' ? 15 : 0
+    
+    // Commission calculée sur le sous-total produits (pas sur la livraison)
+    const commission = getCommissionBreakdown(subtotal)
+    
+    return {
+      ...commission,
+      deliveryFee,
+      grandTotal: commission.total + deliveryFee
+    }
+  }, [order, deliveryType])
+  
   // Vérifier si tous les produits acceptent le paiement différé
   const allProductsAcceptDeferred = useMemo(() => {
-    if (!order) return false;
+    if (!order) return false
     
-    // Vérifier tous les articles standards
     const allItemsAcceptDeferred = order.items.every(item => 
       item.product.acceptDeferred === true
-    );
+    )
     
-    // Vérifier aussi les réservations/livraisons
     const allBookingsAcceptDeferred = order.bookings.every(booking => 
       booking.deliverySlot.product.acceptDeferred === true
-    );
+    )
     
-    return allItemsAcceptDeferred && allBookingsAcceptDeferred;
-  }, [order]);
+    return allItemsAcceptDeferred && allBookingsAcceptDeferred
+  }, [order])
   
-  // Définir le mode de paiement par défaut en fonction des produits
+  // Définir le mode de paiement par défaut
   useEffect(() => {
     if (!allProductsAcceptDeferred) {
-      setPaymentMethod('card');
+      setPaymentMethod('card')
     }
-  }, [allProductsAcceptDeferred]);
+  }, [allProductsAcceptDeferred])
   
   useEffect(() => {
     if (params.id) {
@@ -135,7 +165,6 @@ export default function CheckoutPage({ params }: CheckoutProps) {
       await fetch('/api/bookings/cleanup', { method: 'POST' });
       
       const response = await fetch(`/api/orders/${orderId}`, {
-        // Éviter la mise en cache du navigateur
         cache: 'no-store',
         headers: {
           'pragma': 'no-cache',
@@ -265,8 +294,10 @@ export default function CheckoutPage({ params }: CheckoutProps) {
     }
   }
 
-  // Valider le formulaire de livraison
+  // Validation du formulaire de livraison
   const validateDeliveryForm = (): boolean => {
+    if (deliveryType !== 'delivery') return true
+    
     const errors: Record<string, string> = {};
     const requiredFields: (keyof DeliveryFormData)[] = ['fullName', 'address', 'postalCode', 'city', 'phone'];
     
@@ -275,74 +306,85 @@ export default function CheckoutPage({ params }: CheckoutProps) {
         errors[field] = 'Ce champ est obligatoire';
       }
     }
-  
+
     // Validation du code postal (format suisse)
     if (deliveryFormData.postalCode && !/^\d{4}$/.test(deliveryFormData.postalCode)) {
       errors.postalCode = 'Code postal invalide (format: 1234)';
     }
-  
+
     // Validation du numéro de téléphone
     if (deliveryFormData.phone && !/^(\+\d{1,3}\s?)?(\d{2,3}\s?){2,4}\d{2,3}$/.test(deliveryFormData.phone)) {
       errors.phone = 'Numéro de téléphone invalide';
     }
-  
-    // Ne modifiez l'état que lorsque la fonction est explicitement appelée par un gestionnaire d'événements
-    if (Object.keys(errors).length > 0) {
-      return false;
-    }
-    
-    return true;
+
+    setFormErrors(errors);
+    return Object.keys(errors).length === 0;
   }
   
-  // Ensuite dans handleCheckout, mettez à jour les erreurs explicitement
-  const handleCheckout = async () => {
-    if (!order) return
-  
-    // Si livraison à domicile, valider le formulaire
-    if (deliveryType === 'delivery') {
-      const errors: Record<string, string> = {};
-      const requiredFields: (keyof DeliveryFormData)[] = ['fullName', 'address', 'postalCode', 'city', 'phone'];
-      
-      for (const field of requiredFields) {
-        if (!deliveryFormData[field] || deliveryFormData[field].trim() === '') {
-          errors[field] = 'Ce champ est obligatoire';
-        }
-      }
-  
-      // Validation du code postal (format suisse)
-      if (deliveryFormData.postalCode && !/^\d{4}$/.test(deliveryFormData.postalCode)) {
-        errors.postalCode = 'Code postal invalide (format: 1234)';
-      }
-  
-      // Validation du numéro de téléphone
-      if (deliveryFormData.phone && !/^(\+\d{1,3}\s?)?(\d{2,3}\s?){2,4}\d{2,3}$/.test(deliveryFormData.phone)) {
-        errors.phone = 'Numéro de téléphone invalide';
-      }
-      
-      setFormErrors(errors);
-      
-      if (Object.keys(errors).length > 0) {
-        toast({
-          title: "Formulaire incomplet",
-          description: "Veuillez remplir tous les champs obligatoires",
-          variant: "destructive"
-        });
-        return;
-      }
-    }
+  // Gestion du paiement par carte Stripe
+  const handleStripePaymentSuccess = async (paymentIntent: any) => {
+    if (!order || !commissionBreakdown) return
     
+    try {
+      // Finaliser la commande avec le paiement confirmé
+      await finalizeOrder('card', paymentIntent.id)
+    } catch (error) {
+      toast({
+        title: 'Erreur',
+        description: 'Erreur lors de la finalisation de la commande',
+        variant: 'destructive'
+      })
+    }
+  }
+
+  const handleStripePaymentError = (error: string) => {
+    toast({
+      title: 'Erreur de paiement',
+      description: error,
+      variant: 'destructive'
+    })
+  }
+
+  // Gestion du virement bancaire
+  const handleBankTransferConfirm = async () => {
+    if (!order || !commissionBreakdown) return
+    
+    try {
+      await finalizeOrder('bank_transfer')
+    } catch (error) {
+      toast({
+        title: 'Erreur',
+        description: 'Erreur lors de la confirmation du virement',
+        variant: 'destructive'
+      })
+    }
+  }
+
+  // Finaliser la commande
+  const finalizeOrder = async (method: PaymentMethodType, paymentIntentId?: string) => {
+    if (!order || !commissionBreakdown) return
+
+    if (!validateDeliveryForm()) {
+      toast({
+        title: "Formulaire incomplet",
+        description: "Veuillez remplir tous les champs obligatoires",
+        variant: "destructive"
+      });
+      return;
+    }
+
     try {
       setIsProcessing(true)
       
-      // Créer les données de la commande finalisée
       const checkoutData = {
         deliveryType,
         deliveryInfo: deliveryType === 'delivery' ? deliveryFormData : null,
-        paymentMethod,
-        paymentStatus: paymentMethod === 'invoice' ? 'PENDING' : 'PAID'
+        paymentMethod: method,
+        paymentStatus: method === 'invoice' ? 'PENDING' : 'PAID',
+        paymentIntentId,
+        commission: commissionBreakdown
       }
       
-      // Appeler l'API pour finaliser la commande
       const response = await fetch(`/api/orders/${order.id}/checkout`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -361,51 +403,30 @@ export default function CheckoutPage({ params }: CheckoutProps) {
       router.push(`/confirmation/${order.id}`)
     } catch (error) {
       console.error('Erreur:', error)
-      toast({
-        title: 'Erreur',
-        description: error instanceof Error ? error.message : 'Impossible de finaliser votre commande',
-        variant: 'destructive'
-      })
+      throw error
     } finally {
       setIsProcessing(false)
     }
   }
   
-  // Calcul des totaux
-  const subtotal = order?.items?.reduce((sum, item) => sum + (item.price * item.quantity), 0) || 0
-  
-  // Calcul du total des réservations
-  const bookingsTotal = order?.bookings?.reduce((sum, booking) => {
-    // Utiliser le prix stocké dans la réservation ou le prix du produit associé
-    const price = booking.price || booking.deliverySlot.product.price || 0;
-    return sum + (price * booking.quantity);
-  }, 0) || 0;
-  
-  const deliveryFee = deliveryType === 'delivery' ? 15 : 0
-  const total = subtotal + bookingsTotal + deliveryFee
-  
-  // Formater les dates de livraison
-  const getDeliveryDates = () => {
-    if (!order?.bookings?.length) return null
-    
-    const dates = order.bookings.map(booking => {
-      const date = new Date(booking.deliverySlot.date)
-      return {
-        date,
-        formattedDate: formatDateToFrench(date),
-        product: booking.deliverySlot.product.name
-      }
-    })
-    
-    return dates.sort((a, b) => a.date.getTime() - b.date.getTime())
+  // Gestion du checkout traditionnel (facture)
+  const handleTraditionalCheckout = async () => {
+    if (!order || !commissionBreakdown) return
+    await finalizeOrder('invoice')
   }
-  
-  const deliveryDates = getDeliveryDates()
-  
+
   if (isLoading) {
     return (
       <div className="flex justify-center items-center min-h-[400px]">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-custom-accent" />
+      </div>
+    )
+  }
+
+  if (!commissionBreakdown) {
+    return (
+      <div className="text-center p-8">
+        <p>Erreur lors du calcul des montants</p>
       </div>
     )
   }
@@ -471,13 +492,13 @@ export default function CheckoutPage({ params }: CheckoutProps) {
                 </div>
               </div>
               
-              {/* Formulaire d'adresse de livraison (conditionnel) */}
+              {/* Formulaire d'adresse de livraison (gardez votre code existant) */}
               {deliveryType === 'delivery' && (
                 <div className="mt-4 p-4 bg-foreground/5 rounded-lg space-y-4">
                   <h3 className="font-medium text-sm mb-2">Coordonnées de livraison</h3>
                   
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {/* Nom complet */}
+                    {/* Vos champs de formulaire existants... */}
                     <div>
                       <label htmlFor="fullName" className="block mb-1 text-sm font-medium">
                         Nom complet <span className="text-red-500">*</span>
@@ -495,8 +516,8 @@ export default function CheckoutPage({ params }: CheckoutProps) {
                         <p className="text-xs text-red-500 mt-1">{formErrors.fullName}</p>
                       )}
                     </div>
-                    
-                    {/* Entreprise (optionnelle) */}
+
+                    {/* Entreprise */}
                     <div>
                       <label htmlFor="company" className="block mb-1 text-sm font-medium">
                         Entreprise <span className="text-muted-foreground">(optionnel)</span>
@@ -511,7 +532,7 @@ export default function CheckoutPage({ params }: CheckoutProps) {
                         placeholder="Nom de l'entreprise"
                       />
                     </div>
-                    
+
                     {/* Adresse */}
                     <div className="md:col-span-2">
                       <label htmlFor="address" className="block mb-1 text-sm font-medium">
@@ -530,8 +551,8 @@ export default function CheckoutPage({ params }: CheckoutProps) {
                         <p className="text-xs text-red-500 mt-1">{formErrors.address}</p>
                       )}
                     </div>
-                    
-                    {/* Code postal */}
+
+                    {/* Code postal et ville */}
                     <div>
                       <label htmlFor="postalCode" className="block mb-1 text-sm font-medium">
                         Code postal <span className="text-red-500">*</span>
@@ -549,8 +570,7 @@ export default function CheckoutPage({ params }: CheckoutProps) {
                         <p className="text-xs text-red-500 mt-1">{formErrors.postalCode}</p>
                       )}
                     </div>
-                    
-                    {/* Ville */}
+
                     <div>
                       <label htmlFor="city" className="block mb-1 text-sm font-medium">
                         Ville <span className="text-red-500">*</span>
@@ -568,7 +588,7 @@ export default function CheckoutPage({ params }: CheckoutProps) {
                         <p className="text-xs text-red-500 mt-1">{formErrors.city}</p>
                       )}
                     </div>
-                    
+
                     {/* Téléphone */}
                     <div className="md:col-span-2">
                       <label htmlFor="phone" className="block mb-1 text-sm font-medium">
@@ -587,29 +607,29 @@ export default function CheckoutPage({ params }: CheckoutProps) {
                         <p className="text-xs text-red-500 mt-1">{formErrors.phone}</p>
                       )}
                     </div>
-                  </div>
 
-                  {/* Instructions de livraison */}
-                  <div className="mt-4">
-                    <label htmlFor="notes" className="block mb-1 text-sm font-medium">
-                      Instructions de livraison <span className="text-muted-foreground">(optionnel)</span>
-                    </label>
-                    <textarea
-                      id="notes"
-                      name="notes"
-                      rows={2}
-                      value={deliveryFormData.notes}
-                      onChange={handleDeliveryFormChange}
-                      placeholder="Instructions particulières pour la livraison"
-                      className="w-full p-2 border border-foreground/10 rounded-md bg-background"
-                    ></textarea>
+                    {/* Instructions */}
+                    <div className="md:col-span-2">
+                      <label htmlFor="notes" className="block mb-1 text-sm font-medium">
+                        Instructions de livraison <span className="text-muted-foreground">(optionnel)</span>
+                      </label>
+                      <textarea
+                        id="notes"
+                        name="notes"
+                        rows={2}
+                        value={deliveryFormData.notes}
+                        onChange={handleDeliveryFormChange}
+                        placeholder="Instructions particulières pour la livraison"
+                        className="w-full p-2 border border-foreground/10 rounded-md bg-background"
+                      />
+                    </div>
                   </div>
                 </div>
               )}
             </div>
           </div>
           
-          {/* Dates de livraison */}
+          {/* Dates de livraison - gardez votre code existant */}
           {order?.bookings && order.bookings.length > 0 && (
             <div className="bg-background border border-foreground/10 rounded-lg p-6">
               <h2 className="text-lg font-semibold mb-4 flex items-center">
@@ -618,7 +638,7 @@ export default function CheckoutPage({ params }: CheckoutProps) {
               </h2>
               
               <div className="space-y-3">
-                {order?.bookings?.map((booking) => (
+                {order.bookings.map((booking) => (
                   <div key={booking.id} className="flex items-center justify-between p-3 bg-foreground/5 rounded-lg">
                     <div className="flex items-center">
                       <div className="w-10 h-10 rounded-full bg-custom-accent/10 flex items-center justify-center mr-3">
@@ -634,7 +654,6 @@ export default function CheckoutPage({ params }: CheckoutProps) {
                       </div>
                     </div>
                     
-                    {/* Bouton supprimer */}
                     <button
                       onClick={() => cancelBooking(booking.id)}
                       disabled={isUpdating}
@@ -653,7 +672,7 @@ export default function CheckoutPage({ params }: CheckoutProps) {
             </div>
           )}
           
-          {/* Méthode de paiement */}
+          {/* Méthode de paiement - NOUVELLE VERSION */}
           <div className="bg-background border border-foreground/10 rounded-lg p-6">
             <h2 className="text-lg font-semibold mb-4 flex items-center">
               <CreditCard className="h-5 w-5 mr-2" />
@@ -665,16 +684,17 @@ export default function CheckoutPage({ params }: CheckoutProps) {
                 <AlertCircle className="h-5 w-5 text-amber-600 dark:text-amber-400 mt-0.5 flex-shrink-0" />
                 <div>
                   <p className="text-sm font-medium text-amber-800 dark:text-amber-300">
-                    Certains produits de votre panier n'acceptent pas le paiement sous 30 jours
+                    Certains produits de votre panier n'acceptent pas le paiement différé
                   </p>
                   <p className="text-xs text-amber-700 dark:text-amber-400 mt-1">
-                    Seul le paiement par carte est disponible pour cette commande.
+                    Le paiement immédiat est requis pour cette commande.
                   </p>
                 </div>
               </div>
             )}
             
             <div className="space-y-4">
+              {/* Paiement différé (facture) */}
               {allProductsAcceptDeferred && (
                 <div className="flex items-start space-x-3">
                   <input
@@ -687,14 +707,18 @@ export default function CheckoutPage({ params }: CheckoutProps) {
                     className="mt-1 h-4 w-4 border-foreground/10 text-custom-accent focus:ring-custom-accent"
                   />
                   <div className="flex-1">
-                    <label htmlFor="invoice" className="font-medium">Paiement à 30 jours</label>
+                    <label htmlFor="invoice" className="font-medium flex items-center gap-2">
+                      <Receipt className="h-4 w-4" />
+                      Paiement à 30 jours
+                    </label>
                     <p className="text-sm text-muted-foreground">
-                      Recevez une facture à régler dans un délai de 30 jours. Les factures impayées seront visibles dans votre espace client.
+                      Recevez une facture à régler dans un délai de 30 jours.
                     </p>
                   </div>
                 </div>
               )}
               
+              {/* Paiement par carte */}
               <div className="flex items-start space-x-3">
                 <input
                   id="card"
@@ -706,13 +730,61 @@ export default function CheckoutPage({ params }: CheckoutProps) {
                   className="mt-1 h-4 w-4 border-foreground/10 text-custom-accent focus:ring-custom-accent"
                 />
                 <div className="flex-1">
-                  <label htmlFor="card" className="font-medium">Carte de crédit</label>
+                  <label htmlFor="card" className="font-medium flex items-center gap-2">
+                    <CreditCard className="h-4 w-4" />
+                    Carte de crédit
+                  </label>
                   <p className="text-sm text-muted-foreground">
                     Paiement sécurisé par carte bancaire. Règlement immédiat.
                   </p>
                 </div>
               </div>
+
+              {/* Virement bancaire */}
+              <div className="flex items-start space-x-3">
+                <input
+                  id="bank_transfer"
+                  type="radio"
+                  name="paymentMethod"
+                  value="bank_transfer"
+                  checked={paymentMethod === 'bank_transfer'}
+                  onChange={() => setPaymentMethod('bank_transfer')}
+                  className="mt-1 h-4 w-4 border-foreground/10 text-custom-accent focus:ring-custom-accent"
+                />
+                <div className="flex-1">
+                  <label htmlFor="bank_transfer" className="font-medium flex items-center gap-2">
+                    <Banknote className="h-4 w-4" />
+                    Virement bancaire
+                  </label>
+                  <p className="text-sm text-muted-foreground">
+                    Payez par virement bancaire. Commande traitée après réception.
+                  </p>
+                </div>
+              </div>
               
+              {/* Interface de paiement conditionnelle */}
+              {paymentMethod === 'card' && order && commissionBreakdown && (
+                <div className="mt-6 p-4 bg-foreground/5 rounded-lg">
+                  <StripePaymentForm
+                    amount={commissionBreakdown.grandTotal}
+                    orderId={order.id}
+                    onSuccess={handleStripePaymentSuccess}
+                    onError={handleStripePaymentError}
+                  />
+                </div>
+              )}
+
+              {paymentMethod === 'bank_transfer' && order && commissionBreakdown && (
+                <div className="mt-6 p-4 bg-foreground/5 rounded-lg">
+                  <BankTransferForm
+                    amount={commissionBreakdown.grandTotal}
+                    orderId={order.id}
+                    onConfirm={handleBankTransferConfirm}
+                    isLoading={isProcessing}
+                  />
+                </div>
+              )}
+
               {paymentMethod === 'invoice' && (
                 <div className="mt-4 p-4 bg-foreground/5 rounded-lg">
                   <div className="flex items-center gap-2">
@@ -723,24 +795,11 @@ export default function CheckoutPage({ params }: CheckoutProps) {
                   </div>
                 </div>
               )}
-              
-              {paymentMethod === 'card' && (
-                <div className="mt-4 p-4 bg-foreground/5 rounded-lg">
-                  <div className="flex gap-2 items-center mb-3">
-                    <CardIcon className="h-5 w-5 text-green-600 dark:text-green-400" />
-                    <p className="text-sm font-medium">Informations de paiement</p>
-                  </div>
-                  <p className="text-sm italic text-muted-foreground">
-                    Note: Dans cette version de démonstration, le paiement par carte n'est pas implémenté.
-                    Vous ne serez pas débité.
-                  </p>
-                </div>
-              )}
             </div>
           </div>
         </div>
         
-        {/* Résumé de la commande */}
+        {/* Résumé de la commande - NOUVELLE VERSION AVEC COMMISSIONS */}
         <div className="lg:col-span-1">
           <div className="bg-background border border-foreground/10 rounded-lg p-6 sticky top-4">
             <h2 className="text-lg font-semibold mb-4">Résumé de la commande</h2>
@@ -750,7 +809,6 @@ export default function CheckoutPage({ params }: CheckoutProps) {
               {order?.items?.map((item) => (
                 <div key={item.id} className="flex items-center justify-between text-sm">
                   <div className="flex items-center gap-2">
-                    {/* Miniature du produit */}
                     <div className="w-8 h-8 bg-foreground/5 rounded-md overflow-hidden flex-shrink-0">
                       {item.product.image ? (
                         <img
@@ -789,7 +847,6 @@ export default function CheckoutPage({ params }: CheckoutProps) {
               {order?.bookings?.map((booking) => (
                 <div key={booking.id} className="flex items-center justify-between text-sm">
                   <div className="flex items-center gap-2">
-                    {/* Miniature du produit de réservation */}
                     <div className="w-8 h-8 bg-foreground/5 rounded-md overflow-hidden flex-shrink-0">
                       {booking.deliverySlot.product.image ? (
                         <img
@@ -804,7 +861,7 @@ export default function CheckoutPage({ params }: CheckoutProps) {
                       )}
                     </div>
                     <span>
-                      {booking.quantity} kg × {booking.deliverySlot.product.name} (livraison)
+                      {booking.quantity} {booking.deliverySlot.product.unit} × {booking.deliverySlot.product.name} (livraison)
                     </span>
                   </div>
                   <div className="flex items-center">
@@ -826,24 +883,49 @@ export default function CheckoutPage({ params }: CheckoutProps) {
               ))}
             </div>
             
-            {/* Sous-total */}
+            {/* Calculs détaillés avec commission */}
             <div className="space-y-2 mb-4 pt-3 border-t border-foreground/10">
               <div className="flex justify-between">
-                <span>Sous-total</span>
-                <span>{(subtotal + bookingsTotal).toFixed(2)} CHF</span>
+                <span>Sous-total produits</span>
+                <span>{commissionBreakdown.subtotal.toFixed(2)} CHF</span>
+              </div>
+              
+              <div className="flex justify-between text-sm text-muted-foreground">
+                <span>Commission plateforme ({commissionBreakdown.feePercentage}%)</span>
+                <span>+{commissionBreakdown.platformFee.toFixed(2)} CHF</span>
               </div>
               
               <div className="flex justify-between">
                 <span>Frais de livraison</span>
-                <span>{deliveryFee.toFixed(2)} CHF</span>
+                <span>+{commissionBreakdown.deliveryFee.toFixed(2)} CHF</span>
               </div>
             </div>
             
             {/* Total */}
             <div className="border-t border-foreground/10 pt-3 mb-6">
               <div className="flex justify-between font-semibold text-lg">
-                <span>Total</span>
-                <span>{total.toFixed(2)} CHF</span>
+                <span>Total à payer</span>
+                <span>{commissionBreakdown.grandTotal.toFixed(2)} CHF</span>
+              </div>
+              
+              {/* Information sur la commission pour le client */}
+              <div className="mt-2 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-md">
+                <div className="flex items-center gap-2 mb-1">
+                  <Info className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                  <span className="text-sm font-medium text-blue-900 dark:text-blue-100">
+                    Répartition transparente
+                  </span>
+                </div>
+                <div className="text-xs text-blue-800 dark:text-blue-200 space-y-1">
+                  <div className="flex justify-between">
+                    <span>Montant producteurs:</span>
+                    <span>{commissionBreakdown.producerAmount.toFixed(2)} CHF</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Frais de service:</span>
+                    <span>{commissionBreakdown.platformFee.toFixed(2)} CHF</span>
+                  </div>
+                </div>
               </div>
               
               {paymentMethod === 'invoice' && (
@@ -854,24 +936,24 @@ export default function CheckoutPage({ params }: CheckoutProps) {
               )}
             </div>
             
-            {/* Bouton de commande */}
-            <LoadingButton
-              onClick={handleCheckout}
-              isLoading={isProcessing}
-              disabled={
-                (deliveryType === 'delivery' && 
-                 Object.values(deliveryFormData).some(value => !value && value !== '') && 
-                 Object.values(formErrors).some(error => error !== '')) || 
-                isProcessing ||
-                isUpdating
-              }
-              className="w-full flex items-center justify-center gap-2"
-            >
-              <CheckCircle className="h-5 w-5" />
-              {paymentMethod === 'invoice' 
-                ? "Commander et payer plus tard" 
-                : "Commander et payer maintenant"}
-            </LoadingButton>
+            {/* Bouton de commande conditionnel */}
+            {paymentMethod === 'invoice' && (
+              <LoadingButton
+                onClick={handleTraditionalCheckout}
+                isLoading={isProcessing}
+                disabled={isProcessing || isUpdating || !validateDeliveryForm()}
+                className="w-full flex items-center justify-center gap-2"
+              >
+                <Receipt className="h-5 w-5" />
+                Commander et recevoir la facture
+              </LoadingButton>
+            )}
+
+            {(paymentMethod === 'card' || paymentMethod === 'bank_transfer') && (
+              <div className="text-sm text-muted-foreground text-center">
+                Utilisez le formulaire de paiement ci-dessus pour finaliser votre commande.
+              </div>
+            )}
           </div>
         </div>
       </div>

@@ -82,14 +82,14 @@ function SimpleDialogContent({ className, children }: DialogContentProps) {
       {/* Contenu */}
       <div
         className={cn(
-          "relative bg-background rounded-lg shadow-lg p-6 max-w-lg w-full mx-4 z-50",
+          "relative bg-background rounded-lg shadow-lg p-6 max-w-lg w-full mx-4 z-50 border border-foreground/10",
           className
         )}
         onClick={(e) => e.stopPropagation()}
       >
         {/* Bouton de fermeture */}
         <button
-          className="absolute top-4 right-4 text-gray-500 hover:text-gray-700 focus:outline-none"
+          className="absolute top-4 right-4 text-muted-foreground hover:text-foreground focus:outline-none transition-colors"
           onClick={() => onOpenChange(false)}
         >
           <X className="h-4 w-4" />
@@ -104,14 +104,14 @@ function SimpleDialogContent({ className, children }: DialogContentProps) {
 
 // Composants auxiliaires pour la structure
 function SimpleDialogHeader({ className, ...props }: React.HTMLProps<HTMLDivElement>) {
-  return <div className={cn("mb-4", className)} {...props} />
+  return <div className={cn("mb-4 pr-8", className)} {...props} />
 }
 
 function SimpleDialogFooter({ className, ...props }: React.HTMLProps<HTMLDivElement>) {
   return (
     <div
       className={cn(
-        "flex flex-col-reverse sm:flex-row sm:justify-end sm:space-x-2 mt-6",
+        "flex flex-col-reverse sm:flex-row sm:justify-end sm:space-x-2 mt-6 gap-2",
         className
       )}
       {...props}
@@ -120,11 +120,11 @@ function SimpleDialogFooter({ className, ...props }: React.HTMLProps<HTMLDivElem
 }
 
 function SimpleDialogTitle({ className, ...props }: React.HTMLProps<HTMLHeadingElement>) {
-  return <h3 className={cn("text-lg font-semibold", className)} {...props} />
+  return <h3 className={cn("text-lg font-semibold text-foreground", className)} {...props} />
 }
 
 function SimpleDialogDescription({ className, ...props }: React.HTMLProps<HTMLParagraphElement>) {
-  return <p className={cn("text-sm text-gray-500", className)} {...props} />
+  return <p className={cn("text-sm text-muted-foreground", className)} {...props} />
 }
 
 // Export renommé pour l'usage
