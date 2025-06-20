@@ -168,6 +168,8 @@ export const PATCH = apiAuthMiddleware(async (
   }
 }, ["ADMIN"])
 
+// app/api/admin/users/[id]/route.ts - Remplacer la méthode DELETE
+
 // DELETE: Supprimer un utilisateur
 export const DELETE = apiAuthMiddleware(async (
   req: NextRequest,
@@ -192,23 +194,202 @@ export const DELETE = apiAuthMiddleware(async (
     
     // Vérifier si l'utilisateur existe
     const user = await prisma.user.findUnique({
-      where: { id: userId }
+      where: { id: userId },
+      include: {
+        producer: true,
+        orders: {
+          include: {
+            items: true,
+            bookings: true
+          }
+        },
+        adminLogs: true,
+        notifications: true,
+        invoices: true
+      }
     })
 
     if (!user) {
       return new NextResponse("Utilisateur non trouvé", { status: 404 })
     }
 
-    // Supprimer l'utilisateur (les suppressions en cascade sont gérées par Prisma)
-    await prisma.user.delete({
-      where: { id: userId }
+    // Supprimer dans une transaction pour garantir la cohérence
+    await prisma.$transaction(async (tx) => {
+      // 1. Supprimer les logs admin créés PAR cet utilisateur (s'il était admin)
+      await tx.adminLog.deleteMany({
+        where: { adminId: userId }
+      })
+
+      // 2. Supprimer les notifications
+      await tx.notification.deleteMany({
+        where: { userId: userId }
+      })
+
+      // 3. Supprimer les factures
+      await tx.invoice.deleteMany({
+        where: { userId: userId }
+      })
+
+      // 4. Traiter les commandes et leurs dépendances
+      for (const order of user.orders) {
+        // Supprimer les réservations
+        await tx.booking.deleteMany({
+          where: { orderId: order.id }
+        })
+        
+        // Supprimer les transactions de portefeuille
+        await tx.walletTransaction.deleteMany({
+          where: { orderId: order.id }
+        })
+        
+        // Supprimer les transactions
+        await tx.transaction.deleteMany({
+          where: { orderId: order.id }
+        })
+        
+        // Supprimer les items de commande
+        await tx.orderItem.deleteMany({
+          where: { orderId: order.id }
+        })
+      }
+      
+      // Supprimer les commandes
+      await tx.order.deleteMany({
+        where: { userId: userId }
+      })
+
+      // 5. Si c'est un producteur, supprimer toutes ses dépendances
+      if (user.producer) {
+        const producerId = user.producer.id
+
+        // Supprimer le portefeuille et ses dépendances
+        const wallet = await tx.wallet.findUnique({
+          where: { producerId: producerId }
+        })
+        
+        if (wallet) {
+          // Supprimer les retraits
+          await tx.withdrawal.deleteMany({
+            where: { walletId: wallet.id }
+          })
+          
+          // Supprimer les transactions de portefeuille
+          await tx.walletTransaction.deleteMany({
+            where: { walletId: wallet.id }
+          })
+          
+          // Supprimer le portefeuille
+          await tx.wallet.delete({
+            where: { id: wallet.id }
+          })
+        }
+        
+        // Récupérer tous les produits du producteur
+        const products = await tx.product.findMany({
+          where: { producerId: producerId }
+        })
+        
+        // Supprimer les dépendances de chaque produit
+        for (const product of products) {
+          // Supprimer les alertes de stock
+          await tx.stockAlert.deleteMany({
+            where: { productId: product.id }
+          })
+          
+          // Supprimer l'historique des stocks
+          await tx.stockHistory.deleteMany({
+            where: { productId: product.id }
+          })
+          
+          // Supprimer les plannings de production
+          await tx.productionSchedule.deleteMany({
+            where: { productId: product.id }
+          })
+          
+          // Supprimer les créneaux de livraison et leurs réservations
+          const deliverySlots = await tx.deliverySlot.findMany({
+            where: { productId: product.id }
+          })
+          
+          for (const slot of deliverySlots) {
+            await tx.booking.deleteMany({
+              where: { slotId: slot.id }
+            })
+          }
+          
+          await tx.deliverySlot.deleteMany({
+            where: { productId: product.id }
+          })
+          
+          // Supprimer le stock
+          await tx.stock.deleteMany({
+            where: { productId: product.id }
+          })
+          
+          // Supprimer les items de commande référençant ce produit
+          await tx.orderItem.deleteMany({
+            where: { productId: product.id }
+          })
+        }
+        
+        // Supprimer tous les produits
+        await tx.product.deleteMany({
+          where: { producerId: producerId }
+        })
+        
+        // Supprimer les transactions du producteur
+        await tx.transaction.deleteMany({
+          where: { producerId: producerId }
+        })
+        
+        // Supprimer le profil producteur
+        await tx.producer.delete({
+          where: { id: producerId }
+        })
+      }
+
+      // 6. Supprimer les comptes et sessions liés
+      await tx.account.deleteMany({
+        where: { userId: userId }
+      })
+      
+      await tx.session.deleteMany({
+        where: { userId: userId }
+      })
+
+      // 7. Enfin, supprimer l'utilisateur
+      await tx.user.delete({
+        where: { id: userId }
+      })
     })
+
+    // Log de l'action
+    try {
+      await prisma.adminLog.create({
+        data: {
+          adminId: session.user.id,
+          action: 'DELETE_USER',
+          entityType: 'User',
+          entityId: userId,
+          details: JSON.stringify({
+            action: `Suppression de l'utilisateur: ${user.email}`,
+            userEmail: user.email,
+            userName: user.name,
+            userRole: user.role,
+            wasProducer: !!user.producer
+          })
+        }
+      })
+    } catch (logError) {
+      console.error('Erreur lors de la création du log:', logError)
+      // Ne pas faire échouer pour un problème de log
+    }
 
     return new NextResponse(null, { status: 204 })
   } catch (error) {
     console.error("Erreur lors de la suppression de l'utilisateur:", error)
     return new NextResponse(
-      "Erreur lors de la suppression de l'utilisateur", 
+      "Erreur lors de la suppression de l'utilisateur: " + (error instanceof Error ? error.message : 'Erreur inconnue'), 
       { status: 500 }
     )
   }

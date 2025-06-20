@@ -134,6 +134,118 @@ export class EmailService {
     }
   }
 
+  /**
+   * Envoie un email d'invitation avec mot de passe temporaire
+   */
+  static async sendInvitationEmail(email: string, name: string, tempPassword: string, role?: UserRole) {
+    try {
+      console.log('Préparation de l\'email d\'invitation', {
+        destinataire: email,
+        nom: name,
+        role: role
+      });
+
+      const roleText = role === UserRole.PRODUCER ? 'producteur' : 'client';
+      const loginUrl = `${process.env.NEXTAUTH_URL}/login`;
+
+      const html = `
+        <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+          <div style="text-align: center; margin-bottom: 30px;">
+            <h1 style="color: #FF5A5F; margin-bottom: 10px;">Bienvenue sur Mushroom Marketplace</h1>
+            <p style="color: #666; font-size: 16px;">Votre compte ${roleText} a été créé avec succès</p>
+          </div>
+          
+          <div style="background-color: #f8f9fa; padding: 20px; border-radius: 8px; margin: 20px 0;">
+            <h2 style="color: #333; margin-top: 0;">Bonjour ${name},</h2>
+            <p style="color: #555; line-height: 1.6;">
+              Un compte ${roleText} a été créé pour vous sur Mushroom Marketplace. 
+              Vous pouvez maintenant accéder à la plateforme avec vos identifiants ci-dessous.
+            </p>
+          </div>
+
+          <div style="background-color: #fff3cd; border: 1px solid #ffeaa7; padding: 20px; border-radius: 8px; margin: 20px 0;">
+            <h3 style="color: #856404; margin-top: 0;">Vos identifiants de connexion</h3>
+            <p style="margin: 10px 0;"><strong>Email :</strong> ${email}</p>
+            <p style="margin: 10px 0;"><strong>Mot de passe temporaire :</strong> <code style="background: #f8f9fa; padding: 4px 8px; border-radius: 4px; font-family: monospace;">${tempPassword}</code></p>
+            <p style="color: #856404; font-size: 14px; margin-top: 15px;">
+              ⚠️ <strong>Important :</strong> Ce mot de passe est temporaire. Nous vous recommandons fortement de le changer dès votre première connexion.
+            </p>
+          </div>
+
+          <div style="text-align: center; margin: 30px 0;">
+            <a href="${loginUrl}" 
+               style="background-color: #FF5A5F; color: white; padding: 12px 30px; text-decoration: none; border-radius: 5px; font-weight: bold; display: inline-block;">
+              Se connecter maintenant
+            </a>
+          </div>
+
+          ${role === UserRole.PRODUCER ? `
+          <div style="background-color: #e3f2fd; padding: 20px; border-radius: 8px; margin: 20px 0;">
+            <h3 style="color: #1976d2; margin-top: 0;">Prochaines étapes pour les producteurs</h3>
+            <ul style="color: #555; line-height: 1.6;">
+              <li>Complétez votre profil producteur</li>
+              <li>Ajoutez vos informations bancaires</li>
+              <li>Créez vos premiers produits</li>
+              <li>Configurez vos créneaux de livraison</li>
+            </ul>
+          </div>
+          ` : `
+          <div style="background-color: #e8f5e8; padding: 20px; border-radius: 8px; margin: 20px 0;">
+            <h3 style="color: #2e7d32; margin-top: 0;">Découvrez notre marketplace</h3>
+            <ul style="color: #555; line-height: 1.6;">
+              <li>Parcourez notre catalogue de champignons frais</li>
+              <li>Réservez vos produits préférés</li>
+              <li>Suivez vos commandes en temps réel</li>
+              <li>Profitez de la livraison directe producteur</li>
+            </ul>
+          </div>
+          `}
+
+          <div style="border-top: 1px solid #eee; padding-top: 20px; margin-top: 30px; color: #666; font-size: 14px;">
+            <p>Si vous avez des questions, n'hésitez pas à nous contacter.</p>
+            <p style="margin-bottom: 0;">
+              L'équipe Mushroom Marketplace<br>
+              <a href="mailto:support@mushroom-marketplace.com" style="color: #FF5A5F;">support@mushroom-marketplace.com</a>
+            </p>
+          </div>
+        </div>
+      `;
+
+      await resend.emails.send({
+        from: 'Mushroom Marketplace <no-reply@resend.dev>',
+        to: email,
+        subject: `Bienvenue sur Mushroom Marketplace - Votre compte ${roleText}`,
+        html: html,
+        headers: {
+          'X-Entity-Ref-ID': `invitation_${new Date().getTime()}_${email}`,
+        },
+        tags: [
+          {
+            name: 'type',
+            value: 'invitation'
+          },
+          {
+            name: 'role',
+            value: role || 'unknown'
+          }
+        ]
+      });
+
+      console.log('Email d\'invitation envoyé avec succès', {
+        destinataire: email,
+        role: role
+      });
+
+    } catch (error) {
+      console.error('Erreur lors de l\'envoi de l\'email d\'invitation:', {
+        destinataire: email,
+        erreur: error,
+        stack: error instanceof Error ? error.stack : undefined
+      });
+      throw error;
+    }
+  }
+
 /**
   * Envoie un email de confirmation de commande au client
   */
@@ -575,6 +687,18 @@ static async sendOrderReminder(
     });
     throw error;
   }
+}
+
+/**
+ * Alias pour sendOrderReminder (compatibilité)
+ */
+static async sendOrderReminderEmail(
+  email: string,
+  name: string,
+  orderId: string,
+  recipientType: 'producteur' | 'client'
+): Promise<void> {
+  return this.sendOrderReminder(email, name, orderId, recipientType);
 }
 
 /**

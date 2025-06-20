@@ -54,14 +54,29 @@ export function UserCreateModal({ isOpen, onClose, onSubmit }: UserCreateModalPr
   const validateForm = () => {
     const newErrors: Record<string, string> = {}
     
+    // Email obligatoire
     if (!formData.email) {
       newErrors.email = "L'email est requis"
     } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
       newErrors.email = "Format d'email invalide"
     }
     
-    if (formData.phone && !/^\+?[0-9\s\-\(\)]{8,15}$/.test(formData.phone)) {
-      newErrors.phone = "Format de téléphone invalide"
+    // Téléphone OBLIGATOIRE - Format international flexible
+    if (!formData.phone || formData.phone.trim() === '') {
+      newErrors.phone = "Le téléphone est requis"
+    } else {
+      const phone = formData.phone.trim()
+      // Validation très permissive - accepte tous formats avec ou sans indicatif
+      // Minimum 6 chiffres, maximum 20, accepte +, espaces, tirets, parenthèses
+      const phoneRegex = /^[\+]?[0-9\s\-\(\)]{6,20}$/
+      if (!phoneRegex.test(phone)) {
+        newErrors.phone = "Format de téléphone invalide"
+      }
+    }
+    
+    // Rôle obligatoire
+    if (!formData.role) {
+      newErrors.role = "Le rôle est requis"
     }
     
     setErrors(newErrors)
@@ -75,13 +90,27 @@ export function UserCreateModal({ isOpen, onClose, onSubmit }: UserCreateModalPr
     
     setIsSubmitting(true)
     try {
-      await onSubmit(formData)
+      // Nettoyer les données avant envoi
+      const cleanedData = {
+        ...formData,
+        name: formData.name?.trim() || null,
+        email: formData.email?.trim(),
+        phone: formData.phone?.trim(), // Plus de fallback null - obligatoire
+      }
+      
+      await onSubmit(cleanedData)
+      
+      // Reset du formulaire après succès
       setFormData({
         name: '',
         email: '',
         phone: '',
         role: 'CLIENT'
       })
+      setErrors({})
+    } catch (error) {
+      console.error('Erreur lors de la création:', error)
+      // L'erreur sera gérée par le composant parent
     } finally {
       setIsSubmitting(false)
     }
@@ -136,7 +165,7 @@ export function UserCreateModal({ isOpen, onClose, onSubmit }: UserCreateModalPr
           
           <div>
             <label htmlFor="phone" className="form-label">
-              Téléphone (optionnel)
+              Téléphone <span className="text-destructive">*</span>
             </label>
             <input
               id="phone"
@@ -148,10 +177,14 @@ export function UserCreateModal({ isOpen, onClose, onSubmit }: UserCreateModalPr
                 errors.phone ? 'border-destructive' : ''
               }`}
               placeholder="+41791234567"
+              required
             />
             {errors.phone && (
               <p className="form-error">{errors.phone}</p>
             )}
+            <p className="text-xs text-muted-foreground mt-1">
+              Tous formats acceptés : +41791234567 (Suisse), +33612345678 (France), +1234567890 (USA), etc.
+            </p>
           </div>
           
           <div>
