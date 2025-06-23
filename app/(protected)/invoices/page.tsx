@@ -5,6 +5,7 @@ import { useState, useEffect } from 'react'
 import { useSession } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
 import { useToast } from '@/hooks/use-toast'
+import { useInvoiceContext } from '@/contexts/invoice-context'
 import { 
   CreditCard, 
   FileText, 
@@ -20,11 +21,16 @@ import {
   ChevronDown,
   Package,
   Eye,
-  DollarSign
+  DollarSign,
+  Building2,
+  Receipt
 } from 'lucide-react'
 import { formatDateToFrench } from '@/lib/date-utils'
 import { Badge } from '@/components/ui/badge'
 import { LoadingButton } from '@/components/ui/loading-button'
+import { StripePaymentForm } from '@/components/checkout/stripe-payment-form'
+import { BankTransferForm } from '@/components/checkout/bank-transfer-form'
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import Link from 'next/link'
 
 // Types pour les factures
@@ -52,6 +58,7 @@ export default function InvoicesPage() {
   const { data: session, status } = useSession()
   const router = useRouter()
   const { toast } = useToast()
+  const { refreshPendingCount } = useInvoiceContext()
   const [invoices, setInvoices] = useState<Invoice[]>([])
   const [filteredInvoices, setFilteredInvoices] = useState<Invoice[]>([])
   const [isLoading, setIsLoading] = useState(true)
@@ -60,6 +67,11 @@ export default function InvoicesPage() {
   const [searchQuery, setSearchQuery] = useState('')
   const [statusFilter, setStatusFilter] = useState<string>('all')
   const [sortBy, setSortBy] = useState<string>('dueDate_asc')
+  
+  // États pour la modal de paiement
+  const [showPaymentModal, setShowPaymentModal] = useState(false)
+  const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null)
+  const [paymentMethod, setPaymentMethod] = useState<'card' | 'bank_transfer'>('card')
 
   // Vérifier l'état de l'authentification
   useEffect(() => {
@@ -133,24 +145,38 @@ export default function InvoicesPage() {
     setFilteredInvoices(result)
   }, [invoices, searchQuery, statusFilter, sortBy])
 
-  // Payer une facture
-  const payInvoice = async (invoiceId: string) => {
+  // Ouvrir la modal de paiement
+  const openPaymentModal = (invoice: Invoice) => {
+    setSelectedInvoice(invoice)
+    setShowPaymentModal(true)
+  }
+
+  // Fermer la modal de paiement
+  const closePaymentModal = () => {
+    setShowPaymentModal(false)
+    setSelectedInvoice(null)
+    setPaymentMethod('card')
+  }
+
+  // Gestion du paiement par carte Stripe - SUCCESS
+  const handleStripePaymentSuccess = async (paymentIntent: any) => {
+    if (!selectedInvoice) return
+    
     try {
-      setProcessingInvoiceId(invoiceId)
-      setIsProcessingPayment(true)
-      
-      const response = await fetch(`/api/invoices/${invoiceId}/pay`, {
+      // Finaliser le paiement côté serveur avec l'ID du PaymentIntent
+      const response = await fetch(`/api/invoices/${selectedInvoice.id}/pay`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({
-          paymentMethod: 'card'
+          paymentMethod: 'card',
+          stripePaymentIntentId: paymentIntent.id
         })
       })
       
       if (!response.ok) {
-        throw new Error('Erreur lors du paiement de la facture')
+        throw new Error('Erreur lors de la confirmation du paiement')
       }
       
       const updatedInvoice = await response.json()
@@ -158,7 +184,7 @@ export default function InvoicesPage() {
       // Mettre à jour la liste des factures
       setInvoices(prevInvoices => 
         prevInvoices.map(invoice => 
-          invoice.id === invoiceId ? updatedInvoice : invoice
+          invoice.id === selectedInvoice.id ? updatedInvoice : invoice
         )
       )
       
@@ -167,20 +193,83 @@ export default function InvoicesPage() {
         description: 'Votre facture a été payée avec succès',
         variant: 'default'
       })
+      
+      // Rafraîchir le compteur de factures en attente
+      refreshPendingCount()
+      
+      closePaymentModal()
     } catch (error) {
       console.error('Erreur:', error)
       toast({
-        title: 'Erreur de paiement',
-        description: 'Impossible de traiter votre paiement',
+        title: 'Erreur',
+        description: 'Erreur lors de la finalisation du paiement',
+        variant: 'destructive'
+      })
+    }
+  }
+
+  // Gestion du paiement par carte Stripe - ERROR
+  const handleStripePaymentError = (error: string) => {
+    toast({
+      title: 'Erreur de paiement',
+      description: error,
+      variant: 'destructive'
+    })
+  }
+
+  // Gestion du virement bancaire
+  const handleBankTransferConfirm = async () => {
+    if (!selectedInvoice) return
+    
+    try {
+      setIsProcessingPayment(true)
+      
+      const response = await fetch(`/api/invoices/${selectedInvoice.id}/pay`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          paymentMethod: 'bank_transfer'
+        })
+      })
+      
+      if (!response.ok) {
+        throw new Error('Erreur lors de la confirmation du virement')
+      }
+      
+      const updatedInvoice = await response.json()
+      
+      // Mettre à jour la liste des factures
+      setInvoices(prevInvoices => 
+        prevInvoices.map(invoice => 
+          invoice.id === selectedInvoice.id ? updatedInvoice : invoice
+        )
+      )
+      
+      toast({
+        title: 'Virement confirmé',
+        description: 'Nous traiterons votre virement dans les plus brefs délais',
+        variant: 'default'
+      })
+      
+      // Rafraîchir le compteur de factures en attente
+      refreshPendingCount()
+      
+      closePaymentModal()
+    } catch (error) {
+      console.error('Erreur:', error)
+      toast({
+        title: 'Erreur',
+        description: 'Impossible de confirmer le virement',
         variant: 'destructive'
       })
     } finally {
       setIsProcessingPayment(false)
-      setProcessingInvoiceId(null)
     }
   }
 
-  // Télécharger une facture - NOUVELLE IMPLÉMENTATION
+  // Télécharger une facture
   const downloadInvoice = async (invoiceId: string) => {
     try {
       const response = await fetch(`/api/invoices/${invoiceId}/download`)
@@ -310,7 +399,8 @@ export default function InvoicesPage() {
             <select
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
-              className="w-full appearance-none border border-foreground/10 rounded-md px-3 py-2 pr-8 text-sm bg-background"
+              className="w-full appearance-none border border-foreground/10 rounded-md px-3 py-2 pr-8 text-sm bg-background [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+              style={{ backgroundImage: 'none' }}
             >
               <option value="all">Tous les statuts</option>
               <option value="PENDING">En attente</option>
@@ -326,7 +416,8 @@ export default function InvoicesPage() {
             <select
               value={sortBy}
               onChange={(e) => setSortBy(e.target.value)}
-              className="w-full appearance-none border border-foreground/10 rounded-md px-3 py-2 pr-8 text-sm bg-background"
+              className="w-full appearance-none border border-foreground/10 rounded-md px-3 py-2 pr-8 text-sm bg-background [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+              style={{ backgroundImage: 'none' }}
             >
               <option value="dueDate_asc">Échéance (croissante)</option>
               <option value="dueDate_desc">Échéance (décroissante)</option>
@@ -462,19 +553,13 @@ export default function InvoicesPage() {
                   </Link>
                   
                   {invoice.status === 'PENDING' && (
-                    <LoadingButton
-                      onClick={() => payInvoice(invoice.id)}
-                      isLoading={isProcessingPayment && processingInvoiceId === invoice.id}
-                      size="sm"
-                      className="flex-1 bg-custom-accent text-white hover:bg-custom-accent/90 text-sm"
+                    <button
+                      onClick={() => openPaymentModal(invoice)}
+                      className="flex-1 bg-custom-accent text-white hover:bg-custom-accent/90 transition-colors flex items-center justify-center gap-2 px-3 py-2 rounded-md text-sm"
                     >
-                      {isProcessingPayment && processingInvoiceId === invoice.id ? (
-                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white" />
-                      ) : (
-                        <CreditCard className="h-4 w-4" />
-                      )}
+                      <CreditCard className="h-4 w-4" />
                       Payer
-                    </LoadingButton>
+                    </button>
                   )}
                 </div>
               </div>
@@ -566,14 +651,13 @@ export default function InvoicesPage() {
                     </Link>
                     
                     {invoice.status === 'PENDING' && (
-                      <LoadingButton
-                        onClick={() => payInvoice(invoice.id)}
-                        isLoading={isProcessingPayment && processingInvoiceId === invoice.id}
-                        className="bg-custom-accent text-white hover:bg-custom-accent/90 flex items-center gap-2"
+                      <button
+                        onClick={() => openPaymentModal(invoice)}
+                        className="bg-custom-accent text-white hover:bg-custom-accent/90 flex items-center gap-2 px-4 py-2 rounded-md transition-colors"
                       >
                         <CreditCard className="h-4 w-4" />
                         Payer maintenant
-                      </LoadingButton>
+                      </button>
                     )}
                   </div>
                 </div>
@@ -582,6 +666,131 @@ export default function InvoicesPage() {
           </div>
         </>
       )}
+
+      {/* Modal de paiement */}
+      <Dialog open={showPaymentModal} onOpenChange={setShowPaymentModal}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <CreditCard className="h-5 w-5" />
+              Payer la facture #{selectedInvoice?.id.substring(0, 8).toUpperCase()}
+            </DialogTitle>
+          </DialogHeader>
+          
+          {selectedInvoice && (
+            <div className="space-y-6">
+              {/* Résumé facture */}
+              <div className="bg-foreground/5 p-4 rounded-lg">
+                <div className="flex justify-between items-center mb-2">
+                  <span className="text-sm font-medium">Montant à payer:</span>
+                  <span className="text-lg font-bold">{selectedInvoice.amount.toFixed(2)} CHF</span>
+                </div>
+                <div className="flex justify-between items-center text-sm text-muted-foreground">
+                  <span>Échéance:</span>
+                  <span>{formatDateToFrench(new Date(selectedInvoice.dueDate))}</span>
+                </div>
+              </div>
+              
+              {/* Sélection méthode de paiement */}
+              <div className="space-y-4">
+                <h4 className="font-medium">Choisir une méthode de paiement</h4>
+                
+                <div className="space-y-3">
+                  {/* Paiement par carte */}
+                  <div className="flex items-start space-x-3">
+                    <input
+                      id="card"
+                      type="radio"
+                      name="paymentMethod"
+                      value="card"
+                      checked={paymentMethod === 'card'}
+                      onChange={() => setPaymentMethod('card')}
+                      className="mt-1 h-4 w-4 border-foreground/10 text-custom-accent focus:ring-custom-accent"
+                    />
+                    <div className="flex-1">
+                      <label htmlFor="card" className="font-medium flex items-center gap-2">
+                        <CreditCard className="h-4 w-4" />
+                        Paiement par carte
+                      </label>
+                      <p className="text-sm text-muted-foreground">
+                        Paiement immédiat et sécurisé par Stripe
+                      </p>
+                    </div>
+                  </div>
+                  
+                  {/* Virement bancaire */}
+                  <div className="flex items-start space-x-3">
+                    <input
+                      id="bank_transfer"
+                      type="radio"
+                      name="paymentMethod"
+                      value="bank_transfer"
+                      checked={paymentMethod === 'bank_transfer'}
+                      onChange={() => setPaymentMethod('bank_transfer')}
+                      className="mt-1 h-4 w-4 border-foreground/10 text-custom-accent focus:ring-custom-accent"
+                    />
+                    <div className="flex-1">
+                      <label htmlFor="bank_transfer" className="font-medium flex items-center gap-2">
+                        <Building2 className="h-4 w-4" />
+                        Virement bancaire
+                      </label>
+                      <p className="text-sm text-muted-foreground">
+                        Paiement par virement avec instructions détaillées
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              
+              {/* Interface de paiement selon la méthode choisie */}
+              {paymentMethod === 'card' && (
+                <div className="border border-foreground/10 rounded-lg p-4">
+                  <StripePaymentForm
+                    amount={selectedInvoice.amount}
+                    orderId={selectedInvoice.orderId}
+                    onSuccess={handleStripePaymentSuccess}
+                    onError={handleStripePaymentError}
+                    type="invoice"
+                    invoiceId={selectedInvoice.id}
+                  />
+                </div>
+              )}
+              
+              {paymentMethod === 'bank_transfer' && (
+                <div className="border border-foreground/10 rounded-lg p-4">
+                  <BankTransferForm
+                    amount={selectedInvoice.amount}
+                    orderId={selectedInvoice.orderId} // Utiliser l'ID de la commande pour la référence
+                    onConfirm={handleBankTransferConfirm}
+                    isLoading={isProcessingPayment}
+                  />
+                </div>
+              )}
+              
+              {/* Boutons d'action */}
+              <div className="flex gap-3 pt-4 border-t border-foreground/10">
+                <button
+                  onClick={closePaymentModal}
+                  className="flex-1 px-4 py-2 border border-foreground/10 rounded-md hover:bg-foreground/5 transition-colors"
+                >
+                  Annuler
+                </button>
+                
+                {paymentMethod === 'bank_transfer' && (
+                  <LoadingButton
+                    onClick={handleBankTransferConfirm}
+                    isLoading={isProcessingPayment}
+                    className="flex-1 bg-custom-accent text-white hover:bg-custom-accent/90"
+                  >
+                    <Receipt className="h-4 w-4 mr-2" />
+                    Confirmer le virement
+                  </LoadingButton>
+                )}
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

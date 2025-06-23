@@ -1,4 +1,4 @@
-// components/checkout/stripe-payment-form.tsx
+// components/checkout/stripe-payment-form.tsx (Version mise à jour)
 'use client'
 
 import { useState, useEffect } from 'react'
@@ -22,10 +22,21 @@ interface StripePaymentFormProps {
   onSuccess: (paymentIntent: any) => void
   onError: (error: string) => void
   isLoading?: boolean
+  // Nouveau prop pour distinguer facture vs commande
+  type?: 'order' | 'invoice'
+  // ID de la facture si c'est un paiement de facture
+  invoiceId?: string
 }
 
 // Composant du formulaire de paiement
-function CheckoutForm({ amount, orderId, onSuccess, onError }: StripePaymentFormProps) {
+function CheckoutForm({ 
+  amount, 
+  orderId, 
+  onSuccess, 
+  onError, 
+  type = 'order',
+  invoiceId 
+}: StripePaymentFormProps) {
   const stripe = useStripe()
   const elements = useElements()
   const { toast } = useToast()
@@ -50,15 +61,26 @@ function CheckoutForm({ amount, orderId, onSuccess, onError }: StripePaymentForm
     setCardError(null)
     
     try {
-      // 1. Créer le PaymentIntent côté serveur
-      const response = await fetch('/api/payment/create-intent', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          amount: Math.round(amount * 100), // Convertir en centimes
-          orderId
+      let response: Response
+      
+      // Choisir la route API selon le type de paiement
+      if (type === 'invoice' && invoiceId) {
+        // Route spécifique pour les factures
+        response = await fetch(`/api/invoices/${invoiceId}/create-payment-intent`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' }
         })
-      })
+      } else {
+        // Route existante pour les commandes
+        response = await fetch('/api/payment/create-intent', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ 
+            amount: Math.round(amount * 100), // Convertir en centimes
+            orderId
+          })
+        })
+      }
       
       if (!response.ok) {
         const errorText = await response.text()
@@ -90,9 +112,13 @@ function CheckoutForm({ amount, orderId, onSuccess, onError }: StripePaymentForm
         })
       } else {
         // Paiement réussi
+        const successMessage = type === 'invoice' 
+          ? "Votre facture a été payée avec succès"
+          : "Votre paiement a été traité avec succès"
+          
         toast({
           title: "Paiement réussi",
-          description: "Votre paiement a été traité avec succès",
+          description: successMessage,
         })
         onSuccess(result.paymentIntent)
       }
@@ -170,7 +196,9 @@ function CheckoutForm({ amount, orderId, onSuccess, onError }: StripePaymentForm
       {/* Résumé du montant */}
       <div className="bg-foreground/5 p-4 rounded-lg">
         <div className="flex justify-between items-center">
-          <span className="font-medium">Montant à payer:</span>
+          <span className="font-medium">
+            {type === 'invoice' ? 'Montant de la facture:' : 'Montant à payer:'}
+          </span>
           <span className="text-lg font-bold">{amount.toFixed(2)} CHF</span>
         </div>
       </div>
@@ -183,7 +211,9 @@ function CheckoutForm({ amount, orderId, onSuccess, onError }: StripePaymentForm
         className="w-full bg-custom-accent hover:bg-custom-accent/90 text-white py-3"
         icon={<CreditCard className="h-5 w-5" />}
       >
-        {isProcessing ? 'Traitement en cours...' : `Payer ${amount.toFixed(2)} CHF`}
+        {isProcessing ? 'Traitement en cours...' : 
+         type === 'invoice' ? `Payer la facture ${amount.toFixed(2)} CHF` :
+         `Payer ${amount.toFixed(2)} CHF`}
       </LoadingButton>
       
       {/* Informations de sécurité */}

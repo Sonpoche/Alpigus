@@ -15,15 +15,19 @@ import {
 } from 'lucide-react'
 import { motion } from 'framer-motion'
 import { cn } from '@/lib/utils'
+import { useInvoiceContext } from '@/contexts/invoice-context'
+import { NotificationBadge } from '@/components/ui/notification-badge'
 
 interface MenuItem {
   href: string
   label: string
   icon: React.ReactNode
+  badge?: number
 }
 
 export default function ClientMenu() {
   const pathname = usePathname()
+  const { pendingCount } = useInvoiceContext()
   
   const menuItems: MenuItem[] = [
     {
@@ -44,7 +48,8 @@ export default function ClientMenu() {
     {
       href: '/invoices',
       label: 'Mes factures',
-      icon: <FileText className="h-5 w-5" />
+      icon: <FileText className="h-5 w-5" />,
+      badge: pendingCount
     },
     {
       href: '/cart',
@@ -88,6 +93,12 @@ export default function ClientMenu() {
               {item.icon}
             </span>
             {item.label}
+            {item.badge && item.badge > 0 && (
+              <NotificationBadge 
+                count={item.badge} 
+                variant="sidebar"
+              />
+            )}
             {isActive && (
               <motion.div
                 layoutId="activeClientNavIndicator"
