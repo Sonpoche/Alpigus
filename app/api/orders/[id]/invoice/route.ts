@@ -1,4 +1,4 @@
-// app/api/orders/[id]/invoice/route.ts (version producteur personnalisée)
+// app/api/orders/[id]/invoice/route.ts (version producteur originale)
 import { NextRequest, NextResponse } from 'next/server'
 import { apiAuthMiddleware } from '@/lib/api-middleware'
 import { Session } from 'next-auth'
@@ -58,9 +58,8 @@ export const GET = apiAuthMiddleware(async (
     // Vérifier les autorisations
     const isProducer = session.user.role === 'PRODUCER'
     const isAdmin = session.user.role === 'ADMIN'
-    const isOrderOwner = order.userId === session.user.id
 
-    if (!isAdmin && !isOrderOwner) {
+    if (!isAdmin) {
       if (isProducer) {
         const hasProducts = order.items.some(item => 
           item.product.producer.userId === session.user.id
@@ -520,4 +519,4 @@ export const GET = apiAuthMiddleware(async (
     console.error('Erreur génération facture:', error)
     return new NextResponse('Erreur interne du serveur', { status: 500 })
   }
-}, ["CLIENT", "PRODUCER", "ADMIN"])
+}, ["PRODUCER", "ADMIN"]) // Seulement pour producteurs et admins

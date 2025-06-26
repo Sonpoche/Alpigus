@@ -93,7 +93,8 @@ export default function ClientMenu() {
               {item.icon}
             </span>
             {item.label}
-            {item.badge && item.badge > 0 && (
+            {/* Simplification : le composant NotificationBadge gère déjà le cas count <= 0 */}
+            {item.badge !== undefined && (
               <NotificationBadge 
                 count={item.badge} 
                 variant="sidebar"

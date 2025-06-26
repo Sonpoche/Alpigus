@@ -680,95 +680,77 @@ export default function OrderDetailModal({
 
             
             {/* Actions */}
-            <div className="flex gap-2 pt-4 justify-between">
-              <button
-                onClick={onClose}
-                className="px-4 py-2 border border-foreground/10 rounded-md hover:bg-foreground/5 transition-colors"
-              >
-                Fermer
-              </button>
-              
-              <div className="flex gap-2">
-                {order.status === 'PENDING' && (
-                  <button
-                    onClick={() => {
-                      onUpdateStatus(order.id, 'CONFIRMED');
-                      onClose();
-                    }}
-                    disabled={isUpdating}
-                    className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 transition-colors flex items-center gap-2"
-                  >
-                    <CheckCircle className="h-5 w-5" />
-                    Confirmer la commande
-                  </button>
-                )}
-                
-                {order.status === 'CONFIRMED' && (
-                  <button
-                    onClick={() => {
-                      onUpdateStatus(order.id, 'SHIPPED');
-                      onClose();
-                    }}
-                    disabled={isUpdating}
-                    className="bg-purple-600 text-white px-4 py-2 rounded-md hover:bg-purple-700 transition-colors flex items-center gap-2"
-                  >
-                    <Truck className="h-5 w-5" />
-                    Marquer comme expédiée
-                  </button>
-                )}
-                
-                {order.status === 'SHIPPED' && (
-                  <button
-                    onClick={() => {
-                      onUpdateStatus(order.id, 'DELIVERED');
-                      onClose();
-                    }}
-                    disabled={isUpdating}
-                    className="bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700 transition-colors flex items-center gap-2"
-                  >
-                    <Package className="h-5 w-5" />
-                    Marquer comme livrée
-                  </button>
-                )}
-                
-                {/* Télécharger la facture - pour tous les statuts */}
-                <button
-                  onClick={async () => {
-                    try {
-                      const response = await fetch(`/api/orders/${order.id}/invoice`)
-                      
-                      if (!response.ok) {
-                        throw new Error('Erreur lors de la génération de la facture')
-                      }
-                      
-                      // Ouvrir la facture HTML dans un nouvel onglet
-                      const html = await response.text()
-                      const newWindow = window.open('', '_blank')
-                      if (newWindow) {
-                        newWindow.document.write(html)
-                        newWindow.document.close()
-                      }
-                      
-                      toast({
-                        title: "Succès", 
-                        description: "Facture générée avec succès"
-                      })
-                    } catch (error) {
-                      console.error('Erreur:', error)
-                      toast({
-                        title: "Erreur",
-                        description: "Impossible de générer la facture",
-                        variant: "destructive"
-                      })
-                    }
-                  }}
-                  className="bg-custom-accent text-white px-4 py-2 rounded-md hover:opacity-90 transition-opacity flex items-center gap-2"
-                >
-                  <FileText className="h-5 w-5" />
-                 Télécharger facture
-               </button>
-             </div>
-           </div>
+<div className="flex gap-2 pt-4 justify-between">
+  <button
+    onClick={onClose}
+    className="px-4 py-2 border border-foreground/10 rounded-md hover:bg-foreground/5 transition-colors"
+  >
+    Fermer
+  </button>
+  
+  <div className="flex gap-2">
+    {/* Boutons de changement de statut - SEULEMENT POUR PRODUCTEURS/ADMINS */}
+    {session?.user?.role !== 'CLIENT' && (
+      <>
+        {order.status === 'PENDING' && (
+          <button
+            onClick={() => {
+              onUpdateStatus(order.id, 'CONFIRMED');
+              onClose();
+            }}
+            disabled={isUpdating}
+            className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 transition-colors flex items-center gap-2"
+          >
+            <CheckCircle className="h-5 w-5" />
+            Confirmer la commande
+          </button>
+        )}
+        
+        {order.status === 'CONFIRMED' && (
+          <button
+            onClick={() => {
+              onUpdateStatus(order.id, 'SHIPPED');
+              onClose();
+            }}
+            disabled={isUpdating}
+            className="bg-purple-600 text-white px-4 py-2 rounded-md hover:bg-purple-700 transition-colors flex items-center gap-2"
+          >
+            <Truck className="h-5 w-5" />
+            Marquer comme expédiée
+          </button>
+        )}
+        
+        {order.status === 'SHIPPED' && (
+          <button
+            onClick={() => {
+              onUpdateStatus(order.id, 'DELIVERED');
+              onClose();
+            }}
+            disabled={isUpdating}
+            className="bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700 transition-colors flex items-center gap-2"
+          >
+            <Package className="h-5 w-5" />
+            Marquer comme livrée
+          </button>
+        )}
+      </>
+    )}
+    
+    {/* Bouton télécharger facture - TOUJOURS VISIBLE POUR TOUS LES RÔLES */}
+    <a
+      href={session?.user?.role === 'CLIENT' 
+        ? `/api/orders/${order.id}/invoice/client`
+        : `/api/orders/${order.id}/invoice`
+      }
+      target="_blank"
+      rel="noopener noreferrer"
+      className="bg-custom-accent text-white px-4 py-2 rounded-md hover:opacity-90 transition-opacity flex items-center gap-2 inline-flex no-underline"
+    >
+      <FileText className="h-5 w-5" />
+      Télécharger facture
+    </a>
+  </div>
+</div>
          </div>
        </div>
      </div>
