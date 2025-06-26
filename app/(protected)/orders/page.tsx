@@ -3,6 +3,7 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
+import { useSession } from 'next-auth/react'
 import { useToast } from '@/hooks/use-toast'
 import { 
   ShoppingBag, 
@@ -25,58 +26,11 @@ import Link from 'next/link'
 import { Badge } from '@/components/ui/badge'
 import { motion, AnimatePresence } from 'framer-motion'
 import { OrderStatus } from '@prisma/client'
+import { Order } from '@/types/order'
 
-interface OrderItem {
-  id: string
-  quantity: number
-  price: number
-  product: {
-    id: string
-    name: string
-    unit: string
-    image: string | null
-  }
-}
-
-interface Booking {
-  id: string
-  quantity: number
-  price?: number
-  deliverySlot: {
-    id: string
-    date: string
-    product: {
-      id: string
-      name: string
-      price: number
-      unit: string
-      image: string | null
-    }
-  }
-}
-
-interface Order {
-  id: string
-  createdAt: string
-  updatedAt: string
-  status: OrderStatus
-  total: number
-  items: OrderItem[]
-  bookings: Booking[]
-  metadata?: string
-  user?: {
-    name: string | null
-    email: string
-    phone: string
-  }
-}
-
-interface DeliveryInfo {
-  type?: string;
-  address?: string;
-  notes?: string;
-  paymentMethod?: string;
-}
+// Import des composants modal
+import OrderDetailModal from '@/components/orders/order-detail-modal'
+import ClientOrderDetailModal from '@/components/orders/client-order-detail-modal'
 
 // Composant pour afficher l'adresse de retrait
 function OrderPickupAddress({ orderId, deliveryType }: { orderId: string, deliveryType: string }) {
@@ -168,13 +122,15 @@ function OrderPickupAddress({ orderId, deliveryType }: { orderId: string, delive
 
 export default function OrdersPage() {
   const router = useRouter()
+  const { data: session } = useSession()
   const { toast } = useToast()
   const [orders, setOrders] = useState<Order[]>([])
   const [isLoading, setIsLoading] = useState(true)
-  const [activeStatus, setActiveStatus] = useState<string | null>(null)
+  const [activeStatus, setActiveStatus] = useState<OrderStatus | null>(null)
   const [searchTerm, setSearchTerm] = useState('')
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null)
   const [isDetailOpen, setIsDetailOpen] = useState(false)
+  const [isUpdating, setIsUpdating] = useState(false)
 
   // Charger les commandes
   useEffect(() => {
@@ -185,7 +141,7 @@ export default function OrdersPage() {
         // Construction de l'URL avec les filtres
         const url = new URL('/api/orders', window.location.origin)
         if (activeStatus) {
-          url.searchParams.set('status', activeStatus)
+          url.searchParams.set('status', activeStatus as string)
         }
 
         const response = await fetch(url.toString())
@@ -239,8 +195,56 @@ export default function OrdersPage() {
     }
   }, [orders, isLoading]);
 
+  // Fonction pour gérer la mise à jour du statut (pour les producteurs/admins)
+  const handleUpdateStatus = async (orderId: string, newStatus: OrderStatus) => {
+    try {
+      setIsUpdating(true)
+      
+      const response = await fetch(`/api/orders/${orderId}/status`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ status: newStatus }),
+      })
+      
+      if (!response.ok) {
+        throw new Error('Erreur lors de la mise à jour du statut')
+      }
+      
+      // Rafraîchir la liste des commandes
+      const updatedOrders = orders.map(order => 
+        order.id === orderId 
+          ? { ...order, status: newStatus }
+          : order
+      )
+      setOrders(updatedOrders)
+      
+      // Mettre à jour l'ordre sélectionné si nécessaire
+      if (selectedOrder?.id === orderId) {
+        setSelectedOrder({ ...selectedOrder, status: newStatus })
+      }
+      
+      toast({
+        title: 'Statut mis à jour',
+        description: `La commande est maintenant ${newStatus.toLowerCase()}`,
+      })
+      
+    } catch (error) {
+      console.error('Erreur:', error)
+      toast({
+        title: 'Erreur',
+        description: 'Impossible de mettre à jour le statut de la commande',
+        variant: 'destructive'
+      })
+    } finally {
+      setIsUpdating(false)
+    }
+  }
+
   // Gestion du statut de commande avec le bon badge
-  const getStatusBadge = (status: OrderStatus) => {
+  const getStatusBadge = (status: OrderStatus | string) => {
+    const orderStatus = status as OrderStatus
     const statusLabels: Record<OrderStatus, string> = {
       [OrderStatus.DRAFT]: 'Brouillon',
       [OrderStatus.PENDING]: 'En attente',
@@ -253,7 +257,7 @@ export default function OrdersPage() {
       [OrderStatus.INVOICE_OVERDUE]: 'Facture en retard'
     }
 
-    switch (status) {
+    switch (orderStatus) {
       case OrderStatus.DRAFT:
         return <Badge variant="outline" className="bg-gray-100 text-gray-800 border-gray-200 dark:bg-gray-900/20 dark:text-gray-300 dark:border-gray-800">{statusLabels[OrderStatus.DRAFT]}</Badge>
       case OrderStatus.PENDING:
@@ -277,36 +281,10 @@ export default function OrdersPage() {
     }
   }
 
-  // Gestion de l'icône de statut
-  const getStatusIcon = (status: OrderStatus) => {
-    switch (status) {
-      case OrderStatus.DRAFT:
-        return <Edit2 className="h-5 w-5 text-gray-500" />
-      case OrderStatus.PENDING:
-        return <Clock className="h-5 w-5 text-amber-500" />
-      case OrderStatus.CONFIRMED:
-        return <CheckCircle className="h-5 w-5 text-blue-500" />
-      case OrderStatus.SHIPPED:
-        return <Truck className="h-5 w-5 text-purple-500" />
-      case OrderStatus.DELIVERED:
-        return <Package className="h-5 w-5 text-green-500" />
-      case OrderStatus.CANCELLED:
-        return <XCircle className="h-5 w-5 text-red-500" />
-      case OrderStatus.INVOICE_PENDING:
-        return <Clock className="h-5 w-5 text-yellow-500" />
-      case OrderStatus.INVOICE_PAID:
-        return <CheckCircle className="h-5 w-5 text-green-500" />
-      case OrderStatus.INVOICE_OVERDUE:
-        return <AlertCircle className="h-5 w-5 text-red-500" />
-      default:
-        return <AlertCircle className="h-5 w-5 text-gray-500" />
-    }
-  }
-
   // Filtrer les commandes par recherche
   const filteredOrders = orders.filter(order => {
     // D'abord, s'assurer qu'on n'inclut JAMAIS les commandes DRAFT (paniers)
-    if (order.status === OrderStatus.DRAFT) return false;
+    if ((order.status as OrderStatus) === OrderStatus.DRAFT) return false;
     
     if (!searchTerm) return true
     
@@ -335,28 +313,11 @@ export default function OrdersPage() {
       [OrderStatus.INVOICE_OVERDUE]: 'facture en retard'
     }
     
-    const statusLabel = statusLabels[order.status]
+    const statusLabel = statusLabels[order.status as OrderStatus]
     if (statusLabel && statusLabel.includes(searchLower)) return true
     
     return false
   })
-
-  // Extraire les informations de livraison des métadonnées
-  const getDeliveryInfo = (order: Order): DeliveryInfo | null => {
-    if (!order.metadata) return null;
-    
-    try {
-      const metadata = JSON.parse(order.metadata);
-      return {
-        type: metadata.deliveryType,
-        address: metadata.deliveryAddress,
-        notes: metadata.deliveryNotes,
-        paymentMethod: metadata.paymentMethod
-      };
-    } catch {
-      return null;
-    }
-  }
 
   if (isLoading) {
     return (
@@ -605,298 +566,38 @@ export default function OrdersPage() {
                       setIsDetailOpen(true)
                     }}
                     className="text-custom-accent hover:opacity-80 transition-opacity text-sm font-medium flex items-center gap-1"
-                 >
-                   Détails <ChevronRight className="h-4 w-4" />
-                 </button>
-               </div>
-             </div>
-           </motion.div>
-         ))}
-       </div>
-     )}
+                  >
+                    Détails <ChevronRight className="h-4 w-4" />
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          ))}
+        </div>
+      )}
      
-     {/* Modal détaillée de la commande */}
-     <AnimatePresence>
-       {selectedOrder && isDetailOpen && (
-         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-           <motion.div
-             initial={{ opacity: 0, scale: 0.95 }}
-             animate={{ opacity: 1, scale: 1 }}
-             exit={{ opacity: 0, scale: 0.95 }}
-             className="bg-background rounded-lg shadow-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto"
-           >
-             <div className="p-6 border-b border-foreground/10 flex justify-between items-center sticky top-0 bg-background z-10">
-               <div className="flex items-center gap-2">
-                 {getStatusIcon(selectedOrder.status)}
-                 <h3 className="font-medium text-lg">
-                   Commande #{selectedOrder.id.substring(0, 8).toUpperCase()}
-                 </h3>
-               </div>
-               
-               <button
-                 onClick={() => setIsDetailOpen(false)}
-                 className="text-muted-foreground hover:text-foreground"
-               >
-                 <XCircle className="h-5 w-5" />
-               </button>
-             </div>
-             
-             <div className="p-6 space-y-6">
-               {/* Informations générales */}
-               <div className="grid grid-cols-2 gap-4">
-                 <div>
-                   <p className="text-sm text-muted-foreground">Date de commande</p>
-                   <p className="font-medium">
-                     {new Date(selectedOrder.createdAt).toLocaleDateString('fr-FR', {
-                       day: 'numeric',
-                       month: 'long',
-                       year: 'numeric'
-                     })}
-                   </p>
-                 </div>
-                 <div>
-                   <p className="text-sm text-muted-foreground">Statut</p>
-                   <div>{getStatusBadge(selectedOrder.status)}</div>
-                 </div>
-                 
-                 {/* Informations de livraison */}
-                 {selectedOrder.metadata && (
-                   <>
-                     <div>
-                       <p className="text-sm text-muted-foreground">Mode de livraison</p>
-                       <p className="font-medium">
-                         {getDeliveryInfo(selectedOrder)?.type === 'pickup' 
-                           ? 'Retrait sur place' 
-                           : 'Livraison à domicile'}
-                       </p>
-                     </div>
-                     <div>
-                       <p className="text-sm text-muted-foreground">Paiement</p>
-                       <p className="font-medium">
-                         {getDeliveryInfo(selectedOrder)?.paymentMethod === 'invoice' 
-                           ? 'Facturation' 
-                           : 'Carte de crédit'}
-                       </p>
-                     </div>
-                   </>
-                 )}
-               </div>
-               
-               {/* Adresse de retrait sur place */}
-               {getDeliveryInfo(selectedOrder)?.type === 'pickup' && (
-                 <OrderPickupAddress 
-                   orderId={selectedOrder.id} 
-                   deliveryType="pickup" 
-                 />
-               )}
-               
-               {/* Adresse de livraison si applicable */}
-               {getDeliveryInfo(selectedOrder)?.type === 'delivery' && getDeliveryInfo(selectedOrder)?.address && (
-                 <div>
-                   <p className="text-sm text-muted-foreground mb-1">Adresse de livraison</p>
-                   <p className="p-3 bg-foreground/5 rounded-md">
-                     {getDeliveryInfo(selectedOrder)?.address}
-                   </p>
-                 </div>
-               )}
-               
-               {/* Notes de livraison si applicable */}
-               {getDeliveryInfo(selectedOrder)?.notes && (
-                 <div>
-                   <p className="text-sm text-muted-foreground mb-1">Instructions spéciales</p>
-                   <p className="p-3 bg-foreground/5 rounded-md">
-                     {getDeliveryInfo(selectedOrder)?.notes}
-                   </p>
-                 </div>
-               )}
-               
-               {/* Produits */}
-               <div>
-                 <p className="font-medium mb-3">Produits commandés</p>
-                 <div className="space-y-4 divide-y divide-foreground/10">
-                   {selectedOrder.items.map((item) => (
-                     <div key={item.id} className="flex pt-4 first:pt-0">
-                       <div className="w-16 h-16 bg-foreground/5 rounded-md overflow-hidden flex-shrink-0">
-                         {item.product.image ? (
-                           <img
-                             src={item.product.image}
-                             alt={item.product.name}
-                             className="w-full h-full object-cover"
-                           />
-                         ) : (
-                           <div className="w-full h-full flex items-center justify-center text-foreground/30">
-                             <Package className="h-8 w-8" />
-                           </div>
-                         )}
-                       </div>
-                       <div className="ml-4 flex-1">
-                         <Link href={`/products/${item.product.id}`} className="font-medium hover:text-custom-accent">
-                           {item.product.name}
-                         </Link>
-                         <p className="text-sm text-muted-foreground">
-                           Quantité: {item.quantity} {item.product.unit}
-                         </p>
-                         <p className="text-sm">
-                           Prix unitaire: {item.price.toFixed(2)} CHF
-                         </p>
-                       </div>
-                       <div className="ml-4 text-right">
-                         <p className="font-medium">{(item.price * item.quantity).toFixed(2)} CHF</p>
-                       </div>
-                     </div>
-                   ))}
-                 </div>
-               </div>
-               
-               {/* Livraisons programmées */}
-               {selectedOrder.bookings && selectedOrder.bookings.length > 0 && (
-                 <div>
-                   <p className="font-medium mb-3">Livraisons programmées</p>
-                   <div className="space-y-4 divide-y divide-foreground/10">
-                     {selectedOrder.bookings.map((booking) => {
-                       const isPast = new Date(booking.deliverySlot.date) < new Date();
-                       return (
-                         <div key={booking.id} className="flex pt-4 first:pt-0">
-                           <div className="w-16 h-16 rounded-md overflow-hidden flex-shrink-0">
-                             {booking.deliverySlot.product.image ? (
-                               <img
-                               src={booking.deliverySlot.product.image}
-                               alt={booking.deliverySlot.product.name}
-                               className="w-full h-full object-cover"
-                             />
-                           ) : (
-                             <div className="w-full h-full bg-blue-100 dark:bg-blue-900/20 flex items-center justify-center">
-                               <Calendar className="h-8 w-8 text-blue-600 dark:text-blue-400" />
-                             </div>
-                           )}
-                         </div>
-                         <div className="ml-4 flex-1">
-                           <div className="flex items-center">
-                             <p className="font-medium">{booking.deliverySlot.product.name}</p>
-                             {isPast && (
-                               <span className="ml-2 text-xs bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 px-2 py-0.5 rounded-full">
-                                 Passé
-                               </span>
-                             )}
-                           </div>
-                           <p className="text-sm text-muted-foreground">
-                             {isPast ? "Livraison était prévue le " : "Livraison prévue le "} 
-                             {new Date(booking.deliverySlot.date).toLocaleDateString('fr-FR', {
-                               day: 'numeric',
-                               month: 'long',
-                               year: 'numeric'
-                             })}
-                           </p>
-                           <p className="text-sm mt-1">
-                             Quantité: {booking.quantity} {booking.deliverySlot.product.unit}
-                           </p>
-                           <p className="text-sm font-medium mt-1">
-                             {(booking.price ? booking.price * booking.quantity : 
-                               booking.deliverySlot.product.price ? booking.deliverySlot.product.price * booking.quantity : 
-                               0).toFixed(2)} CHF
-                           </p>
-                         </div>
-                       </div>
-                     );
-                   })}
-                 </div>
-               </div>
-             )}
-             
-             {/* Résumé des coûts */}
-             <div className="border-t border-foreground/10 pt-4">
-               <div className="flex justify-between mb-2">
-                 <p>Sous-total</p>
-                 <p>{selectedOrder.total.toFixed(2)} CHF</p>
-               </div>
-               {getDeliveryInfo(selectedOrder)?.type === 'delivery' && (
-                 <div className="flex justify-between mb-2">
-                   <p>Frais de livraison</p>
-                   <p>15.00 CHF</p>
-                 </div>
-               )}
-               <div className="flex justify-between font-semibold text-lg pt-2 border-t border-foreground/10">
-                 <p>Total</p>
-                 <p>{((getDeliveryInfo(selectedOrder)?.type === 'delivery' ? 15 : 0) + selectedOrder.total).toFixed(2)} CHF</p>
-               </div>
-             </div>
-             
-             {/* Actions */}
-             <div className="flex justify-between pt-4">
-               <button
-                 onClick={() => setIsDetailOpen(false)}
-                 className="px-4 py-2 border border-foreground/10 rounded-md hover:bg-foreground/5 transition-colors"
-               >
-                 Fermer
-               </button>
-               
-               {selectedOrder.status === OrderStatus.DELIVERED && (
-                 <button
-                   className="bg-custom-accent text-white px-4 py-2 rounded-md hover:opacity-90 transition-opacity"
-                 >
-                   Télécharger la facture
-                 </button>
-               )}
-               
-               {(selectedOrder.status === OrderStatus.PENDING || selectedOrder.status === OrderStatus.DRAFT) && (
-                 <button
-                   onClick={async () => {
-                     if (window.confirm("Êtes-vous sûr de vouloir annuler cette commande ? Cette action est irréversible.")) {
-                       try {
-                         const response = await fetch(`/api/orders/${selectedOrder.id}`, {
-                           method: 'PATCH',
-                           headers: { 'Content-Type': 'application/json' },
-                           body: JSON.stringify({ status: OrderStatus.CANCELLED })
-                         });
-                         
-                         if (!response.ok) {
-                           throw new Error('Erreur lors de l\'annulation de la commande');
-                         }
-                         
-                         toast({
-                           title: "Commande annulée",
-                           description: "Votre commande a été annulée avec succès"
-                         });
-                         
-                         setIsDetailOpen(false);
-                         
-                         // Rafraîchir la liste des commandes
-                         setTimeout(() => {
-                           window.location.reload();
-                         }, 500);
-                       } catch (error) {
-                         console.error('Erreur:', error);
-                         toast({
-                           title: "Erreur",
-                           description: "Impossible d'annuler la commande",
-                           variant: "destructive"
-                         });
-                       }
-                     }
-                   }}
-                   className="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-md transition-colors"
-                 >
-                   Annuler la commande
-                 </button>
-               )}
-               
-               {/* Bouton spécifique pour les paniers (DRAFT) */}
-               {selectedOrder.status === OrderStatus.DRAFT && (
-                 <button
-                   onClick={() => {
-                     router.push('/checkout');
-                   }}
-                   className="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-md transition-colors ml-2"
-                 >
-                   Passer au paiement
-                 </button>
-               )}
-             </div>
-           </div>
-         </motion.div>
-       </div>
-     )}
-   </AnimatePresence>
- </div>
-)
+      {/* Modal de détail de commande - Utilisation des composants */}
+      <AnimatePresence>
+        {selectedOrder && isDetailOpen && (
+          session?.user?.role === 'CLIENT' ? (
+            // Modal pour clients
+            <ClientOrderDetailModal
+              order={selectedOrder}
+              isOpen={isDetailOpen}
+              onClose={() => setIsDetailOpen(false)}
+            />
+          ) : (
+            // Modal pour producteurs/admins
+            <OrderDetailModal
+              order={selectedOrder}
+              isOpen={isDetailOpen}
+              onClose={() => setIsDetailOpen(false)}
+              onUpdateStatus={handleUpdateStatus}
+              isUpdating={isUpdating}
+            />
+          )
+        )}
+      </AnimatePresence>
+    </div>
+  )
 }

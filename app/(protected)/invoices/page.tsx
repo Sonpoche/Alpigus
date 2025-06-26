@@ -66,7 +66,7 @@ export default function InvoicesPage() {
   const [processingInvoiceId, setProcessingInvoiceId] = useState<string | null>(null)
   const [searchQuery, setSearchQuery] = useState('')
   const [statusFilter, setStatusFilter] = useState<string>('all')
-  const [sortBy, setSortBy] = useState<string>('dueDate_asc')
+  const [sortBy, setSortBy] = useState<string>('dueDate_desc') // CHANGÉ : décroissant par défaut
   
   // États pour la modal de paiement
   const [showPaymentModal, setShowPaymentModal] = useState(false)
@@ -419,12 +419,12 @@ export default function InvoicesPage() {
               className="w-full appearance-none border border-foreground/10 rounded-md px-3 py-2 pr-8 text-sm bg-background [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
               style={{ backgroundImage: 'none' }}
             >
-              <option value="dueDate_asc">Échéance (croissante)</option>
-              <option value="dueDate_desc">Échéance (décroissante)</option>
-              <option value="amount_asc">Montant (croissant)</option>
+              <option value="dueDate_desc">Échéance (récente)</option>
+              <option value="dueDate_asc">Échéance (ancienne)</option>
               <option value="amount_desc">Montant (décroissant)</option>
-              <option value="date_desc">Date (récente d'abord)</option>
-              <option value="date_asc">Date (ancienne d'abord)</option>
+              <option value="amount_asc">Montant (croissant)</option>
+              <option value="date_desc">Date (récente)</option>
+              <option value="date_asc">Date (ancienne)</option>
             </select>
             <ChevronDown className="absolute right-2 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
           </div>
@@ -434,7 +434,7 @@ export default function InvoicesPage() {
             onClick={() => {
               setStatusFilter('all')
               setSearchQuery('')
-              setSortBy('dueDate_asc')
+              setSortBy('dueDate_desc') // CHANGÉ : reset vers décroissant
             }}
             className="px-3 py-2 border border-foreground/10 rounded-md hover:bg-foreground/5 transition-colors flex items-center justify-center gap-2 text-sm"
           >

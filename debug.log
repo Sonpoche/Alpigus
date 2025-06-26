@@ -1595,3 +1595,45 @@
 }
 [2025-06-26T09:02:29.433Z] Notification créée avec ID: "cmcd5nfat00075p2ad6tpe8ju"
 [2025-06-26T09:02:29.434Z] NotificationService: Fin de l'envoi de notification 
+[2025-06-26T13:34:50.393Z] Requête de création de commande reçue {
+  "items": []
+}
+[2025-06-26T13:34:50.420Z] ATTENTION: Requête reçue sans items 
+[2025-06-26T13:34:50.424Z] Aucun panier existant avec des items trouvé 
+[2025-06-26T13:34:50.425Z] Items qui seront utilisés pour créer la commande: []
+[2025-06-26T13:34:50.431Z] Panier créé avec ID: "cmcdfdo3f000b5p2a4xzj6byv"
+[2025-06-26T13:34:50.432Z] Contenu de l'objet order.items: []
+[2025-06-26T13:34:50.434Z] Vérification des items dans la base de données: []
+[2025-06-26T13:34:50.435Z] Panier créé {
+  "id": "cmcdfdo3f000b5p2a4xzj6byv",
+  "itemsCount": 0,
+  "bookingsCount": 0
+}
+[2025-06-26T13:35:13.540Z] NotificationService: Début envoi notification commande {
+  "orderId": "cmcdfdo3f000b5p2a4xzj6byv"
+}
+[2025-06-26T13:35:13.542Z] Items dans la commande: 1
+[2025-06-26T13:35:13.543Z] Traitement item produit: {
+  "productId": "cmcatkrx6000owv90q7y0a99y",
+  "productName": "Frederic ragaigne"
+}
+[2025-06-26T13:35:13.544Z] Producer ID directement ajouté: "cmcatjzt1000mwv909rwul0k6"
+[2025-06-26T13:35:13.545Z] Bookings dans la commande: 
+[2025-06-26T13:35:13.546Z] Nombre de producteurs à notifier: 1
+[2025-06-26T13:35:13.548Z] Liste des IDs producteurs: [
+  "cmcatjzt1000mwv909rwul0k6"
+]
+[2025-06-26T13:35:13.549Z] Traitement du producteur: "cmcatjzt1000mwv909rwul0k6"
+[2025-06-26T13:35:13.551Z] Producer userId: "cmcatjzt1000lwv90pqpivme9"
+[2025-06-26T13:35:13.552Z] Montant total pour ce producteur: {
+  "itemsTotal": 1,
+  "bookingsTotal": 0,
+  "total": 1
+}
+[2025-06-26T13:35:13.561Z] Notification créée avec ID: "cmcdfe5xz000j5p2a7n6vg36z"
+[2025-06-26T13:35:13.562Z] NotificationService: Fin de l'envoi de notification 
+[2025-06-26T13:35:13.566Z] Notification de création de facture envoyée au client: {
+  "userId": "cmcatiyko000iwv90l96okrc5",
+  "invoiceId": "cmcdfe5wn000h5p2arukgvw6x"
+}
+[2025-06-26T13:50:19.592Z] Notification de changement de statut créée pour le client: "cmcatiyko000iwv90l96okrc5"

@@ -1,16 +1,6 @@
-// components/orders/order-detail-modal.tsx
+// components/orders/client-order-detail-modal.tsx
 import React from 'react'
 import { useSession } from 'next-auth/react'
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog"
 import { Order, DeliveryInfo } from '@/types/order'
 import { formatDateToFrench } from '@/lib/date-utils'
 import { formatNumber } from '@/lib/number-utils'
@@ -21,9 +11,6 @@ import {
   User, 
   Package, 
   Calendar, 
-  CheckCircle,
-  Truck,
-  ShoppingBag,
   CreditCard,
   FileText,
   MapPin,
@@ -52,7 +39,6 @@ function OrderPickupAddress({ orderId, deliveryType }: OrderPickupAddressProps) 
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    // Si ce n'est pas un retrait sur place, ne rien faire
     if (deliveryType !== 'pickup') {
       setIsLoading(false)
       return
@@ -61,7 +47,6 @@ function OrderPickupAddress({ orderId, deliveryType }: OrderPickupAddressProps) 
     async function fetchProducerAddress() {
       try {
         setIsLoading(true)
-        // Récupérer les détails du producteur pour cette commande
         const response = await fetch(`/api/orders/${orderId}/producer-details`)
         
         if (!response.ok) {
@@ -81,7 +66,6 @@ function OrderPickupAddress({ orderId, deliveryType }: OrderPickupAddressProps) 
     fetchProducerAddress()
   }, [orderId, deliveryType])
 
-  // Ne rien afficher si ce n'est pas un retrait sur place
   if (deliveryType !== 'pickup') {
     return null
   }
@@ -95,7 +79,7 @@ function OrderPickupAddress({ orderId, deliveryType }: OrderPickupAddressProps) 
   }
 
   if (error || !producerDetails) {
-    return null; // Ou simplement ne rien afficher au lieu du message d'erreur
+    return null
   }
   
   return (
@@ -147,7 +131,6 @@ function OrderDeliveryAddress({ orderId, deliveryType }: OrderDeliveryAddressPro
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    // Si ce n'est pas une livraison à domicile, ne rien faire
     if (deliveryType !== 'delivery') {
       setIsLoading(false)
       return
@@ -156,7 +139,6 @@ function OrderDeliveryAddress({ orderId, deliveryType }: OrderDeliveryAddressPro
     async function fetchDeliveryAddress() {
       try {
         setIsLoading(true)
-        // Récupérer les détails de livraison pour cette commande
         const response = await fetch(`/api/orders/${orderId}/delivery-details`)
         
         if (!response.ok) {
@@ -176,7 +158,6 @@ function OrderDeliveryAddress({ orderId, deliveryType }: OrderDeliveryAddressPro
     fetchDeliveryAddress()
   }, [orderId, deliveryType])
 
-  // Ne rien afficher si ce n'est pas une livraison à domicile
   if (deliveryType !== 'delivery') {
     return null
   }
@@ -192,7 +173,7 @@ function OrderDeliveryAddress({ orderId, deliveryType }: OrderDeliveryAddressPro
   if (error || !deliveryDetails) {
     return (
       <div className="bg-amber-50 dark:bg-amber-900/20 p-4 rounded-lg text-amber-800 dark:text-amber-300 text-sm">
-        Informations de livraison non disponibles. Contactez le client directement.
+        Informations de livraison non disponibles.
       </div>
     )
   }
@@ -205,7 +186,6 @@ function OrderDeliveryAddress({ orderId, deliveryType }: OrderDeliveryAddressPro
       </h3>
       
       <div className="space-y-3 text-sm">
-        {/* Informations du destinataire */}
         <div className="flex items-start gap-2">
           <User className="h-4 w-4 text-custom-accent mt-0.5 shrink-0" />
           <div>
@@ -216,7 +196,6 @@ function OrderDeliveryAddress({ orderId, deliveryType }: OrderDeliveryAddressPro
           </div>
         </div>
         
-        {/* Adresse complète */}
         <div className="flex items-start gap-2">
           <MapPin className="h-4 w-4 text-custom-accent mt-0.5 shrink-0" />
           <div>
@@ -227,13 +206,11 @@ function OrderDeliveryAddress({ orderId, deliveryType }: OrderDeliveryAddressPro
           </div>
         </div>
         
-        {/* Téléphone */}
         <div className="flex items-start gap-2">
           <Phone className="h-4 w-4 text-custom-accent mt-0.5 shrink-0" />
           <p className="text-foreground/80">{deliveryDetails.phone}</p>
         </div>
         
-        {/* Notes de livraison si présentes */}
         {deliveryDetails.notes && (
           <div className="flex items-start gap-2">
             <FileText className="h-4 w-4 text-custom-accent mt-0.5 shrink-0" />
@@ -254,21 +231,17 @@ function OrderDeliveryAddress({ orderId, deliveryType }: OrderDeliveryAddressPro
   )
 }
 
-interface OrderDetailModalProps {
+interface ClientOrderDetailModalProps {
   order: Order
   isOpen: boolean
   onClose: () => void
-  onUpdateStatus: (orderId: string, newStatus: OrderStatus) => void
-  isUpdating: boolean
 }
 
-export default function OrderDetailModal({ 
+export default function ClientOrderDetailModal({ 
   order, 
   isOpen, 
-  onClose, 
-  onUpdateStatus,
-  isUpdating
-}: OrderDetailModalProps) {
+  onClose
+}: ClientOrderDetailModalProps) {
   const { data: session } = useSession()
   const { toast } = useToast()
   
@@ -279,8 +252,7 @@ export default function OrderDetailModal({
     try {
       const metadata = JSON.parse(order.metadata);
       
-      // Essayer différentes structures possibles
-      let deliveryType = 'pickup'; // valeur par défaut
+      let deliveryType = 'pickup';
       
       if (metadata.deliveryType) {
         deliveryType = metadata.deliveryType;
@@ -347,26 +319,6 @@ export default function OrderDetailModal({
   const finalPaymentStatus = invoiceInfo?.status || paymentInfo?.paymentStatus || null;
   const finalDueDate = invoiceInfo?.dueDate || paymentInfo?.dueDate || null;
 
-  // Fonction pour marquer la facture comme payée
-  const handleMarkAsPaid = async () => {
-    if (!invoiceInfo?.id) return;
-    
-    try {
-      // Appel à l'API pour marquer la facture comme payée
-      const response = await fetch(`/api/invoices/${invoiceInfo.id}/mark-paid`, {
-        method: 'POST'
-      });
-      
-      if (!response.ok) throw new Error('Erreur lors du traitement');
-      
-      // Fermer le modal - la page sera rafraîchie pour voir les changements
-      onClose();
-    } catch (error) {
-      console.error('Erreur:', error);
-      // Gérer l'erreur (avec toast par exemple)
-    }
-  };
-
   return (
     <div className={`fixed inset-0 bg-black/50 z-50 transition-opacity ${isOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
       <div className="flex items-center justify-center min-h-screen p-4">
@@ -389,28 +341,6 @@ export default function OrderDetailModal({
           </div>
           
           <div className="p-6 space-y-6">
-            {/* Informations client */}
-            <div className="bg-foreground/5 rounded-lg p-4">
-              <h4 className="font-medium mb-3 flex items-center gap-2">
-                <User className="h-5 w-5 text-foreground/60" />
-                Informations client
-              </h4>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div>
-                  <p className="text-sm text-muted-foreground">Nom</p>
-                  <p className="font-medium">{order.user?.name || 'Non spécifié'}</p>
-                </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">Email</p>
-                  <p className="font-medium">{order.user?.email}</p>
-                </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">Téléphone</p>
-                  <p className="font-medium">{order.user?.phone || 'Non spécifié'}</p>
-                </div>
-              </div>
-            </div>
-            
             {/* Informations générales */}
             <div className="grid grid-cols-2 gap-4">
               <div>
@@ -447,33 +377,23 @@ export default function OrderDetailModal({
               )}
             </div>
             
-            {/* Adresse de retrait sur place - SEULEMENT POUR LES CLIENTS */}
-            {deliveryInfo?.type === 'pickup' && session?.user?.role === 'CLIENT' && (
+            {/* Adresse de retrait sur place */}
+            {deliveryInfo?.type === 'pickup' && (
               <OrderPickupAddress 
                 orderId={order.id} 
                 deliveryType="pickup" 
               />
             )}
             
-            {/* Adresse de livraison à domicile - SEULEMENT POUR LES CLIENTS */}
-            {deliveryInfo?.type === 'delivery' && session?.user?.role === 'CLIENT' && (
+            {/* Adresse de livraison à domicile */}
+            {deliveryInfo?.type === 'delivery' && (
               <OrderDeliveryAddress 
                 orderId={order.id} 
                 deliveryType="delivery" 
               />
             )}
             
-            {/* Notes de livraison si applicable et pas déjà affichées dans OrderDeliveryAddress */}
-            {deliveryInfo?.notes && deliveryInfo?.type !== 'delivery' && (
-              <div>
-                <p className="text-sm text-muted-foreground mb-1">Instructions spéciales</p>
-                <p className="p-3 bg-foreground/5 rounded-md">
-                  {deliveryInfo.notes}
-                </p>
-              </div>
-            )}
-            
-            {/* Ajout d'une section détaillée sur le paiement */}
+            {/* Informations de paiement */}
             <div className="border-t border-foreground/10 pt-4">
               <h4 className="font-medium mb-3 flex items-center gap-2">
                 <CreditCard className="h-5 w-5 text-foreground/60" />
@@ -528,18 +448,6 @@ export default function OrderDetailModal({
                     )}
                   </div>
                 )}
-                
-                {(paymentInfo?.paymentMethod === 'invoice' || invoiceInfo) && 
-                 finalPaymentStatus !== 'PAID' && finalPaymentStatus !== 'INVOICE_PAID' && (
-                  <div className="mt-3">
-                    <button
-                      className="px-3 py-1 text-sm bg-custom-accent text-white rounded-md hover:opacity-90 transition-opacity"
-                      onClick={handleMarkAsPaid}
-                    >
-                      Marquer comme payé
-                    </button>
-                  </div>
-                )}
               </div>
             </div>
             
@@ -563,9 +471,7 @@ export default function OrderDetailModal({
                       )}
                     </div>
                     <div className="ml-4 flex-1">
-                      <Link href={`/producer/${item.product.id}/edit`} className="font-medium hover:text-custom-accent">
-                        {item.product.name}
-                      </Link>
+                      <p className="font-medium">{item.product.name}</p>
                       <p className="text-sm text-muted-foreground">
                         Quantité: {formatNumber(item.quantity)} {item.product.unit}
                       </p>
@@ -649,37 +555,8 @@ export default function OrderDetailModal({
                 <p>{formatNumber((deliveryInfo?.type === 'delivery' ? 15 : 0) + order.total)} CHF</p>
               </div>
             </div>
-
-            {/* Affichage de la commission pour les producteurs */}
-            {session?.user?.role === 'PRODUCER' && (
-              <div className="bg-orange-50 dark:bg-orange-900/20 p-3 rounded-md mb-2 border border-orange-200 dark:border-orange-800">
-                <h4 className="font-medium text-orange-800 dark:text-orange-200 mb-2 flex items-center gap-2">
-                  💰 Détail de vos revenus
-                </h4>
-                <div className="space-y-1 text-sm">
-                  <div className="flex justify-between">
-                    <span>Vos ventes:</span>
-                    <span>{formatNumber(order.total)} CHF</span>
-                  </div>
-                  <div className="flex justify-between text-orange-700 dark:text-orange-300">
-                    <span>Commission plateforme (5%):</span>
-                    <span>-{formatNumber(order.total * 0.05)} CHF</span>
-                  </div>
-                  <div className="flex justify-between font-semibold text-green-700 dark:text-green-300 pt-1 border-t border-orange-200">
-                    <span>Votre montant:</span>
-                    <span>{formatNumber(order.total * 0.95)} CHF</span>
-                  </div>
-                </div>
-              </div>
-            )}
             
-            <div className="flex justify-between font-semibold text-lg pt-2 border-t border-foreground/10">
-              <p>Total commande</p>
-              <p>{formatNumber((deliveryInfo?.type === 'delivery' ? 15 : 0) + order.total)} CHF</p>
-            </div>
-
-            
-            {/* Actions */}
+            {/* Actions POUR CLIENTS */}
             <div className="flex gap-2 pt-4 justify-between">
               <button
                 onClick={onClose}
@@ -689,79 +566,15 @@ export default function OrderDetailModal({
               </button>
               
               <div className="flex gap-2">
-                {/* DEBUG: Afficher les informations de session */}
-                <div className="text-xs text-red-500 bg-red-100 p-2 rounded">
-                  Role: {session?.user?.role || 'null'} | 
-                  User: {session?.user?.email || 'null'}
-                </div>
-                
-                {/* Boutons de changement de statut - SEULEMENT POUR PRODUCTEURS/ADMINS */}
-                {session?.user?.role !== 'CLIENT' && (
-                  <>
-                    {order.status === 'PENDING' && (
-                      <button
-                        onClick={() => {
-                          onUpdateStatus(order.id, 'CONFIRMED');
-                          onClose();
-                        }}
-                        disabled={isUpdating}
-                        className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 transition-colors flex items-center gap-2"
-                      >
-                        <CheckCircle className="h-5 w-5" />
-                        Confirmer la commande
-                      </button>
-                    )}
-                    
-                    {order.status === 'CONFIRMED' && (
-                      <button
-                        onClick={() => {
-                          onUpdateStatus(order.id, 'SHIPPED');
-                          onClose();
-                        }}
-                        disabled={isUpdating}
-                        className="bg-purple-600 text-white px-4 py-2 rounded-md hover:bg-purple-700 transition-colors flex items-center gap-2"
-                      >
-                        <Truck className="h-5 w-5" />
-                        Marquer comme expédiée
-                      </button>
-                    )}
-                    
-                    {order.status === 'SHIPPED' && (
-                      <button
-                        onClick={() => {
-                          onUpdateStatus(order.id, 'DELIVERED');
-                          onClose();
-                        }}
-                        disabled={isUpdating}
-                        className="bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700 transition-colors flex items-center gap-2"
-                      >
-                        <Package className="h-5 w-5" />
-                        Marquer comme livrée
-                      </button>
-                    )}
-                  </>
-                )}
-                
-                {/* BOUTON FACTURE FORCÉ - TOUJOURS VISIBLE */}
+                {/* BOUTON FACTURE CLIENT - TOUJOURS VISIBLE */}
                 <a
                   href={`/api/orders/${order.id}/invoice/client`}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="bg-red-500 text-white px-4 py-2 rounded-md hover:opacity-90 transition-opacity flex items-center gap-2 inline-flex no-underline"
+                  className="bg-custom-accent text-white px-4 py-2 rounded-md hover:opacity-90 transition-opacity flex items-center gap-2 inline-flex no-underline"
                 >
                   <FileText className="h-5 w-5" />
-                  TEST FACTURE CLIENT
-                </a>
-                
-                {/* BOUTON FACTURE PRODUCTEUR FORCÉ - TOUJOURS VISIBLE */}
-                <a
-                  href={`/api/orders/${order.id}/invoice`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="bg-green-500 text-white px-4 py-2 rounded-md hover:opacity-90 transition-opacity flex items-center gap-2 inline-flex no-underline"
-                >
-                  <FileText className="h-5 w-5" />
-                  TEST FACTURE PROD
+                  Télécharger facture
                 </a>
               </div>
             </div>

@@ -17,7 +17,7 @@ export const GET = apiAuthMiddleware(async (
   try {
     const orderId = context.params.id
 
-    // Récupérer la commande
+    // Récupérer la commande avec la facture
     const order = await prisma.order.findUnique({
       where: { 
         id: orderId,
@@ -75,7 +75,8 @@ export const GET = apiAuthMiddleware(async (
           address: metadata.deliveryInfo?.address || metadata.address,
           postalCode: metadata.deliveryInfo?.postalCode || metadata.postalCode,
           city: metadata.deliveryInfo?.city || metadata.city,
-          phone: metadata.deliveryInfo?.phone || metadata.phone
+          phone: metadata.deliveryInfo?.phone || metadata.phone,
+          paymentMethod: metadata.paymentMethod
         }
       } catch (e) {
         console.error('Erreur parsing metadata:', e)
@@ -93,12 +94,52 @@ export const GET = apiAuthMiddleware(async (
     const deliveryFee = deliveryInfo?.type === 'delivery' ? 15 : 0
     const totalWithDelivery = subtotal + deliveryFee
 
+    // Informations de la facture
     const invoiceNumber = order.invoice 
       ? `FACT-${order.invoice.id.substring(0, 8).toUpperCase()}`
       : `CMD-${order.id.substring(0, 8).toUpperCase()}`
     const invoiceDate = order.createdAt.toLocaleDateString('fr-FR')
+    
+    // Vérifier si la facture/commande est payée (plusieurs sources possibles)
+    let isPaid = false
+    let paidAt = null
+    let paymentMethod = null
+    
+    // 1. Vérifier dans la facture (si elle existe)
+    if (order.invoice) {
+      isPaid = order.invoice.status === 'PAID'
+      paidAt = order.invoice.paidAt ? new Date(order.invoice.paidAt).toLocaleDateString('fr-FR') : null
+      paymentMethod = order.invoice.paymentMethod
+    }
+    
+    // 2. Vérifier dans les métadonnées de la commande
+    if (!isPaid && order.metadata) {
+      try {
+        const metadata = JSON.parse(order.metadata)
+        isPaid = metadata.paymentStatus === 'PAID' || metadata.paymentStatus === 'INVOICE_PAID'
+        if (isPaid && metadata.paidAt) {
+          paidAt = new Date(metadata.paidAt).toLocaleDateString('fr-FR')
+        }
+        if (!paymentMethod) {
+          paymentMethod = metadata.paymentMethod
+        }
+      } catch (e) {
+        // Ignore l'erreur de parsing
+      }
+    }
+    
+    // 3. Vérifier le statut de la commande (fallback)
+    if (!isPaid) {
+      isPaid = order.status === 'INVOICE_PAID'
+    }
+    // Si pas de méthode de paiement trouvée, utiliser celle des métadonnées de livraison
+    if (!paymentMethod && deliveryInfo?.paymentMethod) {
+      paymentMethod = deliveryInfo.paymentMethod
+    }
+    
+    const dueDate = order.invoice?.dueDate ? new Date(order.invoice.dueDate).toLocaleDateString('fr-FR') : null
 
-    // Template HTML pour CLIENT
+    // Template HTML similaire à celui des producteurs
     const html = `
 <!DOCTYPE html>
 <html lang="fr">
@@ -130,6 +171,11 @@ export const GET = apiAuthMiddleware(async (
             margin: 0; 
             letter-spacing: 1px;
         }
+        .company-tagline {
+            color: #7f8c8d; 
+            margin: 8px 0 0 0;
+            font-size: 14px;
+        }
         .invoice-info { 
             text-align: right; 
         }
@@ -151,9 +197,9 @@ export const GET = apiAuthMiddleware(async (
             text-transform: uppercase;
             letter-spacing: 0.5px;
         }
-        .company-tagline {
-            color: #7f8c8d; 
-            margin: 8px 0 0 0;
+        .invoice-details {
+            color: #34495e;
+            margin: 5px 0;
             font-size: 14px;
         }
         .info-section { 
@@ -207,19 +253,34 @@ export const GET = apiAuthMiddleware(async (
             border-bottom: none; 
         }
         .total-section { 
-            text-align: right; 
-            padding: 30px 0; 
-            border-top: 2px solid #dee2e6;
+            background: #f8f9fa;
+            padding: 30px;
+            border-radius: 4px;
+            border: 1px solid #e9ecef;
+            margin-bottom: 30px;
         }
         .total-row { 
-            margin: 8px 0; 
-            font-size: 15px;
+            display: flex;
+            justify-content: space-between;
+            margin: 12px 0;
+            font-size: 16px;
         }
-        .final-total { 
-            font-size: 22px; 
-            color: #FF5A5F; 
-            margin-top: 15px;
+        .total-row.grand-total {
+            border-top: 2px solid #34495e;
+            padding-top: 15px;
+            margin-top: 20px;
+            font-size: 18px;
             font-weight: 600;
+            color: #2c3e50;
+        }
+        .payment-status {
+            background: ${isPaid ? '#d4edda' : '#fff3cd'};
+            border: 1px solid ${isPaid ? '#c3e6cb' : '#ffeaa7'};
+            color: ${isPaid ? '#155724' : '#856404'};
+            padding: 20px;
+            border-radius: 4px;
+            margin-bottom: 30px;
+            text-align: center;
         }
         .footer { 
             text-align: center; 
@@ -244,9 +305,29 @@ export const GET = apiAuthMiddleware(async (
         <div class="invoice-info">
             <div class="client-badge">FACTURE CLIENT</div>
             <h2>Facture ${invoiceNumber}</h2>
-            <p style="margin: 5px 0;">Date: ${invoiceDate}</p>
+            <div class="invoice-details">Date: ${invoiceDate}</div>
+            ${dueDate ? `<div class="invoice-details">Échéance: ${dueDate}</div>` : ''}
         </div>
     </div>
+
+    ${isPaid ? `
+    <div class="payment-status">
+        <h3 style="margin: 0 0 10px 0;">✅ Facture Payée</h3>
+        <p style="margin: 0;">
+            ${paidAt ? `Payée le ${paidAt}` : 'Paiement confirmé'}
+            ${paymentMethod ? ` (${paymentMethod === 'invoice' ? 'Virement bancaire' : paymentMethod === 'card' ? 'Carte bancaire' : paymentMethod})` : ''}
+        </p>
+        <p style="margin: 5px 0 0 0; font-size: 14px;">Merci pour votre paiement. Cette facture est soldée.</p>
+    </div>
+    ` : order.invoice && dueDate ? `
+    <div class="payment-status" style="background: #fff3cd; border: 1px solid #ffeaa7; color: #856404;">
+        <h3 style="margin: 0 0 10px 0;">⏳ FACTURE EN ATTENTE</h3>
+        <p style="margin: 0;">Paiement requis avant le ${dueDate}</p>
+        <p style="margin: 5px 0 0 0; font-size: 14px;">
+            ${paymentMethod === 'invoice' ? 'Veuillez effectuer le virement bancaire avant l\'échéance.' : 'Veuillez procéder au paiement avant l\'échéance.'}
+        </p>
+    </div>
+    ` : ''}
 
     <div class="info-section">
         <div class="info-box">
@@ -266,6 +347,7 @@ export const GET = apiAuthMiddleware(async (
             <p><strong>N° Commande:</strong> #${order.id.substring(0, 8).toUpperCase()}</p>
             <p><strong>Date:</strong> ${order.createdAt.toLocaleDateString('fr-FR')}</p>
             <p><strong>Mode de livraison:</strong> ${deliveryInfo?.type === 'pickup' ? 'Retrait sur place' : 'Livraison à domicile'}</p>
+            <p><strong>Statut:</strong> ${order.status}</p>
         </div>
     </div>
 
@@ -284,7 +366,7 @@ export const GET = apiAuthMiddleware(async (
                     <td>
                         <strong>${item.product.name}</strong><br>
                         <span style="color: #7f8c8d; font-size: 13px;">
-                            Producteur: ${item.product.producer.companyName}
+                            Producteur: ${item.product.producer.companyName || item.product.producer.user.name}
                         </span>
                     </td>
                     <td style="text-align: center;">${formatNumber(item.quantity)} ${item.product.unit}</td>
@@ -300,7 +382,8 @@ export const GET = apiAuthMiddleware(async (
                     <td>
                         <strong>${booking.deliverySlot.product.name}</strong><br>
                         <span style="color: #7f8c8d; font-size: 13px;">
-                            Producteur: ${booking.deliverySlot.product.producer.companyName}
+                            Producteur: ${booking.deliverySlot.product.producer.companyName || booking.deliverySlot.product.producer.user.name}<br>
+                            Livraison: ${new Date(booking.deliverySlot.date).toLocaleDateString('fr-FR')}
                         </span>
                     </td>
                     <td style="text-align: center;">${formatNumber(booking.quantity)} ${booking.deliverySlot.product.unit}</td>
@@ -313,27 +396,38 @@ export const GET = apiAuthMiddleware(async (
     </table>
 
     <div class="total-section">
-        <div class="total-row"><strong>Sous-total:</strong> ${formatNumber(subtotal)} CHF</div>
-        ${deliveryFee > 0 ? `<div class="total-row"><strong>Frais de livraison:</strong> ${formatNumber(deliveryFee)} CHF</div>` : ''}
-        <div class="final-total"><strong>Total à payer:</strong> ${formatNumber(totalWithDelivery)} CHF</div>
+        <div class="total-row">
+            <span>Sous-total:</span>
+            <span>${formatNumber(subtotal)} CHF</span>
+        </div>
+        ${deliveryFee > 0 ? `
+        <div class="total-row">
+            <span>Frais de livraison:</span>
+            <span>${formatNumber(deliveryFee)} CHF</span>
+        </div>
+        ` : ''}
+        <div class="total-row grand-total">
+            <span>${isPaid ? 'Total Payé:' : 'Total à Payer:'}</span>
+            <span>${formatNumber(totalWithDelivery)} CHF</span>
+        </div>
     </div>
 
     <div class="footer">
-        <p>Merci pour votre commande sur Alpigus</p>
-        <p style="margin-top: 10px;">
-            Pour toute question, contactez-nous à support@alpigus.ch
-        </p>
+        <p><strong>alpigus - Marketplace B2B Champignons</strong></p>
+        <p>Cette facture est générée automatiquement par la plateforme alpigus</p>
+        <p>Pour toute question concernant cette facture, contactez-nous à support@alpigus.ch</p>
+        <p>TVA non applicable - Prestations de services numériques</p>
     </div>
 
     <script>
-        window.onload = function() {
+        document.addEventListener('DOMContentLoaded', function() {
             const printBtn = document.createElement('button');
             printBtn.textContent = 'Imprimer / Sauvegarder PDF';
             printBtn.className = 'no-print';
             printBtn.style.cssText = 'position:fixed;top:20px;right:20px;padding:12px 24px;background:#FF5A5F;color:white;border:none;border-radius:4px;cursor:pointer;z-index:1000;font-weight:500;box-shadow:0 2px 8px rgba(0,0,0,0.15);font-size:14px;';
-            printBtn.onclick = function() { window.print(); };
+            printBtn.onclick = () => window.print();
             document.body.appendChild(printBtn);
-        };
+        });
     </script>
 </body>
 </html>`
