@@ -1,4 +1,4 @@
-// components/products/product-list-item.tsx - VERSION CORRIGÉE
+// components/products/product-list-item.tsx - VERSION RESPONSIVE LÉGÈRE
 import { useState } from 'react'
 import { ProductType } from '@prisma/client'
 import { ShoppingCart, Info, Truck, Tag, Plus, Minus } from 'lucide-react'
@@ -41,9 +41,7 @@ export function ProductListItem({ product }: ProductListItemProps) {
   )
   const [showQuantitySelector, setShowQuantitySelector] = useState(false)
   
-  // ✅ CORRECTION: Fonction handleAddToCart améliorée
   const handleAddToCart = async () => {
-    // Pour les produits frais, on utilise le calendrier de livraison
     if (product.type === ProductType.FRESH) {
       window.location.href = `/products/${product.id}`
       return
@@ -52,10 +50,8 @@ export function ProductListItem({ product }: ProductListItemProps) {
     setIsAddingToCart(true)
     
     try {
-      // ✅ CORRECTION: Attendre le résultat ET gérer les erreurs correctement
       await addToCart(product, quantity)
       
-      // ✅ CORRECTION: Toast déplacé ici pour être sûr qu'il s'affiche
       toast({
         title: "✅ Produit ajouté",
         description: `${formatQuantity(quantity, product.unit)} de ${product.name} ajouté au panier`,
@@ -63,7 +59,6 @@ export function ProductListItem({ product }: ProductListItemProps) {
       })
       
     } catch (error: any) {
-      // ✅ CORRECTION: Gestion d'erreur améliorée
       console.error('Erreur addToCart:', error)
       toast({
         title: "❌ Erreur",
@@ -76,7 +71,6 @@ export function ProductListItem({ product }: ProductListItemProps) {
     }
   }
   
-  // Gestion de la quantité
   const incrementQuantity = () => {
     setQuantity(prev => parseToTwoDecimals(prev + 1))
   }
@@ -106,8 +100,8 @@ export function ProductListItem({ product }: ProductListItemProps) {
   return (
     <>
       <div className="card flex hover:shadow-md transition-shadow overflow-hidden">
-        {/* Image avec lien vers détail */}
-        <Link href={`/products/${product.id}`} className="w-32 sm:w-40 h-auto bg-foreground/5 flex-shrink-0 relative">
+        {/* Image avec lien vers détail - Légèrement plus petite sur mobile */}
+        <Link href={`/products/${product.id}`} className="w-28 sm:w-32 md:w-40 h-auto bg-foreground/5 flex-shrink-0 relative">
           {product.image ? (
             <img
               src={product.image}
@@ -116,7 +110,7 @@ export function ProductListItem({ product }: ProductListItemProps) {
             />
           ) : (
             <div className="w-full h-full flex items-center justify-center">
-              <span className="text-4xl">🍄</span>
+              <span className="text-3xl sm:text-4xl">🍄</span>
             </div>
           )}
           
@@ -128,18 +122,19 @@ export function ProductListItem({ product }: ProductListItemProps) {
           </div>
         </Link>
 
-        {/* Contenu */}
-        <div className="p-4 flex-1 flex flex-col">
+        {/* Contenu - Padding légèrement réduit sur mobile */}
+        <div className="p-3 sm:p-4 flex-1 flex flex-col min-w-0">
           <div className="flex-1">
             <div className="flex justify-between items-start mb-1">
-              <Link href={`/products/${product.id}`}>
-                <h3 className="font-semibold text-custom-title hover:text-custom-accent">
+              <Link href={`/products/${product.id}`} className="flex-1 min-w-0">
+                <h3 className="font-semibold text-white hover:text-custom-accent truncate">
                   {product.name}
                 </h3>
               </Link>
             </div>
             
-            <p className="text-sm text-muted-foreground mb-2 line-clamp-2">{product.description}</p>
+            {/* Description - Cachée sur très petits écrans */}
+            <p className="text-sm text-muted-foreground mb-2 line-clamp-2 hidden xs:block sm:block">{product.description}</p>
             
             {/* Tags */}
             <div className="mb-3 flex flex-wrap gap-1">
@@ -158,7 +153,7 @@ export function ProductListItem({ product }: ProductListItemProps) {
               )}
             </div>
             
-            {/* ✅ CORRECTION: Information quantité minimale - Seulement si définie ET > 0 */}
+            {/* Information quantité minimale */}
             {product.minOrderQuantity !== undefined && product.minOrderQuantity > 0 && (
               <p className="text-xs text-muted-foreground mb-2">
                 Quantité minimale: {formatNumber(product.minOrderQuantity)} {product.unit}
@@ -214,13 +209,14 @@ export function ProductListItem({ product }: ProductListItemProps) {
                 </div>
               )}
 
-              <div className="flex gap-2">
+              {/* Boutons - Empilés sur très petits écrans, en ligne ailleurs */}
+              <div className="flex flex-col xs:flex-row gap-2">
                 {product.type === ProductType.FRESH ? (
                   <>
                     {/* Bouton Réserver pour produits frais */}
                     <Link 
                       href={`/products/${product.id}`}
-                      className="flex-[2] flex items-center justify-center gap-2 py-2 bg-custom-accent text-white rounded-md hover:bg-custom-accentHover transition-colors text-sm font-medium"
+                      className="flex-[2] flex items-center justify-center gap-2 py-2 btn-primary rounded-md transition-colors text-sm font-medium"
                     >
                       <Truck className="h-4 w-4" />
                       Réserver
@@ -241,31 +237,34 @@ export function ProductListItem({ product }: ProductListItemProps) {
                     <LoadingButton
                       onClick={handleAddToCart}
                       isLoading={isAddingToCart}
-                      className="flex-[2] bg-custom-accent text-white hover:bg-custom-accentHover"
+                      className="flex-[2] btn-primary"
                       size="sm"
                     >
                       <ShoppingCart className="h-4 w-4 mr-2" />
                       Ajouter {formatNumber(quantity)} {product.unit}
                     </LoadingButton>
                     
-                    {/* Bouton Choisir quantité */}
-                    <button
-                      onClick={() => setShowQuantitySelector(!showQuantitySelector)}
-                      className="flex-1 flex items-center justify-center gap-1 py-2 border border-foreground/10 rounded-md hover:bg-foreground/5 transition-colors text-sm"
-                      title={showQuantitySelector ? "Masquer" : "Choisir la quantité"}
-                    >
-                      <Tag className="h-4 w-4" />
-                      {showQuantitySelector ? "OK" : "Quantité"}
-                    </button>
-                    
-                    {/* Bouton Informations */}
-                    <Link 
-                      href={`/products/${product.id}`}
-                      className="flex-1 flex items-center justify-center py-2 border border-foreground/10 rounded-md hover:bg-foreground/5 transition-colors"
-                      title="Voir les détails"
-                    >
-                      <Info className="h-4 w-4" />
-                    </Link>
+                    {/* Conteneur pour les boutons secondaires - 90/10 */}
+                    <div className="flex gap-2 flex-1">
+                      {/* Bouton Choisir quantité - 90% */}
+                      <button
+                        onClick={() => setShowQuantitySelector(!showQuantitySelector)}
+                        className="flex-[9] flex items-center justify-center gap-1 py-2 border border-foreground/10 rounded-md hover:bg-foreground/5 transition-colors text-sm"
+                        title={showQuantitySelector ? "Masquer" : "Choisir la quantité"}
+                      >
+                        <Tag className="h-4 w-4" />
+                        {showQuantitySelector ? "OK" : "Quantité"}
+                      </button>
+                      
+                      {/* Bouton Informations - 10% */}
+                      <Link 
+                        href={`/products/${product.id}`}
+                        className="flex-1 flex items-center justify-center py-2 border border-foreground/10 rounded-md hover:bg-foreground/5 transition-colors"
+                        title="Voir les détails"
+                      >
+                        <Info className="h-4 w-4" />
+                      </Link>
+                    </div>
                   </>
                 )}
               </div>

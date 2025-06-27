@@ -1,4 +1,4 @@
-// app/(protected)/invoices/page.tsx - VERSION CORRIGÉE AVEC ÉVÉNEMENTS
+// app/(protected)/invoices/page.tsx - VERSION COMPLÈTE AVEC REDIRECTION
 'use client'
 
 import { useState, useEffect } from 'react'
@@ -173,7 +173,7 @@ export default function InvoicesPage() {
     setPaymentMethod('card')
   }
 
-  // ✅ CORRECTION: Gestion du paiement par carte Stripe - SUCCESS avec événement
+  // ✅ NOUVEAU: Gestion du paiement par carte Stripe avec redirection
   const handleStripePaymentSuccess = async (paymentIntent: any) => {
     if (!selectedInvoice) return
     
@@ -196,19 +196,6 @@ export default function InvoicesPage() {
       
       const updatedInvoice = await response.json()
       
-      // Mettre à jour la liste des factures
-      setInvoices(prevInvoices => 
-        prevInvoices.map(invoice => 
-          invoice.id === selectedInvoice.id ? updatedInvoice : invoice
-        )
-      )
-      
-      toast({
-        title: '✅ Paiement réussi',
-        description: 'Votre facture a été payée avec succès',
-        duration: 4000,
-      })
-      
       // Rafraîchir le compteur de factures en attente
       refreshPendingCount()
       
@@ -223,7 +210,15 @@ export default function InvoicesPage() {
         }))
       }, 100)
       
-      closePaymentModal()
+      // ✅ NOUVEAU: Rediriger vers la page de remerciement
+      const params = new URLSearchParams({
+        invoice_id: selectedInvoice.id,
+        payment_method: 'card',
+        amount: selectedInvoice.amount.toString()
+      })
+      
+      window.location.href = `/invoices/payment-success?${params.toString()}`
+      
     } catch (error) {
       console.error('Erreur:', error)
       toast({
@@ -245,7 +240,7 @@ export default function InvoicesPage() {
     })
   }
 
-  // ✅ CORRECTION: Gestion du virement bancaire avec événement
+  // ✅ NOUVEAU: Gestion du virement bancaire avec redirection
   const handleBankTransferConfirm = async () => {
     if (!selectedInvoice) return
     
@@ -268,19 +263,6 @@ export default function InvoicesPage() {
       
       const updatedInvoice = await response.json()
       
-      // Mettre à jour la liste des factures
-      setInvoices(prevInvoices => 
-        prevInvoices.map(invoice => 
-          invoice.id === selectedInvoice.id ? updatedInvoice : invoice
-        )
-      )
-      
-      toast({
-        title: '✅ Virement confirmé',
-        description: 'Nous traiterons votre virement dans les plus brefs délais',
-        duration: 4000,
-      })
-      
       // Rafraîchir le compteur de factures en attente
       refreshPendingCount()
       
@@ -295,7 +277,15 @@ export default function InvoicesPage() {
         }))
       }, 100)
       
-      closePaymentModal()
+      // ✅ NOUVEAU: Rediriger vers la page de remerciement
+      const params = new URLSearchParams({
+        invoice_id: selectedInvoice.id,
+        payment_method: 'bank_transfer',
+        amount: selectedInvoice.amount.toString()
+      })
+      
+      window.location.href = `/invoices/payment-success?${params.toString()}`
+      
     } catch (error) {
       console.error('Erreur:', error)
       toast({

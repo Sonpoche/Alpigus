@@ -554,82 +554,152 @@ L'équipe Mushroom Marketplace`
             </div>
           </div>
           
-          {/* Informations de paiement */}
-          <div className="bg-background border border-foreground/10 rounded-lg shadow-sm overflow-hidden">
-            <div className="p-4 border-b border-foreground/10">
-              <h2 className="font-semibold">Paiement</h2>
-            </div>
-            <div className="p-4">
-              <div className="space-y-3">
-                <div className="flex items-center justify-between text-sm">
-                  <div className="flex items-center">
-                    <CreditCard className="h-4 w-4 mr-2 text-muted-foreground" />
-                    <span>Méthode</span>
+          {/* Section Informations de paiement - VERSION AMÉLIORÉE */}
+            <div className="bg-background border border-foreground/10 rounded-lg shadow-sm overflow-hidden">
+              <div className="p-4 border-b border-foreground/10">
+                <h2 className="font-semibold">Paiement</h2>
+              </div>
+              <div className="p-4">
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between text-sm">
+                    <div className="flex items-center">
+                      <CreditCard className="h-4 w-4 mr-2 text-muted-foreground" />
+                      <span>Méthode</span>
+                    </div>
+                    <span className="font-medium">
+                      {order.paymentInfo?.paymentMethod === 'card' ? 'Carte bancaire' :
+                      order.paymentInfo?.paymentMethod === 'bank_transfer' ? 'Virement bancaire' :
+                      order.invoice?.paymentMethod === 'card' ? 'Carte bancaire' :
+                      order.invoice?.paymentMethod === 'bank_transfer' ? 'Virement bancaire' :
+                      'Facture'}
+                    </span>
                   </div>
-                  <span className="font-medium">Facture</span>
-                </div>
-                <div className="flex items-center justify-between text-sm">
-                  <div className="flex items-center">
-                    <FileText className="h-4 w-4 mr-2 text-muted-foreground" />
-                    <span>Statut</span>
+                  
+                  <div className="flex items-center justify-between text-sm">
+                    <div className="flex items-center">
+                      <FileText className="h-4 w-4 mr-2 text-muted-foreground" />
+                      <span>Statut</span>
+                    </div>
+                    <Badge variant={
+                      order.status === 'INVOICE_PAID' ? 'default' : 
+                      order.status === 'INVOICE_OVERDUE' ? 'destructive' : 
+                      'secondary'
+                    } className={
+                      order.status === 'INVOICE_PAID' ? 'bg-green-100 text-green-800 border-green-200' :
+                      order.status === 'INVOICE_OVERDUE' ? 'bg-red-100 text-red-800 border-red-200' :
+                      'bg-amber-100 text-amber-800 border-amber-200'
+                    }>
+                      {order.status === 'INVOICE_PAID' ? '✅ Payée' : 
+                      order.status === 'INVOICE_OVERDUE' ? '⚠️ En retard' : 
+                      '⏳ En attente'}
+                    </Badge>
                   </div>
-                  <Badge variant={
-                    order.status === 'INVOICE_PAID' ? 'success' : 
-                    order.status === 'INVOICE_OVERDUE' ? 'destructive' : 
-                    'warning'
-                  }>
-                    {order.status === 'INVOICE_PAID' ? 'Payée' : 
-                     order.status === 'INVOICE_OVERDUE' ? 'En retard' : 
-                     'En attente'}
-                  </Badge>
-                </div>
-                {order.invoice && (
-                  <>
+
+                  {/* ✅ NOUVEAU: Afficher la date de paiement si payé */}
+                  {order.status === 'INVOICE_PAID' && (order.paymentInfo?.paidAt || order.invoice?.paidAt) && (
+                    <div className="flex items-center justify-between text-sm">
+                      <div className="flex items-center">
+                        <CheckCircle className="h-4 w-4 mr-2 text-green-600" />
+                        <span>Payée le</span>
+                      </div>
+                      <span className="font-medium text-green-600">
+                        {format(
+                          new Date(order.paymentInfo?.paidAt || order.invoice?.paidAt), 
+                          'dd/MM/yyyy à HH:mm', 
+                          { locale: fr }
+                        )}
+                      </span>
+                    </div>
+                  )}
+
+                  {/* ✅ NOUVEAU: Afficher le montant de la facture */}
+                  {order.invoice && (
                     <div className="flex items-center justify-between text-sm">
                       <div className="flex items-center">
                         <ReceiptText className="h-4 w-4 mr-2 text-muted-foreground" />
-                        <span>Facture #</span>
+                        <span>Montant</span>
                       </div>
-                      <span className="font-medium">{order.invoice.id.substring(0, 8)}</span>
+                      <span className="font-medium">{order.invoice.amount.toFixed(2)} CHF</span>
                     </div>
-                    <div className="flex items-center justify-between text-sm">
-                      <div className="flex items-center">
-                        <CalendarDays className="h-4 w-4 mr-2 text-muted-foreground" />
-                        <span>Échéance</span>
+                  )}
+
+                  {order.invoice && (
+                    <>
+                      <div className="flex items-center justify-between text-sm">
+                        <div className="flex items-center">
+                          <ReceiptText className="h-4 w-4 mr-2 text-muted-foreground" />
+                          <span>Facture #</span>
+                        </div>
+                        <span className="font-medium">{order.invoice.id.substring(0, 8)}</span>
                       </div>
-                      <span className="font-medium">
-                        {format(new Date(order.invoice.dueDate), 'dd/MM/yyyy', { locale: fr })}
-                      </span>
-                    </div>
-                  </>
-                )}
-              </div>
-              
-              {order.invoice && (
-                <div className="mt-4 bg-foreground/5 p-3 rounded-md">
-                  <h4 className="text-sm font-medium mb-2">Détails de la facture</h4>
-                  <div className="text-sm space-y-1">
-                    <div className="flex justify-between">
-                      <span>Numéro:</span>
-                      <span className="font-medium">{order.invoice.id.substring(0, 8)}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span>Date:</span>
-                      <span>{format(new Date(order.invoice.createdAt), 'dd/MM/yyyy', { locale: fr })}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span>Montant:</span>
-                      <span className="font-medium">{formatNumber(order.invoice.amount)} CHF</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span>Échéance:</span>
-                      <span>{format(new Date(order.invoice.dueDate), 'dd/MM/yyyy', { locale: fr })}</span>
+                      
+                      {/* ✅ AMÉLIORATION: Échéance plus claire */}
+                      <div className="flex items-center justify-between text-sm">
+                        <div className="flex items-center">
+                          <CalendarDays className="h-4 w-4 mr-2 text-muted-foreground" />
+                          <span>Échéance</span>
+                        </div>
+                        <span className={cn(
+                          "font-medium",
+                          order.status === 'INVOICE_OVERDUE' && "text-red-600",
+                          order.status === 'INVOICE_PAID' && "text-green-600"
+                        )}>
+                          {format(new Date(order.invoice.dueDate), 'dd/MM/yyyy', { locale: fr })}
+                          {order.status === 'INVOICE_OVERDUE' && " (dépassée)"}
+                          {order.status === 'INVOICE_PAID' && " (respectée)"}
+                        </span>
+                      </div>
+                    </>
+                  )}
+                </div>
+                
+                {/* ✅ NOUVEAU: Section détaillée de la facture */}
+                {order.invoice && (
+                  <div className="mt-4 bg-foreground/5 p-3 rounded-md">
+                    <h4 className="text-sm font-medium mb-2">Détails de la facture</h4>
+                    <div className="text-sm space-y-1">
+                      <div className="flex justify-between">
+                        <span>Numéro:</span>
+                        <span className="font-medium">INV-{order.invoice.id.substring(0, 8).toUpperCase()}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span>Créée le:</span>
+                        <span>{format(new Date(order.invoice.createdAt), 'dd/MM/yyyy', { locale: fr })}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span>Statut technique:</span>
+                        <Badge variant="outline" className="text-xs">
+                          {order.invoice.status}
+                        </Badge>
+                      </div>
+                      
+                      {/* ✅ NOUVEAU: Informations de paiement détaillées */}
+                      {order.status === 'INVOICE_PAID' && order.invoice.paidAt && (
+                        <>
+                          <hr className="my-2" />
+                          <div className="flex justify-between text-green-600">
+                            <span>Paiement confirmé:</span>
+                            <span className="font-medium">
+                              {format(new Date(order.invoice.paidAt), 'dd/MM/yyyy HH:mm', { locale: fr })}
+                            </span>
+                          </div>
+                          {order.invoice.paymentMethod && (
+                            <div className="flex justify-between text-green-600">
+                              <span>Via:</span>
+                              <span className="font-medium">
+                                {order.invoice.paymentMethod === 'card' ? '💳 Carte bancaire' :
+                                order.invoice.paymentMethod === 'bank_transfer' ? '🏦 Virement bancaire' :
+                                order.invoice.paymentMethod}
+                              </span>
+                            </div>
+                          )}
+                        </>
+                      )}
                     </div>
                   </div>
-                </div>
-              )}
+                )}
+              </div>
             </div>
-          </div>
           
           {/* Notes d'administration */}
           <div className="bg-background border border-foreground/10 rounded-lg shadow-sm overflow-hidden">

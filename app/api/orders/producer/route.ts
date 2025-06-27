@@ -1,4 +1,4 @@
-// app/api/orders/producer/route.ts
+// app/api/orders/producer/route.ts - CORRECTION pour cohérence avec exclusion DRAFT
 import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { apiAuthMiddleware } from "@/lib/api-middleware"
@@ -28,16 +28,16 @@ export const GET = apiAuthMiddleware(async (req: NextRequest, session: Session) 
 
     const producerId = producer.id
 
-    // Construire la requête de base
+    // ✅ CORRECTION: Construire la requête de base avec gestion cohérente des DRAFT
     const baseWhere: any = {}
 
     // Ajouter le filtre de statut s'il est spécifié
     if (statusParam) {
       baseWhere.status = statusParam
     } else {
-      // Par défaut, montrer toutes les commandes sauf DRAFT
+      // ✅ CORRECTION: Par défaut, exclure les DRAFT (cohérent avec les autres APIs)
       baseWhere.status = {
-        notIn: [OrderStatus.DRAFT]
+        not: OrderStatus.DRAFT
       }
     }
 
@@ -46,31 +46,37 @@ export const GET = apiAuthMiddleware(async (req: NextRequest, session: Session) 
     // Trouver les commandes qui contiennent des produits de ce producteur
     const ordersWithProducerItems = await prisma.order.findMany({
       where: {
-        OR: [
-          // Commandes contenant des articles standard du producteur
+        AND: [
+          // ✅ CORRECTION: Appliquer le filtre de statut en premier
+          baseWhere,
+          // Ensuite filtrer par producteur
           {
-            items: {
-              some: {
-                product: {
-                  producerId: producerId
+            OR: [
+              // Commandes contenant des articles standard du producteur
+              {
+                items: {
+                  some: {
+                    product: {
+                      producerId: producerId
+                    }
+                  }
                 }
-              }
-            }
-          },
-          // Commandes contenant des réservations de créneaux de livraison du producteur
-          {
-            bookings: {
-              some: {
-                deliverySlot: {
-                  product: {
-                    producerId: producerId
+              },
+              // Commandes contenant des réservations de créneaux de livraison du producteur
+              {
+                bookings: {
+                  some: {
+                    deliverySlot: {
+                      product: {
+                        producerId: producerId
+                      }
+                    }
                   }
                 }
               }
-            }
+            ]
           }
-        ],
-        ...baseWhere
+        ]
       },
       include: {
         user: {
@@ -111,7 +117,6 @@ export const GET = apiAuthMiddleware(async (req: NextRequest, session: Session) 
       take: limit
     })
 
-    // app/api/orders/producer/route.ts (suite)
     console.log(`Nombre de commandes trouvées: ${ordersWithProducerItems.length}`);
 
     // Filtrer les éléments pour ne renvoyer que ceux appartenant au producteur

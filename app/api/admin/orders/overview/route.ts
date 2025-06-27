@@ -1,9 +1,9 @@
-// app/api/admin/orders/overview/route.ts
+// app/api/admin/orders/overview/route.ts - CORRECTION pour exclure les DRAFT
 import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { apiAuthMiddleware } from "@/lib/api-middleware"
 import { Session } from "next-auth"
-import { Prisma } from "@prisma/client"
+import { Prisma, OrderStatus } from "@prisma/client"
 
 export const GET = apiAuthMiddleware(
   async (
@@ -28,25 +28,41 @@ export const GET = apiAuthMiddleware(
       
       console.log("Début du traitement de l'API orders/overview");
       
-      // ÉTAPE 1: Statistiques de base sur les commandes
-      console.log("Récupération des statistiques de base des commandes");
-      // Données globales des commandes
-      const totalOrders = await prisma.order.count();
-      console.log(`Total des commandes: ${totalOrders}`);
+      // ✅ CORRECTION: ÉTAPE 1 - Statistiques de base SANS les DRAFT
+      console.log("Récupération des statistiques de base des commandes (sans DRAFT)");
       
-      // Commandes par statut
+      // Total des commandes (SANS les DRAFT)
+      const totalOrders = await prisma.order.count({
+        where: {
+          status: {
+            not: OrderStatus.DRAFT
+          }
+        }
+      });
+      console.log(`Total des commandes (sans DRAFT): ${totalOrders}`);
+      
+      // ✅ CORRECTION: Commandes par statut (SANS les DRAFT)
       const ordersByStatus = await prisma.order.groupBy({
         by: ['status'],
+        where: {
+          status: {
+            not: OrderStatus.DRAFT
+          }
+        },
         _count: {
           id: true
         }
       });
-      console.log("Commandes par statut récupérées:", ordersByStatus);
+      console.log("Commandes par statut récupérées (sans DRAFT):", ordersByStatus);
       
-      // Préparation de la recherche avec des filtres Prisma valides
+      // ✅ CORRECTION: Préparation de la recherche avec exclusion des DRAFT
       let whereClause: Prisma.OrderWhereInput = {
         createdAt: {
           gte: dateLimit
+        },
+        // Exclure explicitement les DRAFT
+        status: {
+          not: OrderStatus.DRAFT
         }
       };
       
@@ -72,8 +88,8 @@ export const GET = apiAuthMiddleware(
         };
       }
       
-      // Commandes récentes avec pagination et recherche
-      console.log("Récupération des commandes avec pagination et recherche");
+      // ✅ CORRECTION: Commandes récentes avec pagination (SANS les DRAFT)
+      console.log("Récupération des commandes avec pagination et recherche (sans DRAFT)");
       const skip = (page - 1) * limit;
       
       const orders = await prisma.order.findMany({
@@ -94,7 +110,7 @@ export const GET = apiAuthMiddleware(
         }
       });
       
-      // Nombre total de commandes correspondant à la recherche
+      // Nombre total de commandes correspondant à la recherche (SANS les DRAFT)
       const totalFilteredOrders = await prisma.order.count({
         where: whereClause
       });
@@ -102,21 +118,30 @@ export const GET = apiAuthMiddleware(
       // Nombre total de pages
       const totalPages = Math.ceil(totalFilteredOrders / limit);
       
-      console.log(`${orders.length} commandes récupérées sur ${totalFilteredOrders} au total`);
+      console.log(`${orders.length} commandes récupérées sur ${totalFilteredOrders} au total (sans DRAFT)`);
       
-      // ÉTAPE 2: Commandes nécessitant attention
-      console.log("Récupération des commandes nécessitant attention");
+      // ✅ CORRECTION: ÉTAPE 2 - Commandes nécessitant attention (SANS les DRAFT)
+      console.log("Récupération des commandes nécessitant attention (sans DRAFT)");
       const ordersNeedingAttention = await prisma.order.findMany({
         where: {
-          OR: [
-            { 
-              status: 'PENDING', 
-              createdAt: { 
-                lte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) 
-              } 
+          AND: [
+            // Exclure les DRAFT
+            {
+              status: {
+                not: OrderStatus.DRAFT
+              }
+            },
+            // Conditions d'attention
+            {
+              OR: [
+                { 
+                  status: OrderStatus.PENDING, 
+                  createdAt: { 
+                    lte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) 
+                  } 
+                }
+              ]
             }
-            // Nous retirons temporairement la condition INVOICE_OVERDUE
-            // Nous l'ajouterons plus tard si tout fonctionne
           ]
         },
         include: {
@@ -132,7 +157,7 @@ export const GET = apiAuthMiddleware(
         },
         take: 10
       });
-      console.log(`${ordersNeedingAttention.length} commandes nécessitant attention récupérées`);
+      console.log(`${ordersNeedingAttention.length} commandes nécessitant attention récupérées (sans DRAFT)`);
       
       // Préparation de la réponse
       console.log("Préparation de la réponse");

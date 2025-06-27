@@ -1,4 +1,4 @@
-// app/api/orders/route.ts
+// app/api/orders/route.ts - CORRECTION pour exclure les DRAFT de façon cohérente
 import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { apiAuthMiddleware } from "@/lib/api-middleware"
@@ -47,23 +47,22 @@ export const GET = apiAuthMiddleware(async (req: NextRequest, session: Session) 
    const page = parseInt(searchParams.get('page') ?? '1')
    const limit = parseInt(searchParams.get('limit') ?? '10')
 
-   // Base de la requête
+   // ✅ CORRECTION: Base de la requête avec exclusion systématique des DRAFT
    const baseWhere: any = {
      ...(session.user.role === 'CLIENT' && {
        userId: session.user.id
+     }),
+     // Toujours exclure les DRAFT sauf si explicitement demandé
+     ...(statusParam !== OrderStatus.DRAFT && {
+       status: statusParam ? statusParam : { not: OrderStatus.DRAFT }
+     }),
+     // Si on demande explicitement les DRAFT, les inclure
+     ...(statusParam === OrderStatus.DRAFT && {
+       status: OrderStatus.DRAFT
      })
    }
 
-   // Ajouter le filtre de statut s'il est spécifié
-   if (statusParam) {
-     baseWhere.status = statusParam
-   } else {
-     // Par défaut, n'inclure que les commandes réellement validées
-     // Exclure à la fois DRAFT (paniers) et PENDING (en attente de paiement)
-     baseWhere.status = {
-       notIn: [OrderStatus.DRAFT, OrderStatus.PENDING]
-     }
-   }
+   console.log("Filtres appliqués pour les commandes:", baseWhere)
 
    // Récupérer les commandes avec pagination
    const [orders, total] = await Promise.all([
@@ -172,22 +171,20 @@ export const POST = apiAuthMiddleware(async (req: NextRequest, session: Session)
     
     await logDebug("Items qui seront utilisés pour créer la commande:", itemsToCreate);
     
-    // Créer une commande vide ou avec les items fournis
+    // Créer la nouvelle commande
+    let totalAmount = 0;
+    
+    // Calculer le montant total des items
+    for (const item of itemsToCreate) {
+      totalAmount += item.price * item.quantity;
+    }
+    
+    // Créer la commande
     const order = await prisma.order.create({
       data: {
         userId: session.user.id,
-        total: 0,
-        status: OrderStatus.DRAFT,  // Toujours utiliser DRAFT pour les paniers
-        // Si des items sont fournis, les ajouter
-        ...(itemsToCreate.length > 0 && {
-          items: {
-            create: itemsToCreate.map((item: any) => ({
-              productId: item.productId,
-              quantity: item.quantity,
-              price: item.price || 0
-            }))
-          }
-        })
+        total: totalAmount,
+        status: OrderStatus.DRAFT
       },
       include: {
         items: {
@@ -221,34 +218,88 @@ export const POST = apiAuthMiddleware(async (req: NextRequest, session: Session)
         }
       }
     });
-
-    await logDebug("Panier créé avec ID:", order.id);
-    await logDebug("Contenu de l'objet order.items:", order.items);
     
-    // Vérification supplémentaire des items du panier dans la base de données
-    const itemsInDb = await prisma.orderItem.findMany({
-      where: { orderId: order.id },
-      include: { product: true }
+    await logDebug("Commande créée avec ID:", order.id);
+    
+    // Créer les items de commande
+    for (const item of itemsToCreate) {
+      await prisma.orderItem.create({
+        data: {
+          orderId: order.id,
+          productId: item.productId,
+          quantity: item.quantity,
+          price: item.price
+        }
+      });
+    }
+    
+    // Récupérer la commande mise à jour avec les items
+    const updatedOrder = await prisma.order.findUnique({
+      where: { id: order.id },
+      include: {
+        items: {
+          include: {
+            product: {
+              include: {
+                producer: true
+              }
+            }
+          }
+        },
+        user: {
+          select: {
+            name: true,
+            email: true,
+            phone: true
+          }
+        },
+        bookings: {
+          include: {
+            deliverySlot: {
+              include: {
+                product: {
+                  include: {
+                    producer: true
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
     });
-    await logDebug("Vérification des items dans la base de données:", itemsInDb);
-
-    await logDebug("Panier créé", { 
-      id: order.id, 
-      itemsCount: order.items?.length || 0,
-      bookingsCount: order.bookings?.length || 0
+    
+    await logDebug("Contenu de l'objet order.items:", updatedOrder?.items);
+    
+    // Vérifier que la commande a été créée correctement
+    const verifyItems = await prisma.orderItem.findMany({
+      where: { orderId: order.id }
     });
-
-    // Ne pas envoyer de notifications car c'est juste un panier (DRAFT)
-
-    return NextResponse.json(order)
-  } catch (e) {
-    // Correction pour TypeScript: erreur de type unknown
-    const error = e as Error;
-    await logDebug("Erreur création commande", { 
-      error: error.message, 
-      stack: error.stack 
+    
+    await logDebug("Vérification des items dans la base de données:", verifyItems);
+    
+    await logDebug("Commande créée", {
+      id: order.id,
+      itemsCount: verifyItems.length,
+      bookingsCount: updatedOrder?.bookings.length || 0
     });
-    console.error("Erreur création commande:", error)
+    
+    // Si la commande a des items, envoyer une notification
+    if (verifyItems.length > 0) {
+      try {
+        await NotificationService.sendNewOrderNotification(updatedOrder!);
+      } catch (notificationError) {
+        await logDebug("Erreur lors de l'envoi de notification:", notificationError);
+        // Ne pas faire échouer la création de commande pour une erreur de notification
+      }
+    } else {
+      await logDebug("Aucun item dans la commande - pas de notification à créer");
+    }
+
+    return NextResponse.json(updatedOrder);
+  } catch (error) {
+    await logDebug("Erreur lors de la création de commande:", error);
+    console.error("Erreur lors de la création de la commande:", error)
     return new NextResponse("Erreur lors de la création de la commande", { status: 500 })
   }
 })
