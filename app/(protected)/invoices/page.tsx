@@ -1,4 +1,4 @@
-// app/(protected)/invoices/page.tsx
+// app/(protected)/invoices/page.tsx - VERSION CORRIGÉE AVEC ÉVÉNEMENTS
 'use client'
 
 import { useState, useEffect } from 'react'
@@ -66,7 +66,7 @@ export default function InvoicesPage() {
   const [processingInvoiceId, setProcessingInvoiceId] = useState<string | null>(null)
   const [searchQuery, setSearchQuery] = useState('')
   const [statusFilter, setStatusFilter] = useState<string>('all')
-  const [sortBy, setSortBy] = useState<string>('dueDate_desc') // CHANGÉ : décroissant par défaut
+  const [sortBy, setSortBy] = useState<string>('dueDate_desc')
   
   // États pour la modal de paiement
   const [showPaymentModal, setShowPaymentModal] = useState(false)
@@ -82,11 +82,18 @@ export default function InvoicesPage() {
     }
   }, [status, router])
 
-  // Récupérer les factures
+  // ✅ CORRECTION: Récupérer les factures avec événement de mise à jour
   const fetchInvoices = async () => {
     try {
       setIsLoading(true)
-      const response = await fetch('/api/invoices')
+      const response = await fetch('/api/invoices', {
+        // ✅ CORRECTION: Empêcher la mise en cache
+        cache: 'no-store',
+        headers: {
+          'pragma': 'no-cache',
+          'cache-control': 'no-cache'
+        }
+      })
       
       if (!response.ok) {
         throw new Error('Erreur lors de la récupération des factures')
@@ -95,6 +102,14 @@ export default function InvoicesPage() {
       const data = await response.json()
       setInvoices(data.invoices || [])
       setFilteredInvoices(data.invoices || [])
+      
+      // ✅ CORRECTION: Déclencher l'événement après le chargement
+      setTimeout(() => {
+        window.dispatchEvent(new CustomEvent('invoice:updated', {
+          detail: { type: 'loaded', count: data.invoices?.length || 0 }
+        }))
+      }, 100)
+      
     } catch (error) {
       console.error('Erreur:', error)
       toast({
@@ -158,7 +173,7 @@ export default function InvoicesPage() {
     setPaymentMethod('card')
   }
 
-  // Gestion du paiement par carte Stripe - SUCCESS
+  // ✅ CORRECTION: Gestion du paiement par carte Stripe - SUCCESS avec événement
   const handleStripePaymentSuccess = async (paymentIntent: any) => {
     if (!selectedInvoice) return
     
@@ -189,21 +204,33 @@ export default function InvoicesPage() {
       )
       
       toast({
-        title: 'Paiement réussi',
+        title: '✅ Paiement réussi',
         description: 'Votre facture a été payée avec succès',
-        variant: 'default'
+        duration: 4000,
       })
       
       // Rafraîchir le compteur de factures en attente
       refreshPendingCount()
       
+      // ✅ CORRECTION: Déclencher l'événement global
+      setTimeout(() => {
+        window.dispatchEvent(new CustomEvent('invoice:paid', {
+          detail: { 
+            invoiceId: selectedInvoice.id,
+            amount: selectedInvoice.amount,
+            method: 'card'
+          }
+        }))
+      }, 100)
+      
       closePaymentModal()
     } catch (error) {
       console.error('Erreur:', error)
       toast({
-        title: 'Erreur',
+        title: '❌ Erreur',
         description: 'Erreur lors de la finalisation du paiement',
-        variant: 'destructive'
+        variant: 'destructive',
+        duration: 5000,
       })
     }
   }
@@ -211,13 +238,14 @@ export default function InvoicesPage() {
   // Gestion du paiement par carte Stripe - ERROR
   const handleStripePaymentError = (error: string) => {
     toast({
-      title: 'Erreur de paiement',
+      title: '❌ Erreur de paiement',
       description: error,
-      variant: 'destructive'
+      variant: 'destructive',
+      duration: 5000,
     })
   }
 
-  // Gestion du virement bancaire
+  // ✅ CORRECTION: Gestion du virement bancaire avec événement
   const handleBankTransferConfirm = async () => {
     if (!selectedInvoice) return
     
@@ -248,21 +276,33 @@ export default function InvoicesPage() {
       )
       
       toast({
-        title: 'Virement confirmé',
+        title: '✅ Virement confirmé',
         description: 'Nous traiterons votre virement dans les plus brefs délais',
-        variant: 'default'
+        duration: 4000,
       })
       
       // Rafraîchir le compteur de factures en attente
       refreshPendingCount()
       
+      // ✅ CORRECTION: Déclencher l'événement global
+      setTimeout(() => {
+        window.dispatchEvent(new CustomEvent('invoice:paid', {
+          detail: { 
+            invoiceId: selectedInvoice.id,
+            amount: selectedInvoice.amount,
+            method: 'bank_transfer'
+          }
+        }))
+      }, 100)
+      
       closePaymentModal()
     } catch (error) {
       console.error('Erreur:', error)
       toast({
-        title: 'Erreur',
+        title: '❌ Erreur',
         description: 'Impossible de confirmer le virement',
-        variant: 'destructive'
+        variant: 'destructive',
+        duration: 5000,
       })
     } finally {
       setIsProcessingPayment(false)
@@ -287,16 +327,17 @@ export default function InvoicesPage() {
       }
       
       toast({
-        title: 'Facture générée',
+        title: '📄 Facture générée',
         description: 'Votre facture s\'ouvre dans un nouvel onglet',
-        variant: 'default'
+        duration: 3000,
       })
     } catch (error) {
       console.error('Erreur:', error)
       toast({
-        title: 'Erreur',
+        title: '❌ Erreur',
         description: 'Impossible de télécharger la facture',
-        variant: 'destructive'
+        variant: 'destructive',
+        duration: 4000,
       })
     }
   }
@@ -434,7 +475,7 @@ export default function InvoicesPage() {
             onClick={() => {
               setStatusFilter('all')
               setSearchQuery('')
-              setSortBy('dueDate_desc') // CHANGÉ : reset vers décroissant
+              setSortBy('dueDate_desc')
             }}
             className="px-3 py-2 border border-foreground/10 rounded-md hover:bg-foreground/5 transition-colors flex items-center justify-center gap-2 text-sm"
           >
@@ -760,7 +801,7 @@ export default function InvoicesPage() {
                 <div className="border border-foreground/10 rounded-lg p-4">
                   <BankTransferForm
                     amount={selectedInvoice.amount}
-                    orderId={selectedInvoice.orderId} // Utiliser l'ID de la commande pour la référence
+                    orderId={selectedInvoice.orderId}
                     onConfirm={handleBankTransferConfirm}
                     isLoading={isProcessingPayment}
                   />

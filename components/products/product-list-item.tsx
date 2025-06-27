@@ -1,5 +1,4 @@
-// components/products/product-list-item.tsx
-
+// components/products/product-list-item.tsx - VERSION CORRIGÉE
 import { useState } from 'react'
 import { ProductType } from '@prisma/client'
 import { ShoppingCart, Info, Truck, Tag, Plus, Minus } from 'lucide-react'
@@ -7,8 +6,7 @@ import { useToast } from '@/hooks/use-toast'
 import { useCart } from '@/hooks/use-cart'
 import { Badge } from '@/components/ui/badge'
 import { LoadingButton } from '@/components/ui/loading-button'
-import { AddToCartAnimation } from '@/components/cart/add-to-cart-animation'
-import { formatPriceSimple, formatQuantity, formatInputValue, parseToTwoDecimals } from '@/lib/number-utils'
+import { formatPriceSimple, formatQuantity, formatInputValue, parseToTwoDecimals, formatNumber } from '@/lib/number-utils'
 import Link from 'next/link'
 
 interface Product {
@@ -36,7 +34,6 @@ export function ProductListItem({ product }: ProductListItemProps) {
   const { toast } = useToast()
   const { addToCart } = useCart()
   const [isAddingToCart, setIsAddingToCart] = useState(false)
-  const [showAnimation, setShowAnimation] = useState(false)
   const [quantity, setQuantity] = useState(
     product.minOrderQuantity !== undefined && product.minOrderQuantity > 0 
       ? product.minOrderQuantity 
@@ -44,6 +41,7 @@ export function ProductListItem({ product }: ProductListItemProps) {
   )
   const [showQuantitySelector, setShowQuantitySelector] = useState(false)
   
+  // ✅ CORRECTION: Fonction handleAddToCart améliorée
   const handleAddToCart = async () => {
     // Pour les produits frais, on utilise le calendrier de livraison
     if (product.type === ProductType.FRESH) {
@@ -52,24 +50,26 @@ export function ProductListItem({ product }: ProductListItemProps) {
     }
     
     setIsAddingToCart(true)
+    
     try {
-      const success = await addToCart(product, quantity)
+      // ✅ CORRECTION: Attendre le résultat ET gérer les erreurs correctement
+      await addToCart(product, quantity)
       
-      if (success) {
-        setShowAnimation(true)
-        
-        toast({
-          title: "Produit ajouté",
-          description: `${formatQuantity(quantity, product.unit)} de ${product.name} ajouté(s) au panier`
-        })
-      } else {
-        throw new Error('Erreur lors de l\'ajout au panier')
-      }
-    } catch (error: any) {
+      // ✅ CORRECTION: Toast déplacé ici pour être sûr qu'il s'affiche
       toast({
-        title: "Erreur",
+        title: "✅ Produit ajouté",
+        description: `${formatQuantity(quantity, product.unit)} de ${product.name} ajouté au panier`,
+        duration: 3000,
+      })
+      
+    } catch (error: any) {
+      // ✅ CORRECTION: Gestion d'erreur améliorée
+      console.error('Erreur addToCart:', error)
+      toast({
+        title: "❌ Erreur",
         description: error.message || "Impossible d'ajouter au panier",
-        variant: "destructive"
+        variant: "destructive",
+        duration: 4000,
       })
     } finally {
       setIsAddingToCart(false)
@@ -158,106 +158,121 @@ export function ProductListItem({ product }: ProductListItemProps) {
               )}
             </div>
             
-            {/* Information quantité minimale si applicable */}
-            {(product.minOrderQuantity !== undefined && product.minOrderQuantity > 0) ? (
-              <div className="text-xs bg-amber-50 dark:bg-amber-900/20 text-amber-800 dark:text-amber-300 p-2 rounded-md mb-3 inline-block">
-                Minimum: {formatQuantity(product.minOrderQuantity, product.unit)}
-              </div>
-            ) : null}
-
-            {/* Sélecteur de quantité */}
-            {showQuantitySelector && product.type !== ProductType.FRESH && (
-              <div className="flex items-center mb-3 bg-foreground/5 rounded-md p-2 w-fit">
-                <button 
-                  onClick={decrementQuantity} 
-                  className="w-8 h-8 flex items-center justify-center rounded-md border border-foreground/10 bg-background hover:bg-accent"
-                  disabled={quantity <= (product.minOrderQuantity || 1)}
-                >
-                  <Minus className="h-3 w-3" />
-                </button>
-                <input 
-                  type="number" 
-                  value={quantity} 
-                  onChange={handleQuantityChange}
-                  min={product.minOrderQuantity || 1}
-                  step="0.01"
-                  max="999999.99"
-                  className="w-16 text-center bg-background border border-foreground/10 rounded-md mx-2 px-2 py-1 text-sm"
-                />
-                <span className="text-xs mr-2">{product.unit}</span>
-                <button 
-                  onClick={incrementQuantity} 
-                  className="w-8 h-8 flex items-center justify-center rounded-md border border-foreground/10 bg-background hover:bg-accent"
-                >
-                  <Plus className="h-3 w-3" />
-                </button>
-              </div>
+            {/* ✅ CORRECTION: Information quantité minimale - Seulement si définie ET > 0 */}
+            {product.minOrderQuantity !== undefined && product.minOrderQuantity > 0 && (
+              <p className="text-xs text-muted-foreground mb-2">
+                Quantité minimale: {formatNumber(product.minOrderQuantity)} {product.unit}
+              </p>
             )}
-          </div>
-          
-          {/* Prix et actions */}
-          <div className="flex items-center justify-between mt-2 pt-2 border-t border-foreground/5">
-            <div>
-              <span className="font-medium text-lg">{formatPriceSimple(product.price)} CHF/{product.unit}</span>
+            
+            {/* Prix */}
+            <div className="flex items-baseline gap-2 mb-3">
+              <span className="text-lg font-bold text-custom-accent">
+                {formatPriceSimple(product.price)} CHF
+              </span>
+              <span className="text-sm text-muted-foreground">/{product.unit}</span>
               {product.stock && (
-                <span className="text-xs text-muted-foreground ml-2">
-                  (Stock: {formatQuantity(product.stock.quantity, product.unit)})
+                <span className="text-xs text-muted-foreground ml-auto">
+                  Stock: {formatPriceSimple(product.stock.quantity)} {product.unit}
                 </span>
               )}
             </div>
-            
-            {/* Boutons d'action */}
-            {product.available && (
-              <div className="flex gap-2">
-                <Link 
-                  href={`/products/${product.id}`}
-                  className="flex items-center justify-center gap-1 py-2 px-3 border border-foreground/10 rounded-md hover:bg-foreground/5 transition-colors text-sm font-medium"
-                >
-                  <Info className="h-4 w-4" />
-                  <span className="hidden sm:inline">Détails</span>
-                </Link>
-                
-                {product.type === ProductType.FRESH ? (
-                  <LoadingButton
-                    onClick={handleAddToCart}
-                    isLoading={isAddingToCart}
-                    className="bg-custom-accent text-white hover:bg-custom-accentHover text-sm"
+          </div>
+
+          {/* Actions - Boutons alignés */}
+          {!product.available ? (
+            <div className="text-center py-2 text-sm text-muted-foreground">
+              Produit indisponible
+            </div>
+          ) : (
+            <>
+              {/* Sélecteur de quantité conditionnel */}
+              {showQuantitySelector && product.type !== ProductType.FRESH && (
+                <div className="flex items-center border border-foreground/20 rounded-md mb-3">
+                  <button
+                    onClick={decrementQuantity}
+                    className="p-1 hover:bg-foreground/5 rounded-l"
+                    disabled={quantity <= (product.minOrderQuantity || 1)}
                   >
-                    <Truck className="h-4 w-4 mr-1" />
-                    <span className="hidden sm:inline">Livraison</span>
-                  </LoadingButton>
+                    <Minus className="h-4 w-4" />
+                  </button>
+                  <input
+                    type="number"
+                    value={quantity}
+                    onChange={handleQuantityChange}
+                    className="flex-1 text-center border-0 bg-transparent text-sm py-2 focus:outline-none"
+                    min={product.minOrderQuantity || 1}
+                    step="0.1"
+                  />
+                  <span className="text-sm text-muted-foreground px-2">{product.unit}</span>
+                  <button
+                    onClick={incrementQuantity}
+                    className="p-1 hover:bg-foreground/5 rounded-r"
+                  >
+                    <Plus className="h-4 w-4" />
+                  </button>
+                </div>
+              )}
+
+              <div className="flex gap-2">
+                {product.type === ProductType.FRESH ? (
+                  <>
+                    {/* Bouton Réserver pour produits frais */}
+                    <Link 
+                      href={`/products/${product.id}`}
+                      className="flex-[2] flex items-center justify-center gap-2 py-2 bg-custom-accent text-white rounded-md hover:bg-custom-accentHover transition-colors text-sm font-medium"
+                    >
+                      <Truck className="h-4 w-4" />
+                      Réserver
+                    </Link>
+                    
+                    {/* Bouton Informations */}
+                    <Link 
+                      href={`/products/${product.id}`}
+                      className="flex-1 flex items-center justify-center py-2 border border-foreground/10 rounded-md hover:bg-foreground/5 transition-colors"
+                      title="Voir les détails"
+                    >
+                      <Info className="h-4 w-4" />
+                    </Link>
+                  </>
                 ) : (
-                  <div className="flex items-center gap-2">
-                    {!showQuantitySelector && (
-                      <button
-                        onClick={() => setShowQuantitySelector(true)}
-                        className="text-xs text-custom-accent hover:underline"
-                      >
-                        Modifier quantité
-                      </button>
-                    )}
+                  <>
+                    {/* Bouton Ajouter au panier */}
                     <LoadingButton
                       onClick={handleAddToCart}
                       isLoading={isAddingToCart}
-                      className="bg-custom-accent text-white hover:bg-custom-accentHover text-sm"
+                      className="flex-[2] bg-custom-accent text-white hover:bg-custom-accentHover"
+                      size="sm"
                     >
-                      <ShoppingCart className="h-4 w-4 mr-1" />
-                      <span className="hidden sm:inline">Ajouter</span>
+                      <ShoppingCart className="h-4 w-4 mr-2" />
+                      Ajouter {formatNumber(quantity)} {product.unit}
                     </LoadingButton>
-                  </div>
+                    
+                    {/* Bouton Choisir quantité */}
+                    <button
+                      onClick={() => setShowQuantitySelector(!showQuantitySelector)}
+                      className="flex-1 flex items-center justify-center gap-1 py-2 border border-foreground/10 rounded-md hover:bg-foreground/5 transition-colors text-sm"
+                      title={showQuantitySelector ? "Masquer" : "Choisir la quantité"}
+                    >
+                      <Tag className="h-4 w-4" />
+                      {showQuantitySelector ? "OK" : "Quantité"}
+                    </button>
+                    
+                    {/* Bouton Informations */}
+                    <Link 
+                      href={`/products/${product.id}`}
+                      className="flex-1 flex items-center justify-center py-2 border border-foreground/10 rounded-md hover:bg-foreground/5 transition-colors"
+                      title="Voir les détails"
+                    >
+                      <Info className="h-4 w-4" />
+                    </Link>
+                  </>
                 )}
               </div>
-            )}
-          </div>
+            </>
+          )}
         </div>
       </div>
-      
-      <AddToCartAnimation
-        isOpen={showAnimation}
-        onClose={() => setShowAnimation(false)}
-        productName={product.name}
-        productImage={product.image}
-      />
     </>
   )
 }

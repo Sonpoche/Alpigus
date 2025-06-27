@@ -1,4 +1,4 @@
-// hooks/use-cart.ts
+// hooks/use-cart.ts - VERSION CORRIGÉE
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
@@ -71,7 +71,7 @@ export function useCart() {
     }
   }, [])
   
-  // Ajouter un produit au panier
+  // ✅ CORRECTION: Ajouter un produit au panier avec toast intégré
   const addToCart = async (product: Product, quantity: number) => {
     try {
       setIsLoading(true)
@@ -87,7 +87,7 @@ export function useCart() {
         const response = await fetch('/api/orders', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ items: [] }) // Créer un panier vide
+          body: JSON.stringify({ items: [] })
         })
         
         if (!response.ok) {
@@ -114,22 +114,29 @@ export function useCart() {
       })
       
       if (!response.ok) {
-        const errorText = await response.text();
+        const errorText = await response.text()
         throw new Error(errorText || 'Erreur lors de l\'ajout au panier')
       }
       
-      // Après un ajout réussi, toujours récupérer les données à jour
+      // ✅ CORRECTION: Récupérer les données AVANT de déclencher les événements
       await fetchCartSummary(currentId)
       
-      // Déclencher l'événement de mise à jour du panier
-      window.dispatchEvent(new CustomEvent('cart:updated', {
-        detail: { productId: product.id, quantity }
-      }))
+      // ✅ CORRECTION: Déclencher les événements avec un petit délai pour s'assurer que tout est à jour
+      setTimeout(() => {
+        window.dispatchEvent(new CustomEvent('cart:updated', {
+          detail: { 
+            productId: product.id, 
+            quantity,
+            productName: product.name,
+            productUnit: product.unit
+          }
+        }))
+      }, 100)
       
       return true
     } catch (error: any) {
       console.error('Erreur:', error)
-      return false
+      throw error // ✅ CORRECTION: Relancer l'erreur pour que le composant puisse la gérer
     } finally {
       setIsLoading(false)
     }

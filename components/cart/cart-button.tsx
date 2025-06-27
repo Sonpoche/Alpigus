@@ -1,4 +1,4 @@
-// components/cart/cart-button.tsx - VERSION CORRIGÉE
+// components/cart/cart-button.tsx - VERSION CORRIGÉE CACHE
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
@@ -24,100 +24,151 @@ export function CartButton({ className }: CartButtonProps) {
   const [closeTimeout, setCloseTimeout] = useState<NodeJS.Timeout | null>(null)
   const [deletingItemId, setDeletingItemId] = useState<string | null>(null)
 
-  // Animation quand le panier est mis à jour et actualiser les données
+  // ✅ CORRECTION: Gestion des événements de mise à jour du panier améliorée
   useEffect(() => {
-    const handleCartUpdate = () => {
-      // Mettre à jour immédiatement les données du panier
-      refreshCart();
+    const handleCartUpdate = (event?: CustomEvent) => {
+      console.log('🔄 Cart update event received:', event?.detail)
+      
+      // ✅ NOUVEAU: Ouvrir automatiquement le dropdown quand on ajoute un produit
+      if (event?.detail?.productId) {
+        setShowDropdown(true)
+        
+        // Fermer automatiquement après 4 secondes
+        setTimeout(() => {
+          setShowDropdown(false)
+        }, 4000)
+      }
+      
+      // ✅ CORRECTION: Double refresh avec délai pour s'assurer de la mise à jour
+      refreshCart()
+      
+      // Refresh supplémentaire après un court délai pour être sûr
+      setTimeout(() => {
+        refreshCart()
+      }, 500)
       
       // Animer l'icône du panier
-      setIsAnimating(true);
-      setTimeout(() => setIsAnimating(false), 1000);
-    };
+      setIsAnimating(true)
+      setTimeout(() => setIsAnimating(false), 1000)
+    }
 
-    window.addEventListener('cart:updated', handleCartUpdate);
-    return () => window.removeEventListener('cart:updated', handleCartUpdate);
-  }, [refreshCart]);
+    // ✅ CORRECTION: Écouter tous les événements de panier
+    window.addEventListener('cart:updated', handleCartUpdate as EventListener)
+    window.addEventListener('cart:item-added', handleCartUpdate as EventListener)
+    window.addEventListener('cart:item-removed', handleCartUpdate as EventListener)
+    
+    return () => {
+      window.removeEventListener('cart:updated', handleCartUpdate as EventListener)
+      window.removeEventListener('cart:item-added', handleCartUpdate as EventListener)
+      window.removeEventListener('cart:item-removed', handleCartUpdate as EventListener)
+    }
+  }, [refreshCart])
 
-  // Rafraîchir périodiquement le panier lorsque le dropdown est ouvert
+  // ✅ CORRECTION: Refresh initial et périodique amélioré
+  useEffect(() => {
+    // Refresh initial au montage du composant
+    if (cartId) {
+      refreshCart()
+    }
+    
+    // ✅ CORRECTION: Refresh périodique pour capturer les changements manqués
+    const interval = setInterval(() => {
+      if (cartId) {
+        refreshCart()
+      }
+    }, 10000) // Toutes les 10 secondes
+    
+    return () => clearInterval(interval)
+  }, [cartId, refreshCart])
+
+  // ✅ CORRECTION: Refresh quand le dropdown s'ouvre
   useEffect(() => {
     if (showDropdown) {
-      // Rafraîchir immédiatement lors de l'ouverture
-      refreshCart();
+      // Refresh immédiat à l'ouverture
+      refreshCart()
       
-      // Mettre en place un intervalle pour les mises à jour périodiques
+      // Refresh périodique pendant que le dropdown est ouvert
       const interval = setInterval(() => {
-        refreshCart();
-      }, 2000); // Rafraîchir toutes les 2 secondes
+        refreshCart()
+      }, 3000) // Toutes les 3 secondes quand ouvert
       
-      return () => clearInterval(interval);
+      return () => clearInterval(interval)
     }
-  }, [showDropdown, refreshCart]);
+  }, [showDropdown, refreshCart])
 
   // Gestion du hover avec délai pour éviter la disparition instantanée
   const handleMouseEnter = () => {
     if (closeTimeout) {
-      clearTimeout(closeTimeout);
-      setCloseTimeout(null);
+      clearTimeout(closeTimeout)
+      setCloseTimeout(null)
     }
     if (cartSummary && cartSummary.itemCount > 0) {
-      setShowDropdown(true);
-      // Rafraîchir le panier quand on ouvre le dropdown
-      refreshCart();
+      setShowDropdown(true)
+      // ✅ CORRECTION: Force refresh à l'ouverture
+      setTimeout(() => refreshCart(), 100)
     }
-  };
+  }
 
   const handleMouseLeave = () => {
-    // Délai plus long avant de fermer le dropdown pour éviter le clignotement
     const timeout = setTimeout(() => {
-      setShowDropdown(false);
-    }, 500); // Augmenté de 300ms à 500ms
-    setCloseTimeout(timeout);
-  };
+      setShowDropdown(false)
+    }, 500)
+    setCloseTimeout(timeout)
+  }
 
   // Fonction pour maintenir le dropdown ouvert quand on survole la zone complète
   const handleContainerMouseEnter = () => {
     if (closeTimeout) {
-      clearTimeout(closeTimeout);
-      setCloseTimeout(null);
+      clearTimeout(closeTimeout)
+      setCloseTimeout(null)
     }
-  };
+  }
 
   const handleContainerMouseLeave = () => {
-    // Fermeture immédiate quand on quitte complètement la zone
     const timeout = setTimeout(() => {
-      setShowDropdown(false);
-    }, 200);
-    setCloseTimeout(timeout);
-  };
+      setShowDropdown(false)
+    }, 200)
+    setCloseTimeout(timeout)
+  }
 
-  // Fonction pour supprimer un élément du panier
+  // ✅ CORRECTION: Fonction de suppression améliorée
   const handleRemoveItem = async (itemId: string) => {
     try {
-      setDeletingItemId(itemId);
-      const success = await removeFromCart(itemId);
+      setDeletingItemId(itemId)
+      const success = await removeFromCart(itemId)
       
       if (success) {
         toast({
-          title: "Article supprimé",
+          title: "✅ Article supprimé",
           description: "L'article a été retiré de votre panier",
-        });
+          duration: 3000,
+        })
         
-        // Rafraîchir explicitement après suppression
-        refreshCart();
+        // ✅ CORRECTION: Multiple refresh pour s'assurer de la mise à jour
+        refreshCart()
+        setTimeout(() => refreshCart(), 300)
+        setTimeout(() => refreshCart(), 1000)
+        
+        // ✅ CORRECTION: Déclencher un événement personnalisé
+        window.dispatchEvent(new CustomEvent('cart:item-removed', {
+          detail: { itemId, timestamp: Date.now() }
+        }))
+        
       } else {
-        throw new Error("Impossible de supprimer l'article");
+        throw new Error("Impossible de supprimer l'article")
       }
     } catch (error) {
+      console.error('Erreur suppression:', error)
       toast({
-        title: "Erreur",
+        title: "❌ Erreur",
         description: "Impossible de supprimer l'article",
-        variant: "destructive"
-      });
+        variant: "destructive",
+        duration: 4000,
+      })
     } finally {
-      setDeletingItemId(null);
+      setDeletingItemId(null)
     }
-  };
+  }
 
   // Fermer le dropdown si on clique ailleurs
   useEffect(() => {
@@ -128,13 +179,13 @@ export function CartButton({ className }: CartButtonProps) {
         !dropdownRef.current.contains(event.target as Node) &&
         !buttonRef.current.contains(event.target as Node)
       ) {
-        setShowDropdown(false);
+        setShowDropdown(false)
       }
-    };
+    }
 
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [])
 
   return (
     <div 
@@ -146,13 +197,15 @@ export function CartButton({ className }: CartButtonProps) {
         ref={buttonRef}
         onClick={() => {
           if (cartSummary && cartSummary.itemCount > 0) {
-            setShowDropdown(!showDropdown);
+            setShowDropdown(!showDropdown)
             if (!showDropdown) {
-              refreshCart(); // Rafraîchir lorsqu'on ouvre manuellement
+              // ✅ CORRECTION: Force refresh à l'ouverture manuelle
+              refreshCart()
+              setTimeout(() => refreshCart(), 200)
             }
           } else {
             // Si le panier est vide, aller directement à la page panier
-            router.push('/cart');
+            router.push('/cart')
           }
         }}
         onMouseEnter={handleMouseEnter}
@@ -182,7 +235,7 @@ export function CartButton({ className }: CartButtonProps) {
         </AnimatePresence>
       </button>
 
-      {/* Dropdown au survol - CORRIGÉ avec z-index plus élevé et positionnement fixe */}
+      {/* Dropdown au survol */}
       <AnimatePresence>
         {showDropdown && cartSummary && cartSummary.itemCount > 0 && cartId && (
           <>
@@ -204,7 +257,9 @@ export function CartButton({ className }: CartButtonProps) {
               }}
             >
               <div className="flex justify-between items-center mb-3">
-                <h3 className="font-medium text-foreground">Votre panier ({cartSummary.itemCount})</h3>
+                <h3 className="font-medium text-foreground">
+                  Votre panier ({cartSummary.itemCount})
+                </h3>
                 <button 
                   onClick={() => setShowDropdown(false)}
                   className="p-1 rounded-full hover:bg-foreground/5 text-foreground/60 hover:text-foreground transition-colors"
@@ -216,7 +271,7 @@ export function CartButton({ className }: CartButtonProps) {
               {/* Liste des articles (limitée à 4) */}
               <div className="max-h-56 overflow-y-auto mb-3 divide-y divide-foreground/5 scrollbar-thin scrollbar-thumb-foreground/20 scrollbar-track-transparent">
                 {cartSummary.items.slice(0, 4).map((item, index) => (
-                  <div key={item.id || `temp-${index}`} className="flex items-center gap-3 py-3 group first:pt-0">
+                  <div key={`${item.id}-${index}`} className="flex items-center gap-3 py-3 group first:pt-0">
                     <div className="w-12 h-12 bg-foreground/5 rounded-md overflow-hidden flex-shrink-0">
                       {item.product.image ? (
                         <img
@@ -243,8 +298,8 @@ export function CartButton({ className }: CartButtonProps) {
                     {/* Bouton de suppression */}
                     <button
                       onClick={(e) => {
-                        e.stopPropagation();
-                        handleRemoveItem(item.id);
+                        e.stopPropagation()
+                        handleRemoveItem(item.id)
                       }}
                       className="p-1.5 rounded-full hover:bg-red-100 hover:text-red-600 dark:hover:bg-red-900/20 dark:hover:text-red-400 opacity-0 group-hover:opacity-100 transition-all duration-200 text-foreground/40"
                       disabled={deletingItemId === item.id}

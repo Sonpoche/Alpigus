@@ -1,16 +1,6 @@
 // components/orders/order-detail-modal.tsx
 import React from 'react'
 import { useSession } from 'next-auth/react'
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog"
 import { Order, DeliveryInfo } from '@/types/order'
 import { formatDateToFrench } from '@/lib/date-utils'
 import { formatNumber } from '@/lib/number-utils'
@@ -23,236 +13,14 @@ import {
   Calendar, 
   CheckCircle,
   Truck,
-  ShoppingBag,
   CreditCard,
-  FileText,
-  MapPin,
-  Store,
-  Phone,
-  Home
+  FileText
 } from 'lucide-react'
 import OrderStatusBadge from './order-status-badge'
 import OrderStatusIcon from './order-status-icon'
 import PaymentStatusBadge from './payment-status-badge'
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { useToast } from '@/hooks/use-toast'
-
-interface OrderPickupAddressProps {
-  orderId: string
-  deliveryType: string
-}
-
-function OrderPickupAddress({ orderId, deliveryType }: OrderPickupAddressProps) {
-  const [producerDetails, setProducerDetails] = useState<{
-    companyName: string
-    address: string
-    phone: string
-  } | null>(null)
-  const [isLoading, setIsLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-
-  useEffect(() => {
-    // Si ce n'est pas un retrait sur place, ne rien faire
-    if (deliveryType !== 'pickup') {
-      setIsLoading(false)
-      return
-    }
-
-    async function fetchProducerAddress() {
-      try {
-        setIsLoading(true)
-        // Récupérer les détails du producteur pour cette commande
-        const response = await fetch(`/api/orders/${orderId}/producer-details`)
-        
-        if (!response.ok) {
-          throw new Error('Impossible de récupérer les informations du producteur')
-        }
-        
-        const data = await response.json()
-        setProducerDetails(data)
-      } catch (error) {
-        console.error('Erreur:', error)
-        setError('Impossible de charger l\'adresse de retrait')
-      } finally {
-        setIsLoading(false)
-      }
-    }
-
-    fetchProducerAddress()
-  }, [orderId, deliveryType])
-
-  // Ne rien afficher si ce n'est pas un retrait sur place
-  if (deliveryType !== 'pickup') {
-    return null
-  }
-
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center h-20">
-        <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-custom-accent"></div>
-      </div>
-    )
-  }
-
-  if (error || !producerDetails) {
-    return null; // Ou simplement ne rien afficher au lieu du message d'erreur
-  }
-  
-  return (
-    <div className="bg-background border border-foreground/10 rounded-lg p-4 mt-4">
-      <h3 className="font-medium text-base mb-3 flex items-center gap-2">
-        <Store className="h-5 w-5 text-custom-accent" />
-        Adresse de retrait
-      </h3>
-      
-      <div className="space-y-2 text-sm">
-        <p className="font-semibold">{producerDetails.companyName}</p>
-        
-        <div className="flex items-start gap-2">
-          <MapPin className="h-4 w-4 text-custom-accent mt-0.5 shrink-0" />
-          <p className="text-foreground/80 whitespace-pre-line">{producerDetails.address}</p>
-        </div>
-        
-        {producerDetails.phone && (
-          <div className="flex items-start gap-2">
-            <Phone className="h-4 w-4 text-custom-accent mt-0.5 shrink-0" />
-            <p className="text-foreground/80">{producerDetails.phone}</p>
-          </div>
-        )}
-      </div>
-      
-      <div className="mt-4 text-xs text-foreground/60 bg-foreground/5 p-3 rounded-md">
-        Veuillez vous présenter avec votre numéro de commande lors du retrait.
-      </div>
-    </div>
-  )
-}
-
-interface OrderDeliveryAddressProps {
-  orderId: string
-  deliveryType: string
-}
-
-function OrderDeliveryAddress({ orderId, deliveryType }: OrderDeliveryAddressProps) {
-  const [deliveryDetails, setDeliveryDetails] = useState<{
-    fullName: string
-    company?: string
-    address: string
-    postalCode: string
-    city: string
-    phone: string
-    notes?: string
-  } | null>(null)
-  const [isLoading, setIsLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-
-  useEffect(() => {
-    // Si ce n'est pas une livraison à domicile, ne rien faire
-    if (deliveryType !== 'delivery') {
-      setIsLoading(false)
-      return
-    }
-
-    async function fetchDeliveryAddress() {
-      try {
-        setIsLoading(true)
-        // Récupérer les détails de livraison pour cette commande
-        const response = await fetch(`/api/orders/${orderId}/delivery-details`)
-        
-        if (!response.ok) {
-          throw new Error('Impossible de récupérer les informations de livraison')
-        }
-        
-        const data = await response.json()
-        setDeliveryDetails(data)
-      } catch (error) {
-        console.error('Erreur:', error)
-        setError('Impossible de charger l\'adresse de livraison')
-      } finally {
-        setIsLoading(false)
-      }
-    }
-
-    fetchDeliveryAddress()
-  }, [orderId, deliveryType])
-
-  // Ne rien afficher si ce n'est pas une livraison à domicile
-  if (deliveryType !== 'delivery') {
-    return null
-  }
-
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center h-20">
-        <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-custom-accent"></div>
-      </div>
-    )
-  }
-
-  if (error || !deliveryDetails) {
-    return (
-      <div className="bg-amber-50 dark:bg-amber-900/20 p-4 rounded-lg text-amber-800 dark:text-amber-300 text-sm">
-        Informations de livraison non disponibles. Contactez le client directement.
-      </div>
-    )
-  }
-
-  return (
-    <div className="bg-background border border-foreground/10 rounded-lg p-4 mt-4">
-      <h3 className="font-medium text-base mb-3 flex items-center gap-2">
-        <Home className="h-5 w-5 text-custom-accent" />
-        Adresse de livraison
-      </h3>
-      
-      <div className="space-y-3 text-sm">
-        {/* Informations du destinataire */}
-        <div className="flex items-start gap-2">
-          <User className="h-4 w-4 text-custom-accent mt-0.5 shrink-0" />
-          <div>
-            <p className="font-semibold">{deliveryDetails.fullName}</p>
-            {deliveryDetails.company && (
-              <p className="text-foreground/70">{deliveryDetails.company}</p>
-            )}
-          </div>
-        </div>
-        
-        {/* Adresse complète */}
-        <div className="flex items-start gap-2">
-          <MapPin className="h-4 w-4 text-custom-accent mt-0.5 shrink-0" />
-          <div>
-            <p className="text-foreground/80">{deliveryDetails.address}</p>
-            <p className="text-foreground/80">
-              {deliveryDetails.postalCode} {deliveryDetails.city}
-            </p>
-          </div>
-        </div>
-        
-        {/* Téléphone */}
-        <div className="flex items-start gap-2">
-          <Phone className="h-4 w-4 text-custom-accent mt-0.5 shrink-0" />
-          <p className="text-foreground/80">{deliveryDetails.phone}</p>
-        </div>
-        
-        {/* Notes de livraison si présentes */}
-        {deliveryDetails.notes && (
-          <div className="flex items-start gap-2">
-            <FileText className="h-4 w-4 text-custom-accent mt-0.5 shrink-0" />
-            <div>
-              <p className="text-xs text-muted-foreground mb-1">Instructions spéciales :</p>
-              <p className="text-foreground/80 italic">{deliveryDetails.notes}</p>
-            </div>
-          </div>
-        )}
-      </div>
-      
-      <div className="mt-4 text-xs text-foreground/60 bg-foreground/5 p-3 rounded-md">
-        <p className="font-medium mb-1">Informations de livraison :</p>
-        <p>• Frais de livraison : {formatNumber(15)} CHF</p>
-        <p>• Numéro de commande : #{orderId.substring(0, 8).toUpperCase()}</p>
-      </div>
-    </div>
-  )
-}
 
 interface OrderDetailModalProps {
   order: Order
@@ -359,11 +127,20 @@ export default function OrderDetailModal({
       
       if (!response.ok) throw new Error('Erreur lors du traitement');
       
+      toast({
+        title: "Succès",
+        description: "Facture marquée comme payée",
+      });
+      
       // Fermer le modal - la page sera rafraîchie pour voir les changements
       onClose();
     } catch (error) {
       console.error('Erreur:', error);
-      // Gérer l'erreur (avec toast par exemple)
+      toast({
+        title: "Erreur",
+        description: "Impossible de marquer la facture comme payée",
+        variant: "destructive"
+      });
     }
   };
 
@@ -447,33 +224,37 @@ export default function OrderDetailModal({
               )}
             </div>
             
-            {/* Adresse de retrait sur place - SEULEMENT POUR LES CLIENTS */}
-            {deliveryInfo?.type === 'pickup' && session?.user?.role === 'CLIENT' && (
-              <OrderPickupAddress 
-                orderId={order.id} 
-                deliveryType="pickup" 
-              />
-            )}
-            
-            {/* Adresse de livraison à domicile - SEULEMENT POUR LES CLIENTS */}
-            {deliveryInfo?.type === 'delivery' && session?.user?.role === 'CLIENT' && (
-              <OrderDeliveryAddress 
-                orderId={order.id} 
-                deliveryType="delivery" 
-              />
-            )}
-            
-            {/* Notes de livraison si applicable et pas déjà affichées dans OrderDeliveryAddress */}
-            {deliveryInfo?.notes && deliveryInfo?.type !== 'delivery' && (
-              <div>
-                <p className="text-sm text-muted-foreground mb-1">Instructions spéciales</p>
-                <p className="p-3 bg-foreground/5 rounded-md">
-                  {deliveryInfo.notes}
-                </p>
+            {/* Informations de livraison détaillées pour les producteurs */}
+            {deliveryInfo && (deliveryInfo.type === 'delivery' || deliveryInfo.type === 'livraison') && (
+              <div className="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-4">
+                <h4 className="font-medium mb-3 text-blue-800 dark:text-blue-200">
+                  📦 Adresse de livraison
+                </h4>
+                <div className="space-y-2 text-sm">
+                  <div>
+                    <strong>Destinataire :</strong> {deliveryInfo.fullName}
+                    {deliveryInfo.company && <span> ({deliveryInfo.company})</span>}
+                  </div>
+                  <div>
+                    <strong>Adresse :</strong> {deliveryInfo.address}
+                  </div>
+                  <div>
+                    <strong>Code postal et ville :</strong> {deliveryInfo.postalCode} {deliveryInfo.city}
+                  </div>
+                  <div>
+                    <strong>Téléphone :</strong> {deliveryInfo.phone}
+                  </div>
+                  {deliveryInfo.notes && (
+                    <div>
+                      <strong>Instructions spéciales :</strong> 
+                      <p className="italic mt-1">{deliveryInfo.notes}</p>
+                    </div>
+                  )}
+                </div>
               </div>
             )}
             
-            {/* Ajout d'une section détaillée sur le paiement */}
+            {/* Section paiement */}
             <div className="border-t border-foreground/10 pt-4">
               <h4 className="font-medium mb-3 flex items-center gap-2">
                 <CreditCard className="h-5 w-5 text-foreground/60" />
@@ -651,33 +432,30 @@ export default function OrderDetailModal({
             </div>
 
             {/* Affichage de la commission pour les producteurs */}
-            {session?.user?.role === 'PRODUCER' && (
-              <div className="bg-orange-50 dark:bg-orange-900/20 p-3 rounded-md mb-2 border border-orange-200 dark:border-orange-800">
-                <h4 className="font-medium text-orange-800 dark:text-orange-200 mb-2 flex items-center gap-2">
-                  💰 Détail de vos revenus
-                </h4>
-                <div className="space-y-1 text-sm">
-                  <div className="flex justify-between">
-                    <span>Vos ventes:</span>
-                    <span>{formatNumber(order.total)} CHF</span>
-                  </div>
-                  <div className="flex justify-between text-orange-700 dark:text-orange-300">
-                    <span>Commission plateforme (5%):</span>
-                    <span>-{formatNumber(order.total * 0.05)} CHF</span>
-                  </div>
-                  <div className="flex justify-between font-semibold text-green-700 dark:text-green-300 pt-1 border-t border-orange-200">
-                    <span>Votre montant:</span>
-                    <span>{formatNumber(order.total * 0.95)} CHF</span>
-                  </div>
+            <div className="bg-orange-50 dark:bg-orange-900/20 p-3 rounded-md mb-2 border border-orange-200 dark:border-orange-800">
+              <h4 className="font-medium text-orange-800 dark:text-orange-200 mb-2 flex items-center gap-2">
+                💰 Détail de vos revenus
+              </h4>
+              <div className="space-y-1 text-sm">
+                <div className="flex justify-between">
+                  <span>Vos ventes:</span>
+                  <span>{formatNumber(order.total)} CHF</span>
+                </div>
+                <div className="flex justify-between text-orange-700 dark:text-orange-300">
+                  <span>Commission plateforme (5%):</span>
+                  <span>-{formatNumber(order.total * 0.05)} CHF</span>
+                </div>
+                <div className="flex justify-between font-semibold text-green-700 dark:text-green-300 pt-1 border-t border-orange-200">
+                  <span>Votre montant:</span>
+                  <span>{formatNumber(order.total * 0.95)} CHF</span>
                 </div>
               </div>
-            )}
+            </div>
             
             <div className="flex justify-between font-semibold text-lg pt-2 border-t border-foreground/10">
               <p>Total commande</p>
               <p>{formatNumber((deliveryInfo?.type === 'delivery' ? 15 : 0) + order.total)} CHF</p>
             </div>
-
             
             {/* Actions */}
             <div className="flex gap-2 pt-4 justify-between">
@@ -689,79 +467,58 @@ export default function OrderDetailModal({
               </button>
               
               <div className="flex gap-2">
-                {/* DEBUG: Afficher les informations de session */}
-                <div className="text-xs text-red-500 bg-red-100 p-2 rounded">
-                  Role: {session?.user?.role || 'null'} | 
-                  User: {session?.user?.email || 'null'}
-                </div>
-                
-                {/* Boutons de changement de statut - SEULEMENT POUR PRODUCTEURS/ADMINS */}
-                {session?.user?.role !== 'CLIENT' && (
-                  <>
-                    {order.status === 'PENDING' && (
-                      <button
-                        onClick={() => {
-                          onUpdateStatus(order.id, 'CONFIRMED');
-                          onClose();
-                        }}
-                        disabled={isUpdating}
-                        className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 transition-colors flex items-center gap-2"
-                      >
-                        <CheckCircle className="h-5 w-5" />
-                        Confirmer la commande
-                      </button>
-                    )}
-                    
-                    {order.status === 'CONFIRMED' && (
-                      <button
-                        onClick={() => {
-                          onUpdateStatus(order.id, 'SHIPPED');
-                          onClose();
-                        }}
-                        disabled={isUpdating}
-                        className="bg-purple-600 text-white px-4 py-2 rounded-md hover:bg-purple-700 transition-colors flex items-center gap-2"
-                      >
-                        <Truck className="h-5 w-5" />
-                        Marquer comme expédiée
-                      </button>
-                    )}
-                    
-                    {order.status === 'SHIPPED' && (
-                      <button
-                        onClick={() => {
-                          onUpdateStatus(order.id, 'DELIVERED');
-                          onClose();
-                        }}
-                        disabled={isUpdating}
-                        className="bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700 transition-colors flex items-center gap-2"
-                      >
-                        <Package className="h-5 w-5" />
-                        Marquer comme livrée
-                      </button>
-                    )}
-                  </>
+                {/* Boutons de changement de statut */}
+                {order.status === 'PENDING' && (
+                  <button
+                    onClick={() => {
+                      onUpdateStatus(order.id, 'CONFIRMED');
+                      onClose();
+                    }}
+                    disabled={isUpdating}
+                    className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 transition-colors flex items-center gap-2 disabled:opacity-50"
+                  >
+                    <CheckCircle className="h-4 w-4" />
+                    Confirmer la commande
+                  </button>
                 )}
                 
-                {/* BOUTON FACTURE FORCÉ - TOUJOURS VISIBLE */}
-                <a
-                  href={`/api/orders/${order.id}/invoice/client`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="bg-red-500 text-white px-4 py-2 rounded-md hover:opacity-90 transition-opacity flex items-center gap-2 inline-flex no-underline"
-                >
-                  <FileText className="h-5 w-5" />
-                  TEST FACTURE CLIENT
-                </a>
+                {order.status === 'CONFIRMED' && (
+                  <button
+                    onClick={() => {
+                      onUpdateStatus(order.id, 'SHIPPED');
+                      onClose();
+                    }}
+                    disabled={isUpdating}
+                    className="bg-purple-600 text-white px-4 py-2 rounded-md hover:bg-purple-700 transition-colors flex items-center gap-2 disabled:opacity-50"
+                  >
+                    <Truck className="h-4 w-4" />
+                    Marquer comme expédiée
+                  </button>
+                )}
                 
-                {/* BOUTON FACTURE PRODUCTEUR FORCÉ - TOUJOURS VISIBLE */}
+                {order.status === 'SHIPPED' && (
+                  <button
+                    onClick={() => {
+                      onUpdateStatus(order.id, 'DELIVERED');
+                      onClose();
+                    }}
+                    disabled={isUpdating}
+                    className="bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700 transition-colors flex items-center gap-2 disabled:opacity-50"
+                  >
+                    <Package className="h-4 w-4" />
+                    Marquer comme livrée
+                  </button>
+                )}
+
+                {/* Lien vers la facture producteur */}
                 <a
                   href={`/api/orders/${order.id}/invoice`}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="bg-green-500 text-white px-4 py-2 rounded-md hover:opacity-90 transition-opacity flex items-center gap-2 inline-flex no-underline"
+                  className="bg-custom-accent text-white px-4 py-2 rounded-md hover:opacity-90 transition-opacity flex items-center gap-2 inline-flex no-underline"
                 >
-                  <FileText className="h-5 w-5" />
-                  TEST FACTURE PROD
+                  <FileText className="h-4 w-4" />
+                  Voir la facture
                 </a>
               </div>
             </div>
