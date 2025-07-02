@@ -1,22 +1,16 @@
-// components/layout/admin-menu.tsx (mise à jour)
+// components/layout/admin-menu.tsx
 'use client'
 
 import Link from 'next/link'
-import { usePathname } from 'next/navigation'
 import { 
   LayoutDashboard, 
   Package, 
-  ShoppingBag, 
-  Settings, 
   Users,
-  Briefcase,
   BarChart4,
-  ShieldAlert,
   Tags,
   Gauge,
   Wallet
 } from 'lucide-react'
-import { motion } from 'framer-motion'
 import { cn } from '@/lib/utils'
 
 interface MenuItem {
@@ -25,9 +19,11 @@ interface MenuItem {
   icon: React.ReactNode
 }
 
-export default function AdminMenu() {
-  const pathname = usePathname()
-  
+interface AdminMenuProps {
+  currentPath: string
+}
+
+export default function AdminMenu({ currentPath }: AdminMenuProps) {
   const menuItems: MenuItem[] = [
     {
       href: '/admin',
@@ -64,22 +60,31 @@ export default function AdminMenu() {
       label: 'Statistiques',
       icon: <BarChart4 className="h-5 w-5" />
     },
-    
   ]
+
+  // Fonction centralisée pour déterminer l'état actif
+  const isActive = (href: string) => {
+    if (href === '/admin') {
+      // Pour la page admin principale, être exact
+      return currentPath === '/admin'
+    }
+    // Pour les autres pages, vérifier si le chemin commence par l'href
+    return currentPath.startsWith(href)
+  }
 
   return (
     <nav className="space-y-1 px-3 py-2">
       {menuItems.map((item) => {
-        const isActive = pathname === item.href || pathname.startsWith(`${item.href}/`)
+        const active = isActive(item.href)
         
         return (
           <Link 
             key={item.href}
             href={item.href}
             className={cn(
-              "flex items-center px-4 py-2.5 text-sm font-medium rounded-md transition-colors",
-              isActive 
-                ? "bg-custom-accentLight text-custom-accent" 
+              "flex items-center px-4 py-2.5 text-sm font-medium rounded-md transition-all duration-200",
+              active 
+                ? "bg-custom-accentLight text-custom-accent shadow-sm" 
                 : "text-foreground/70 hover:text-foreground hover:bg-foreground/5"
             )}
           >
@@ -87,11 +92,9 @@ export default function AdminMenu() {
               {item.icon}
             </span>
             {item.label}
-            {isActive && (
-              <motion.div
-                layoutId="activeAdminNavIndicator"
-                className="ml-auto w-1 h-5 bg-custom-accent rounded-full"
-              />
+            {/* Indicateur simplifié sans animation */}
+            {active && (
+              <div className="ml-auto w-1 h-5 bg-custom-accent rounded-full" />
             )}
           </Link>
         )

@@ -1,4 +1,4 @@
-// components/layout/sidebar.tsx - Mise à jour de la détection mobile/tablette
+// components/layout/sidebar.tsx - Version corrigée avec passage du currentPath
 'use client'
 
 import { useState, useEffect } from 'react'
@@ -104,9 +104,9 @@ export function Sidebar() {
             
             <div className="flex-1 overflow-y-auto pt-2">
               <div className="py-2">
-                {session.user.role === UserRole.CLIENT && <ClientMenu />}
-                {session.user.role === UserRole.PRODUCER && <ProducerMenu />}
-                {session.user.role === UserRole.ADMIN && <AdminMenu />}
+                {session.user.role === UserRole.CLIENT && <ClientMenu currentPath={pathname} />}
+                {session.user.role === UserRole.PRODUCER && <ProducerMenu currentPath={pathname} />}
+                {session.user.role === UserRole.ADMIN && <AdminMenu currentPath={pathname} />}
               </div>
             </div>
             

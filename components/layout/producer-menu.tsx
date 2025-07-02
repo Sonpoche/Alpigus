@@ -2,19 +2,15 @@
 'use client'
 
 import Link from 'next/link'
-import { usePathname } from 'next/navigation'
 import { 
-  LayoutDashboard, 
   Package, 
-  Calendar, 
   ShoppingBag, 
   Settings, 
   BarChart4, 
   Truck,
   Users,
-  Wallet // Importation de l'icône Wallet
+  Wallet
 } from 'lucide-react'
-import { motion } from 'framer-motion'
 import { cn } from '@/lib/utils'
 
 interface MenuItem {
@@ -23,9 +19,11 @@ interface MenuItem {
   icon: React.ReactNode
 }
 
-export default function ProducerMenu() {
-  const pathname = usePathname()
-  
+interface ProducerMenuProps {
+  currentPath: string
+}
+
+export default function ProducerMenu({ currentPath }: ProducerMenuProps) {
   const menuItems: MenuItem[] = [
     {
       href: '/producer',
@@ -48,7 +46,7 @@ export default function ProducerMenu() {
       icon: <BarChart4 className="h-5 w-5" />
     },
     {
-      href: '/producer/wallet', // Ajout du nouveau lien vers la page wallet
+      href: '/producer/wallet',
       label: 'Portefeuille',
       icon: <Wallet className="h-5 w-5" />
     },
@@ -64,19 +62,36 @@ export default function ProducerMenu() {
     }
   ]
 
+  // Fonction centralisée pour déterminer l'état actif
+  const isActive = (href: string) => {
+    if (href === '/producer') {
+      // Pour la page producer principale, être exact sauf pour les sous-pages spécifiques
+      return currentPath === '/producer' || (
+        currentPath.startsWith('/producer/') && 
+        !currentPath.startsWith('/producer/orders') &&
+        !currentPath.startsWith('/producer/delivery-slots') &&
+        !currentPath.startsWith('/producer/stats') &&
+        !currentPath.startsWith('/producer/wallet') &&
+        !currentPath.startsWith('/producer/clients') &&
+        !currentPath.startsWith('/producer/settings')
+      )
+    }
+    return currentPath.startsWith(href)
+  }
+
   return (
     <nav className="space-y-1 px-3 py-2">
       {menuItems.map((item) => {
-        const isActive = pathname === item.href || pathname.startsWith(`${item.href}/`)
+        const active = isActive(item.href)
         
         return (
           <Link 
             key={item.href}
             href={item.href}
             className={cn(
-              "flex items-center px-4 py-2.5 text-sm font-medium rounded-md transition-colors",
-              isActive 
-                ? "bg-custom-accentLight text-custom-accent" 
+              "flex items-center px-4 py-2.5 text-sm font-medium rounded-md transition-all duration-200",
+              active 
+                ? "bg-custom-accentLight text-custom-accent shadow-sm" 
                 : "text-foreground/70 hover:text-foreground hover:bg-foreground/5"
             )}
           >
@@ -84,11 +99,9 @@ export default function ProducerMenu() {
               {item.icon}
             </span>
             {item.label}
-            {isActive && (
-              <motion.div
-                layoutId="activeProducerNavIndicator"
-                className="ml-auto w-1 h-5 bg-custom-accent rounded-full"
-              />
+            {/* Indicateur simplifié sans animation */}
+            {active && (
+              <div className="ml-auto w-1 h-5 bg-custom-accent rounded-full" />
             )}
           </Link>
         )
