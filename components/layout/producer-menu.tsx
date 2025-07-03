@@ -12,11 +12,14 @@ import {
   Wallet
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { useOrderContext } from '@/contexts/order-context'
+import { NotificationBadge } from '@/components/ui/notification-badge'
 
 interface MenuItem {
   href: string
   label: string
   icon: React.ReactNode
+  badge?: number
 }
 
 interface ProducerMenuProps {
@@ -24,6 +27,8 @@ interface ProducerMenuProps {
 }
 
 export default function ProducerMenu({ currentPath }: ProducerMenuProps) {
+  const { pendingCount } = useOrderContext()
+  
   const menuItems: MenuItem[] = [
     {
       href: '/producer',
@@ -33,7 +38,8 @@ export default function ProducerMenu({ currentPath }: ProducerMenuProps) {
     {
       href: '/producer/orders',
       label: 'Commandes',
-      icon: <ShoppingBag className="h-5 w-5" />
+      icon: <ShoppingBag className="h-5 w-5" />,
+      badge: pendingCount
     },
     {
       href: '/producer/delivery-slots/overview',
@@ -99,6 +105,13 @@ export default function ProducerMenu({ currentPath }: ProducerMenuProps) {
               {item.icon}
             </span>
             {item.label}
+            {/* Badge de notification pour les commandes */}
+            {item.badge !== undefined && (
+              <NotificationBadge 
+                count={item.badge} 
+                variant="sidebar"
+              />
+            )}
             {/* Indicateur simplifié sans animation */}
             {active && (
               <div className="ml-auto w-1 h-5 bg-custom-accent rounded-full" />

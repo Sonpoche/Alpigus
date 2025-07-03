@@ -27,9 +27,7 @@ import OrderItem from '@/components/orders/order-item'
 import OrderDetailModal from '@/components/orders/order-detail-modal'
 import EmptyOrdersView from '@/components/orders/empty-orders-view'
 import { formatDateToFrench } from '@/lib/date-utils'
-import { Order } from '@/types/order' // Importer le type depuis le fichier de types
-
-// Supprimer les interfaces locales et utiliser celles du fichier types/order.ts
+import { Order } from '@/types/order'
 
 export default function ProducerOrdersPage() {
   const router = useRouter()
@@ -99,10 +97,14 @@ export default function ProducerOrdersPage() {
     }
   }, [orders, isLoading]);
 
-  // Mettre à jour le statut d'une commande
+  // Mettre à jour le statut d'une commande avec événements
   const handleUpdateStatus = async (orderId: string, newStatus: OrderStatus) => {
     try {
       setIsUpdating(true)
+      
+      // Garder l'ancien statut pour l'événement
+      const currentOrder = orders.find(order => order.id === orderId)
+      const oldStatus = currentOrder?.status
       
       const response = await fetch(`/api/orders/${orderId}/status`, {
         method: 'PATCH',
@@ -115,13 +117,32 @@ export default function ProducerOrdersPage() {
         throw new Error(errorText || 'Erreur lors de la mise à jour du statut')
       }
       
-      // Rafraîchir la liste des commandes
-      const updatedOrder = await response.json()
+      // Mettre à jour l'état local
       setOrders(prevOrders => 
         prevOrders.map(order => 
           order.id === orderId ? { ...order, status: newStatus } : order
         )
       )
+      
+      // Déclencher les événements de notification
+      setTimeout(() => {
+        window.dispatchEvent(new CustomEvent('order:status-changed', {
+          detail: { 
+            orderId,
+            oldStatus,
+            newStatus,
+            timestamp: Date.now()
+          }
+        }))
+        
+        window.dispatchEvent(new CustomEvent('order:updated', {
+          detail: { 
+            orderId,
+            action: 'status-changed',
+            timestamp: Date.now()
+          }
+        }))
+      }, 500)
       
       toast({
         title: 'Statut mis à jour',

@@ -1,4 +1,4 @@
-// app/(protected)/checkout/[id]/page.tsx - VERSION COMPLÈTE CORRIGÉE SANS COMMISSION VISIBLE POUR LE CLIENT
+// app/(protected)/checkout/[id]/page.tsx - VERSION COMPLÈTE CORRIGÉE AVEC FIX BADGE FACTURES
 'use client'
 
 import { useState, useEffect, useMemo } from 'react'
@@ -366,58 +366,96 @@ export default function CheckoutPage({ params }: CheckoutProps) {
 
   // Finaliser la commande
   const finalizeOrder = async (method: PaymentMethodType, paymentIntentId?: string) => {
-    if (!order || !commissionBreakdown) return
+  if (!order || !commissionBreakdown) return
 
-    if (!validateDeliveryForm()) {
-      toast({
-        title: "Formulaire incomplet",
-        description: "Veuillez remplir tous les champs obligatoires",
-        variant: "destructive"
-      });
-      return;
-    }
-
-    try {
-      setIsProcessing(true)
-      
-      const checkoutData = {
-        deliveryType,
-        deliveryInfo: deliveryType === 'delivery' ? deliveryFormData : null,
-        paymentMethod: method,
-        paymentStatus: method === 'invoice' ? 'PENDING' : 'PAID',
-        paymentIntentId,
-        commission: commissionBreakdown
-      }
-      
-      const response = await fetch(`/api/orders/${order.id}/checkout`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(checkoutData)
-      })
-      
-      if (!response.ok) {
-        const errorData = await response.text();
-        throw new Error(errorData || 'Erreur lors de la finalisation de la commande');
-      }
-      
-      // Supprimer l'ID de commande du localStorage
-      localStorage.removeItem('currentOrderId')
-      
-      // Déclencher un événement pour vider le panier dans la navigation
-      window.dispatchEvent(new CustomEvent('cart:cleared'))
-      
-      // Déclencher aussi l'événement cart:updated pour s'assurer que tous les composants se mettent à jour
-      window.dispatchEvent(new CustomEvent('cart:updated'))
-      
-      // Rediriger vers la page de confirmation
-      router.push(`/confirmation/${order.id}`)
-    } catch (error) {
-      console.error('Erreur:', error)
-      throw error
-    } finally {
-      setIsProcessing(false)
-    }
+  if (!validateDeliveryForm()) {
+    toast({
+      title: "Formulaire incomplet",
+      description: "Veuillez remplir tous les champs obligatoires",
+      variant: "destructive"
+    });
+    return;
   }
+
+  try {
+    setIsProcessing(true)
+    
+    const checkoutData = {
+      deliveryType,
+      deliveryInfo: deliveryType === 'delivery' ? deliveryFormData : null,
+      paymentMethod: method,
+      paymentStatus: method === 'invoice' ? 'PENDING' : 'PAID',
+      paymentIntentId,
+      commission: commissionBreakdown
+    }
+    
+    const response = await fetch(`/api/orders/${order.id}/checkout`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(checkoutData)
+    })
+    
+    if (!response.ok) {
+      const errorData = await response.text();
+      throw new Error(errorData || 'Erreur lors de la finalisation de la commande');
+    }
+    
+    // Supprimer l'ID de commande du localStorage
+    localStorage.removeItem('currentOrderId')
+    
+    // Déclencher un événement pour vider le panier dans la navigation
+    window.dispatchEvent(new CustomEvent('cart:cleared'))
+    
+    // Déclencher aussi l'événement cart:updated pour s'assurer que tous les composants se mettent à jour
+    window.dispatchEvent(new CustomEvent('cart:updated'))
+    
+    // ÉVÉNEMENTS POUR LES FACTURES (clients)
+    setTimeout(() => {
+      window.dispatchEvent(new CustomEvent('invoice:created', {
+        detail: { 
+          orderId: order.id,
+          paymentMethod: method,
+          timestamp: Date.now()
+        }
+      }))
+      
+      window.dispatchEvent(new CustomEvent('invoice:updated', {
+        detail: { 
+          orderId: order.id,
+          action: 'created',
+          timestamp: Date.now()
+        }
+      }))
+    }, 1000) // Délai de 1 seconde pour laisser le temps à la facture d'être créée
+    
+    // ÉVÉNEMENTS POUR LES COMMANDES (producteurs)
+    setTimeout(() => {
+      window.dispatchEvent(new CustomEvent('order:created', {
+        detail: { 
+          orderId: order.id,
+          paymentMethod: method,
+          timestamp: Date.now()
+        }
+      }))
+      
+      window.dispatchEvent(new CustomEvent('order:updated', {
+        detail: { 
+          orderId: order.id,
+          action: 'created',
+          timestamp: Date.now()
+        }
+      }))
+    }, 1200) // Légèrement décalé par rapport aux factures
+    
+    // Rediriger vers la page de confirmation
+    router.push(`/confirmation/${order.id}`)
+  } catch (error) {
+    console.error('Erreur:', error)
+    throw error
+  } finally {
+    setIsProcessing(false)
+  }
+}
   
   // Gestion du checkout traditionnel (facture)
   const handleTraditionalCheckout = async () => {

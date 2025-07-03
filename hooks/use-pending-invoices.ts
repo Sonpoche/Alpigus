@@ -11,8 +11,10 @@ export function usePendingInvoices() {
 
   // ✅ CORRECTION: Fonction avec useCallback pour éviter les re-renders inutiles
   const fetchPendingInvoices = useCallback(async () => {
-    if (!session?.user) {
+    // 🔧 MODIFICATION : Seuls les CLIENTS ont des factures à payer
+    if (!session?.user || session.user.role !== 'CLIENT') {
       setIsLoading(false)
+      setPendingCount(0) // Producteurs et admins n'ont pas de factures à payer
       return
     }
 
