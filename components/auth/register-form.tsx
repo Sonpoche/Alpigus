@@ -294,37 +294,7 @@ export function RegisterForm() {
             </div>
           </div>
 
-          <div>
-            <label htmlFor="confirmPassword" className="form-label flex items-center gap-2">
-              <Shield className="h-4 w-4 text-custom-accent" />
-              Confirmer le mot de passe
-            </label>
-            <div className="relative">
-              <input
-                id="confirmPassword"
-                type={showConfirmPassword ? "text" : "password"}
-                required
-                value={confirmPassword}
-                onChange={(e) => setConfirmPassword(e.target.value)}
-                className={cn(
-                  "form-input pr-10",
-                  fieldErrors.confirmPassword && "border-destructive"
-                )}
-              />
-              <button
-                type="button"
-                className="absolute inset-y-0 right-0 flex items-center pr-3 text-muted-foreground hover:text-foreground"
-                onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-              >
-                {showConfirmPassword ? (
-                  <EyeOff className="h-4 w-4" />
-                ) : (
-                  <Eye className="h-4 w-4" />
-                )}
-              </button>
-            </div>
-          </div>
-        
+        {/* BLOC SUPPRIMÉ - Cette section dupliquée a été supprimée */}
 
         {/* Indicateur de force du mot de passe */}
         {password && <PasswordStrength password={password} />}

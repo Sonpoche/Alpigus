@@ -2259,3 +2259,18 @@
   "id": "cmcnksa6f001psjc6v3rnf170"
 }
 [2025-07-03T16:03:52.075Z] Notification de changement de statut créée pour le client: "cmcatiyko000iwv90l96okrc5"
+[2025-07-03T16:50:04.005Z] Requête de création de commande reçue {
+  "items": []
+}
+[2025-07-03T16:50:04.006Z] ATTENTION: Requête reçue sans items 
+[2025-07-03T16:50:04.011Z] Aucun panier existant avec des items trouvé 
+[2025-07-03T16:50:04.012Z] Items qui seront utilisés pour créer la commande: []
+[2025-07-03T16:50:04.046Z] Commande créée avec ID: "cmcnmfp0u000364ejhgj3ulzw"
+[2025-07-03T16:50:04.049Z] Contenu de l'objet order.items: []
+[2025-07-03T16:50:04.052Z] Vérification des items dans la base de données: []
+[2025-07-03T16:50:04.053Z] Commande créée {
+  "id": "cmcnmfp0u000364ejhgj3ulzw",
+  "itemsCount": 0,
+  "bookingsCount": 0
+}
+[2025-07-03T16:50:04.054Z] Aucun item dans la commande - pas de notification à créer 

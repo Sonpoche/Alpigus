@@ -1,4 +1,4 @@
-// components/products/product-card.tsx - VERSION CORRIGÉE
+// components/products/product-card.tsx - VERSION CORRIGÉE AVEC WISHLIST
 import { useState } from 'react'
 import { ProductType } from '@prisma/client'
 import { ShoppingCart, Info, Truck, Tag, Plus, Minus } from 'lucide-react'
@@ -7,6 +7,7 @@ import { useCart } from '@/hooks/use-cart'
 import { formatNumber } from '@/lib/number-utils'
 import { Badge } from '@/components/ui/badge'
 import { LoadingButton } from '@/components/ui/loading-button'
+import { WishlistButton } from '@/components/wishlist/wishlist-button' // ✅ AJOUT IMPORT WISHLIST
 import { motion } from 'framer-motion'
 import Link from 'next/link'
 
@@ -157,12 +158,23 @@ export function ProductCard({ product }: ProductCardProps) {
           </span>
         </div>
         
-        {/* Badge de disponibilité */}
-        {!product.available && (
-          <div className="absolute top-2 right-2">
-            <Badge variant="destructive">Indisponible</Badge>
-          </div>
-        )}
+        {/* ✅ AJOUT DU BOUTON WISHLIST */}
+        <div className="absolute top-2 right-2 flex gap-1">
+          {/* Bouton Favoris */}
+          <WishlistButton 
+            productId={product.id}
+            size="sm"
+            variant="ghost"
+            className="bg-white/90 hover:bg-white shadow-sm backdrop-blur-sm"
+          />
+          
+          {/* Badge de disponibilité - repositionné si nécessaire */}
+          {!product.available && (
+            <Badge variant="destructive" className="text-xs">
+              Indisponible
+            </Badge>
+          )}
+        </div>
       </div>
       
       {/* Contenu */}

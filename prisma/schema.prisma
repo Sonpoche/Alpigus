@@ -29,6 +29,7 @@ model User {
  notifications    Notification[]
  invoices         Invoice[]
  adminLogs        AdminLog[]
+ wishlist     Wishlist[]
 }
 
 model Account {
@@ -113,6 +114,7 @@ model Product {
   productionSchedules ProductionSchedule[] // Relation inverse pour ProductionSchedule
   acceptDeferred   Boolean              @default(false)  // Accepte paiement sous 30 jours
   minOrderQuantity Float                @default(0)      // Quantité minimale à la vente
+  wishlist     Wishlist[]
 }
 
 model Stock {
@@ -344,4 +346,19 @@ model Withdrawal {
   processedAt     DateTime?
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
+}
+
+model Wishlist {
+  id        String   @id @default(cuid())
+  userId    String
+  productId String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Contrainte d'unicité : un utilisateur ne peut ajouter le même produit qu'une fois
+  @@unique([userId, productId])
+  @@index([userId])
+  @@index([productId])
 }
