@@ -1947,3 +1947,184 @@
   "userId": "cmcatiyko000iwv90l96okrc5",
   "invoiceId": "cmclwezbr000zwelfzh7vqgdz"
 }
+[2025-07-02T12:15:00.607Z] Requête de création de commande reçue {
+  "items": [
+    {
+      "productId": "cmcatkrx6000owv90q7y0a99y",
+      "quantity": 1,
+      "price": 1
+    }
+  ]
+}
+[2025-07-02T12:15:00.608Z] Détails des items reçus dans la requête: [
+  {
+    "productId": "cmcatkrx6000owv90q7y0a99y",
+    "quantity": 1,
+    "price": 1
+  }
+]
+[2025-07-02T12:15:00.611Z] Aucun panier existant avec des items trouvé 
+[2025-07-02T12:15:00.612Z] Items qui seront utilisés pour créer la commande: [
+  {
+    "productId": "cmcatkrx6000owv90q7y0a99y",
+    "quantity": 1,
+    "price": 1
+  }
+]
+[2025-07-02T12:15:00.628Z] Commande créée avec ID: "cmclx64920017welffwv68vfa"
+[2025-07-02T12:15:00.634Z] Contenu de l'objet order.items: [
+  {
+    "id": "cmclx649i0019welfjs9c2t4p",
+    "orderId": "cmclx64920017welffwv68vfa",
+    "productId": "cmcatkrx6000owv90q7y0a99y",
+    "quantity": 1,
+    "price": 1,
+    "product": {
+      "id": "cmcatkrx6000owv90q7y0a99y",
+      "name": "Frederic ragaigne",
+      "description": "",
+      "price": 1,
+      "type": "SUBSTRATE",
+      "image": "/presets/mushrooms/optimized/morel.jpg",
+      "unit": "kg",
+      "producerId": "cmcatjzt1000mwv909rwul0k6",
+      "available": true,
+      "createdAt": "2025-06-24T17:48:58.073Z",
+      "updatedAt": "2025-06-24T17:49:09.522Z",
+      "acceptDeferred": true,
+      "minOrderQuantity": 0,
+      "producer": {
+        "id": "cmcatjzt1000mwv909rwul0k6",
+        "userId": "cmcatjzt1000lwv90pqpivme9",
+        "companyName": "webdev",
+        "address": "",
+        "description": "",
+        "bankName": null,
+        "bankAccountName": null,
+        "iban": null,
+        "bic": null
+      }
+    }
+  }
+]
+[2025-07-02T12:15:00.636Z] Vérification des items dans la base de données: [
+  {
+    "id": "cmclx649i0019welfjs9c2t4p",
+    "orderId": "cmclx64920017welffwv68vfa",
+    "productId": "cmcatkrx6000owv90q7y0a99y",
+    "quantity": 1,
+    "price": 1
+  }
+]
+[2025-07-02T12:15:00.637Z] Commande créée {
+  "id": "cmclx64920017welffwv68vfa",
+  "itemsCount": 1,
+  "bookingsCount": 0
+}
+[2025-07-02T12:15:00.639Z] NotificationService: Début envoi notification commande {
+  "orderId": "cmclx64920017welffwv68vfa"
+}
+[2025-07-02T12:15:00.640Z] Items dans la commande: 1
+[2025-07-02T12:15:00.641Z] Traitement item produit: {
+  "productId": "cmcatkrx6000owv90q7y0a99y",
+  "productName": "Frederic ragaigne"
+}
+[2025-07-02T12:15:00.642Z] Producer ID directement ajouté: "cmcatjzt1000mwv909rwul0k6"
+[2025-07-02T12:15:00.643Z] Bookings dans la commande: 
+[2025-07-02T12:15:00.645Z] Nombre de producteurs à notifier: 1
+[2025-07-02T12:15:00.646Z] Liste des IDs producteurs: [
+  "cmcatjzt1000mwv909rwul0k6"
+]
+[2025-07-02T12:15:00.647Z] Traitement du producteur: "cmcatjzt1000mwv909rwul0k6"
+[2025-07-02T12:15:00.649Z] Producer userId: "cmcatjzt1000lwv90pqpivme9"
+[2025-07-02T12:15:00.650Z] Montant total pour ce producteur: {
+  "itemsTotal": 1,
+  "bookingsTotal": 0,
+  "total": 1
+}
+[2025-07-02T12:15:00.653Z] Notification créée avec ID: "cmclx64a3001bwelfubt6b42a"
+[2025-07-02T12:15:00.654Z] NotificationService: Fin de l'envoi de notification 
+[2025-07-02T15:23:25.529Z] NotificationService: Début envoi notification commande {
+  "orderId": "cmclx64920017welffwv68vfa"
+}
+[2025-07-02T15:23:25.530Z] Items dans la commande: 1
+[2025-07-02T15:23:25.532Z] Traitement item produit: {
+  "productId": "cmcatkrx6000owv90q7y0a99y",
+  "productName": "Frederic ragaigne"
+}
+[2025-07-02T15:23:25.533Z] Producer ID directement ajouté: "cmcatjzt1000mwv909rwul0k6"
+[2025-07-02T15:23:25.534Z] Bookings dans la commande: 
+[2025-07-02T15:23:25.535Z] Nombre de producteurs à notifier: 1
+[2025-07-02T15:23:25.536Z] Liste des IDs producteurs: [
+  "cmcatjzt1000mwv909rwul0k6"
+]
+[2025-07-02T15:23:25.537Z] Traitement du producteur: "cmcatjzt1000mwv909rwul0k6"
+[2025-07-02T15:23:25.539Z] Producer userId: "cmcatjzt1000lwv90pqpivme9"
+[2025-07-02T15:23:25.541Z] Montant total pour ce producteur: {
+  "itemsTotal": 1,
+  "bookingsTotal": 0,
+  "total": 1
+}
+[2025-07-02T15:23:25.544Z] Notification créée avec ID: "cmcm3wf6u001gwelf25ewttwy"
+[2025-07-02T15:23:25.545Z] NotificationService: Fin de l'envoi de notification 
+[2025-07-02T15:23:25.550Z] Notification de création de facture envoyée au client: {
+  "userId": "cmcatiyko000iwv90l96okrc5",
+  "invoiceId": "cmcm3wf6d001ewelf0dk2xtbl"
+}
+[2025-07-02T15:23:43.505Z] Requête de création de commande reçue {
+  "items": []
+}
+[2025-07-02T15:23:43.507Z] ATTENTION: Requête reçue sans items 
+[2025-07-02T15:23:43.510Z] Aucun panier existant avec des items trouvé 
+[2025-07-02T15:23:43.512Z] Items qui seront utilisés pour créer la commande: []
+[2025-07-02T15:23:43.542Z] Commande créée avec ID: "cmcm3wt22001mwelfow06co2l"
+[2025-07-02T15:23:43.546Z] Contenu de l'objet order.items: []
+[2025-07-02T15:23:43.549Z] Vérification des items dans la base de données: []
+[2025-07-02T15:23:43.550Z] Commande créée {
+  "id": "cmcm3wt22001mwelfow06co2l",
+  "itemsCount": 0,
+  "bookingsCount": 0
+}
+[2025-07-02T15:23:43.551Z] Aucun item dans la commande - pas de notification à créer 
+[2025-07-02T15:24:11.967Z] NotificationService: Début envoi notification commande {
+  "orderId": "cmcm3wt22001mwelfow06co2l"
+}
+[2025-07-02T15:24:11.968Z] Items dans la commande: 1
+[2025-07-02T15:24:11.970Z] Traitement item produit: {
+  "productId": "cmcatkrx6000owv90q7y0a99y",
+  "productName": "Frederic ragaigne"
+}
+[2025-07-02T15:24:11.971Z] Producer ID directement ajouté: "cmcatjzt1000mwv909rwul0k6"
+[2025-07-02T15:24:11.973Z] Bookings dans la commande: 
+[2025-07-02T15:24:11.974Z] Nombre de producteurs à notifier: 1
+[2025-07-02T15:24:11.975Z] Liste des IDs producteurs: [
+  "cmcatjzt1000mwv909rwul0k6"
+]
+[2025-07-02T15:24:11.976Z] Traitement du producteur: "cmcatjzt1000mwv909rwul0k6"
+[2025-07-02T15:24:11.979Z] Producer userId: "cmcatjzt1000lwv90pqpivme9"
+[2025-07-02T15:24:11.980Z] Montant total pour ce producteur: {
+  "itemsTotal": 1,
+  "bookingsTotal": 0,
+  "total": 1
+}
+[2025-07-02T15:24:11.984Z] Notification créée avec ID: "cmcm3xf0u0023welf9wtkyvo8"
+[2025-07-02T15:24:11.985Z] NotificationService: Fin de l'envoi de notification 
+[2025-07-02T15:24:11.989Z] Notification de création de facture envoyée au client: {
+  "userId": "cmcatiyko000iwv90l96okrc5",
+  "invoiceId": "cmcm3xezl0021welfqbpk3d87"
+}
+[2025-07-02T15:25:45.196Z] Requête de création de commande reçue {
+  "items": []
+}
+[2025-07-02T15:25:45.197Z] ATTENTION: Requête reçue sans items 
+[2025-07-02T15:25:45.200Z] Aucun panier existant avec des items trouvé 
+[2025-07-02T15:25:45.201Z] Items qui seront utilisés pour créer la commande: []
+[2025-07-02T15:25:45.233Z] Commande créée avec ID: "cmcm3zeyc0029welfxifyoxxv"
+[2025-07-02T15:25:45.237Z] Contenu de l'objet order.items: []
+[2025-07-02T15:25:45.239Z] Vérification des items dans la base de données: []
+[2025-07-02T15:25:45.240Z] Commande créée {
+  "id": "cmcm3zeyc0029welfxifyoxxv",
+  "itemsCount": 0,
+  "bookingsCount": 0
+}
+[2025-07-02T15:25:45.242Z] Aucun item dans la commande - pas de notification à créer 

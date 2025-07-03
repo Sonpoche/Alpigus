@@ -1,4 +1,4 @@
-// app/(protected)/checkout/[id]/page.tsx - VERSION COMPLÈTE AVEC PAIEMENTS
+// app/(protected)/checkout/[id]/page.tsx - VERSION COMPLÈTE CORRIGÉE SANS COMMISSION VISIBLE POUR LE CLIENT
 'use client'
 
 import { useState, useEffect, useMemo } from 'react'
@@ -106,7 +106,7 @@ export default function CheckoutPage({ params }: CheckoutProps) {
   const [isUpdating, setIsUpdating] = useState(false)
   const [formErrors, setFormErrors] = useState<Record<string, string>>({})
   
-  // Calculs de commission avec frais de livraison
+  // CORRECTION : Calculs de commission avec frais de livraison
   const commissionBreakdown = useMemo((): (CommissionBreakdown & { deliveryFee: number; grandTotal: number }) | null => {
     if (!order) return null
     
@@ -119,13 +119,17 @@ export default function CheckoutPage({ params }: CheckoutProps) {
     const subtotal = itemsTotal + bookingsTotal
     const deliveryFee = deliveryType === 'delivery' ? 15 : 0
     
-    // Commission calculée sur le sous-total produits (pas sur la livraison)
-    const commission = getCommissionBreakdown(subtotal)
+    // CORRECTION : Le client paie seulement subtotal + frais de livraison
+    // La commission est une répartition interne, pas un coût supplémentaire
+    const grandTotal = subtotal + deliveryFee
+    
+    // Calcul de la commission pour la répartition interne (non visible au client)
+    const breakdown = getCommissionBreakdown(subtotal)
     
     return {
-      ...commission,
+      ...breakdown,
       deliveryFee,
-      grandTotal: commission.total + deliveryFee
+      grandTotal // = subtotal + deliveryFee (PAS + commission)
     }
   }, [order, deliveryType])
   
@@ -399,6 +403,12 @@ export default function CheckoutPage({ params }: CheckoutProps) {
       // Supprimer l'ID de commande du localStorage
       localStorage.removeItem('currentOrderId')
       
+      // Déclencher un événement pour vider le panier dans la navigation
+      window.dispatchEvent(new CustomEvent('cart:cleared'))
+      
+      // Déclencher aussi l'événement cart:updated pour s'assurer que tous les composants se mettent à jour
+      window.dispatchEvent(new CustomEvent('cart:updated'))
+      
       // Rediriger vers la page de confirmation
       router.push(`/confirmation/${order.id}`)
     } catch (error) {
@@ -492,13 +502,12 @@ export default function CheckoutPage({ params }: CheckoutProps) {
                 </div>
               </div>
               
-              {/* Formulaire d'adresse de livraison (gardez votre code existant) */}
+              {/* Formulaire d'adresse de livraison */}
               {deliveryType === 'delivery' && (
                 <div className="mt-4 p-4 bg-foreground/5 rounded-lg space-y-4">
                   <h3 className="font-medium text-sm mb-2">Coordonnées de livraison</h3>
                   
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {/* Vos champs de formulaire existants... */}
                     <div>
                       <label htmlFor="fullName" className="block mb-1 text-sm font-medium">
                         Nom complet <span className="text-red-500">*</span>
@@ -517,7 +526,6 @@ export default function CheckoutPage({ params }: CheckoutProps) {
                       )}
                     </div>
 
-                    {/* Entreprise */}
                     <div>
                       <label htmlFor="company" className="block mb-1 text-sm font-medium">
                         Entreprise <span className="text-muted-foreground">(optionnel)</span>
@@ -533,7 +541,6 @@ export default function CheckoutPage({ params }: CheckoutProps) {
                       />
                     </div>
 
-                    {/* Adresse */}
                     <div className="md:col-span-2">
                       <label htmlFor="address" className="block mb-1 text-sm font-medium">
                         Adresse <span className="text-red-500">*</span>
@@ -552,7 +559,6 @@ export default function CheckoutPage({ params }: CheckoutProps) {
                       )}
                     </div>
 
-                    {/* Code postal et ville */}
                     <div>
                       <label htmlFor="postalCode" className="block mb-1 text-sm font-medium">
                         Code postal <span className="text-red-500">*</span>
@@ -589,7 +595,6 @@ export default function CheckoutPage({ params }: CheckoutProps) {
                       )}
                     </div>
 
-                    {/* Téléphone */}
                     <div className="md:col-span-2">
                       <label htmlFor="phone" className="block mb-1 text-sm font-medium">
                         Téléphone <span className="text-red-500">*</span>
@@ -608,7 +613,6 @@ export default function CheckoutPage({ params }: CheckoutProps) {
                       )}
                     </div>
 
-                    {/* Instructions */}
                     <div className="md:col-span-2">
                       <label htmlFor="notes" className="block mb-1 text-sm font-medium">
                         Instructions de livraison <span className="text-muted-foreground">(optionnel)</span>
@@ -629,7 +633,7 @@ export default function CheckoutPage({ params }: CheckoutProps) {
             </div>
           </div>
           
-          {/* Dates de livraison - gardez votre code existant */}
+          {/* Dates de livraison */}
           {order?.bookings && order.bookings.length > 0 && (
             <div className="bg-background border border-foreground/10 rounded-lg p-6">
               <h2 className="text-lg font-semibold mb-4 flex items-center">
@@ -672,7 +676,7 @@ export default function CheckoutPage({ params }: CheckoutProps) {
             </div>
           )}
           
-          {/* Méthode de paiement - NOUVELLE VERSION */}
+          {/* Méthode de paiement */}
           <div className="bg-background border border-foreground/10 rounded-lg p-6">
             <h2 className="text-lg font-semibold mb-4 flex items-center">
               <CreditCard className="h-5 w-5 mr-2" />
@@ -799,7 +803,7 @@ export default function CheckoutPage({ params }: CheckoutProps) {
           </div>
         </div>
         
-        {/* Résumé de la commande - NOUVELLE VERSION AVEC COMMISSIONS */}
+        {/* RÉSUMÉ DE LA COMMANDE - VERSION CORRIGÉE SANS COMMISSION VISIBLE */}
         <div className="lg:col-span-1">
           <div className="bg-background border border-foreground/10 rounded-lg p-6 sticky top-4">
             <h2 className="text-lg font-semibold mb-4">Résumé de la commande</h2>
@@ -883,49 +887,37 @@ export default function CheckoutPage({ params }: CheckoutProps) {
               ))}
             </div>
             
-            {/* Calculs détaillés avec commission */}
-            <div className="space-y-2 mb-4 pt-3 border-t border-foreground/10">
-              <div className="flex justify-between">
+            {/* DÉTAIL DE LA COMMANDE - VERSION SIMPLIFIÉE POUR LE CLIENT */}
+            <div className="border-t border-foreground/10 pt-4 mt-4 space-y-2">
+              <div className="flex justify-between text-sm">
                 <span>Sous-total produits</span>
                 <span>{commissionBreakdown.subtotal.toFixed(2)} CHF</span>
               </div>
               
-              <div className="flex justify-between text-sm text-muted-foreground">
-                <span>Commission plateforme ({commissionBreakdown.feePercentage}%)</span>
-                <span>+{commissionBreakdown.platformFee.toFixed(2)} CHF</span>
-              </div>
+              {deliveryType === 'delivery' && (
+                <div className="flex justify-between text-sm">
+                  <span>Frais de livraison</span>
+                  <span>{commissionBreakdown.deliveryFee.toFixed(2)} CHF</span>
+                </div>
+              )}
               
-              <div className="flex justify-between">
-                <span>Frais de livraison</span>
-                <span>+{commissionBreakdown.deliveryFee.toFixed(2)} CHF</span>
-              </div>
-            </div>
-            
-            {/* Total */}
-            <div className="border-t border-foreground/10 pt-3 mb-6">
-              <div className="flex justify-between font-semibold text-lg">
+              <div className="flex justify-between font-semibold text-lg border-t border-foreground/10 pt-2">
                 <span>Total à payer</span>
                 <span>{commissionBreakdown.grandTotal.toFixed(2)} CHF</span>
               </div>
               
-              {/* Information sur la commission pour le client */}
-              <div className="mt-2 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-md">
+              {/* Information optionnelle sur la plateforme (si vous voulez être transparent) */}
+              <div className="mt-3 p-2 bg-blue-50 dark:bg-blue-900/20 rounded-md">
                 <div className="flex items-center gap-2 mb-1">
                   <Info className="h-4 w-4 text-blue-600 dark:text-blue-400" />
-                  <span className="text-sm font-medium text-blue-900 dark:text-blue-100">
-                    Répartition transparente
+                  <span className="text-xs font-medium text-blue-900 dark:text-blue-100">
+                    Plateforme transparente
                   </span>
                 </div>
-                <div className="text-xs text-blue-800 dark:text-blue-200 space-y-1">
-                  <div className="flex justify-between">
-                    <span>Montant producteurs:</span>
-                    <span>{commissionBreakdown.producerAmount.toFixed(2)} CHF</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span>Frais de service:</span>
-                    <span>{commissionBreakdown.platformFee.toFixed(2)} CHF</span>
-                  </div>
-                </div>
+                <p className="text-xs text-blue-800 dark:text-blue-200">
+                  Vos achats soutiennent directement les producteurs locaux. 
+                  Une petite commission aide à maintenir la plateforme.
+                </p>
               </div>
               
               {paymentMethod === 'invoice' && (
@@ -942,7 +934,7 @@ export default function CheckoutPage({ params }: CheckoutProps) {
                 onClick={handleTraditionalCheckout}
                 isLoading={isProcessing}
                 disabled={isProcessing || isUpdating || !validateDeliveryForm()}
-                className="w-full flex items-center justify-center gap-2"
+                className="w-full flex items-center justify-center gap-2 mt-6"
               >
                 <Receipt className="h-5 w-5" />
                 Commander et recevoir la facture
@@ -950,7 +942,7 @@ export default function CheckoutPage({ params }: CheckoutProps) {
             )}
 
             {(paymentMethod === 'card' || paymentMethod === 'bank_transfer') && (
-              <div className="text-sm text-muted-foreground text-center">
+              <div className="text-sm text-muted-foreground text-center mt-6">
                 Utilisez le formulaire de paiement ci-dessus pour finaliser votre commande.
               </div>
             )}

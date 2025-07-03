@@ -52,15 +52,50 @@ export function CartButton({ className }: CartButtonProps) {
       setTimeout(() => setIsAnimating(false), 1000)
     }
 
+    // ✅ NOUVEAU: Gestionnaire pour la création d'un nouveau panier
+    const handleCartCreated = (event?: CustomEvent) => {
+      console.log('🆕 Cart created event received:', event?.detail)
+      
+      // Forcer le refresh du cart pour récupérer le nouveau cartId
+      refreshCart()
+      
+      // Refresh supplémentaire après un délai
+      setTimeout(() => {
+        refreshCart()
+      }, 200)
+    }
+
+    // ✅ NOUVEAU: Gestionnaire spécifique pour vider le panier après une commande
+    const handleCartCleared = () => {
+      console.log('🧹 Cart cleared event received')
+      
+      // Fermer immédiatement le dropdown
+      setShowDropdown(false)
+      
+      // Rafraîchir le panier plusieurs fois pour s'assurer qu'il est bien vide
+      refreshCart()
+      setTimeout(() => refreshCart(), 200)
+      setTimeout(() => refreshCart(), 500)
+      setTimeout(() => refreshCart(), 1000)
+      
+      // Animer l'icône du panier
+      setIsAnimating(true)
+      setTimeout(() => setIsAnimating(false), 1000)
+    }
+
     // ✅ CORRECTION: Écouter tous les événements de panier
     window.addEventListener('cart:updated', handleCartUpdate as EventListener)
     window.addEventListener('cart:item-added', handleCartUpdate as EventListener)
     window.addEventListener('cart:item-removed', handleCartUpdate as EventListener)
+    window.addEventListener('cart:created', handleCartCreated as EventListener)
+    window.addEventListener('cart:cleared', handleCartCleared as EventListener)
     
     return () => {
       window.removeEventListener('cart:updated', handleCartUpdate as EventListener)
       window.removeEventListener('cart:item-added', handleCartUpdate as EventListener)
       window.removeEventListener('cart:item-removed', handleCartUpdate as EventListener)
+      window.removeEventListener('cart:created', handleCartCreated as EventListener)
+      window.removeEventListener('cart:cleared', handleCartCleared as EventListener)
     }
   }, [refreshCart])
 
@@ -139,9 +174,9 @@ export function CartButton({ className }: CartButtonProps) {
       
       if (success) {
         toast({
-          title: "✅ Article supprimé",
+          title: "Article supprimé",
           description: "L'article a été retiré de votre panier",
-          duration: 3000,
+          duration: 2000,
         })
         
         // ✅ CORRECTION: Multiple refresh pour s'assurer de la mise à jour
