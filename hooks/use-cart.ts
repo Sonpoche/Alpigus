@@ -137,7 +137,7 @@ export function useCart() {
     }
   }, [cartId, fetchCartSummary])
   
-  // ✅ CORRECTION: Ajouter un produit au panier avec toast intégré
+  // ✅ CORRECTION MAJEURE: Nouvelle logique pour addToCart
   const addToCart = async (product: Product, quantity: number) => {
     try {
       setIsLoading(true)
@@ -147,16 +147,27 @@ export function useCart() {
         throw new Error(`La quantité minimale pour ce produit est de ${product.minOrderQuantity} ${product.unit}`)
       }
       
-      // Si pas de panier, en créer un
       let currentId = cartId
+      
+      // ✅ NOUVEAU: Si pas de panier, créer directement avec le produit
       if (!currentId) {
+        console.log('🛒 Création d\'un nouveau panier avec le produit:', product.name)
+        
         const response = await fetch('/api/orders', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ items: [] })
+          body: JSON.stringify({ 
+            items: [{
+              productId: product.id,
+              quantity: quantity,
+              price: product.price
+            }]
+          })
         })
         
         if (!response.ok) {
+          const errorText = await response.text()
+          console.error('❌ Erreur création panier:', errorText)
           throw new Error('Erreur lors de la création du panier')
         }
         
@@ -165,14 +176,42 @@ export function useCart() {
         setCartId(data.id)
         currentId = data.id
         
-        // ✅ NOUVEAU: Déclencher un événement pour notifier la création du panier
+        console.log('✅ Nouveau panier créé avec ID:', data.id)
+        
+        // Récupérer le résumé du nouveau panier
+        await fetchCartSummary(currentId!)
+        
+        // Déclencher les événements
         window.dispatchEvent(new CustomEvent('cart:created', {
           detail: { cartId: data.id }
         }))
+        
+        // Délai pour s'assurer que tout est à jour
+        setTimeout(() => {
+          window.dispatchEvent(new CustomEvent('cart:updated', {
+            detail: { 
+              productId: product.id, 
+              quantity,
+              productName: product.name,
+              productUnit: product.unit
+            }
+          }))
+          
+          window.dispatchEvent(new CustomEvent('cart:item-added', {
+            detail: { 
+              productId: product.id, 
+              quantity,
+              productName: product.name,
+              productUnit: product.unit
+            }
+          }))
+        }, 300)
+        
+        return true
       }
       
-      // Ajouter le produit au panier
-      if (!currentId) throw new Error('Erreur d\'identification du panier')
+      // ✅ Si le panier existe, ajouter via l'API items
+      console.log('🛒 Ajout au panier existant:', currentId)
       
       const response = await fetch('/api/orders/items', {
         method: 'POST',
@@ -186,16 +225,16 @@ export function useCart() {
       
       if (!response.ok) {
         const errorText = await response.text()
+        console.error('❌ Erreur ajout item:', errorText)
         throw new Error(errorText || 'Erreur lors de l\'ajout au panier')
       }
       
+      console.log('✅ Produit ajouté au panier existant')
+      
       // ✅ CORRECTION: Récupérer les données AVANT de déclencher les événements
-      await fetchCartSummary(currentId)
+      await fetchCartSummary(currentId!)
       
-      // ✅ NOUVEAU: Attendre un peu plus longtemps lors de la première création
-      const delay = !cartId ? 300 : 100
-      
-      // ✅ CORRECTION: Déclencher les événements avec un petit délai pour s'assurer que tout est à jour
+      // ✅ Déclencher les événements avec un petit délai
       setTimeout(() => {
         window.dispatchEvent(new CustomEvent('cart:updated', {
           detail: { 
@@ -206,7 +245,6 @@ export function useCart() {
           }
         }))
         
-        // ✅ NOUVEAU: Déclencher aussi cart:item-added pour être sûr
         window.dispatchEvent(new CustomEvent('cart:item-added', {
           detail: { 
             productId: product.id, 
@@ -215,11 +253,11 @@ export function useCart() {
             productUnit: product.unit
           }
         }))
-      }, delay)
+      }, 100)
       
       return true
     } catch (error: any) {
-      console.error('Erreur:', error)
+      console.error('❌ Erreur addToCart:', error)
       throw error // ✅ CORRECTION: Relancer l'erreur pour que le composant puisse la gérer
     } finally {
       setIsLoading(false)

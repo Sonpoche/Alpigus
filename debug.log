@@ -2274,3 +2274,139 @@
   "bookingsCount": 0
 }
 [2025-07-03T16:50:04.054Z] Aucun item dans la commande - pas de notification à créer 
+[2025-07-05T10:33:23.912Z] NotificationService: Début envoi notification commande {
+  "orderId": "cmcnmfp0u000364ejhgj3ulzw"
+}
+[2025-07-05T10:33:23.914Z] Items dans la commande: 1
+[2025-07-05T10:33:23.916Z] Traitement item produit: {
+  "productId": "cmcatkrx6000owv90q7y0a99y",
+  "productName": "Frederic ragaigne"
+}
+[2025-07-05T10:33:23.917Z] Producer ID directement ajouté: "cmcatjzt1000mwv909rwul0k6"
+[2025-07-05T10:33:23.918Z] Bookings dans la commande: 
+[2025-07-05T10:33:23.919Z] Nombre de producteurs à notifier: 1
+[2025-07-05T10:33:23.920Z] Liste des IDs producteurs: [
+  "cmcatjzt1000mwv909rwul0k6"
+]
+[2025-07-05T10:33:23.921Z] Traitement du producteur: "cmcatjzt1000mwv909rwul0k6"
+[2025-07-05T10:33:23.924Z] Producer userId: "cmcatjzt1000lwv90pqpivme9"
+[2025-07-05T10:33:23.925Z] Montant total pour ce producteur: {
+  "itemsTotal": 1,
+  "bookingsTotal": 0,
+  "total": 1
+}
+[2025-07-05T10:33:23.929Z] Notification créée avec ID: "cmcq3v00o000512eeqhxvbe2v"
+[2025-07-05T10:33:23.931Z] NotificationService: Fin de l'envoi de notification 
+[2025-07-05T10:33:57.674Z] Requête de création de commande reçue {
+  "items": []
+}
+[2025-07-05T10:33:57.675Z] ATTENTION: Requête reçue sans items 
+[2025-07-05T10:33:57.679Z] Aucun panier existant avec des items trouvé 
+[2025-07-05T10:33:57.680Z] Items qui seront utilisés pour créer la commande: []
+[2025-07-05T10:33:57.686Z] Commande créée avec ID: "cmcq3vq2b000912eetu3htxsc"
+[2025-07-05T10:33:57.689Z] Contenu de l'objet order.items: []
+[2025-07-05T10:33:57.692Z] Vérification des items dans la base de données: []
+[2025-07-05T10:33:57.693Z] Commande créée {
+  "id": "cmcq3vq2b000912eetu3htxsc",
+  "itemsCount": 0,
+  "bookingsCount": 0
+}
+[2025-07-05T10:33:57.695Z] Aucun item dans la commande - pas de notification à créer 
+[2025-07-05T10:34:11.301Z] NotificationService: Début envoi notification commande {
+  "orderId": "cmcq3vq2b000912eetu3htxsc"
+}
+[2025-07-05T10:34:11.303Z] Items dans la commande: 1
+[2025-07-05T10:34:11.304Z] Traitement item produit: {
+  "productId": "cmcatkrx6000owv90q7y0a99y",
+  "productName": "Frederic ragaigne"
+}
+[2025-07-05T10:34:11.305Z] Producer ID directement ajouté: "cmcatjzt1000mwv909rwul0k6"
+[2025-07-05T10:34:11.306Z] Bookings dans la commande: 
+[2025-07-05T10:34:11.307Z] Nombre de producteurs à notifier: 1
+[2025-07-05T10:34:11.309Z] Liste des IDs producteurs: [
+  "cmcatjzt1000mwv909rwul0k6"
+]
+[2025-07-05T10:34:11.310Z] Traitement du producteur: "cmcatjzt1000mwv909rwul0k6"
+[2025-07-05T10:34:11.313Z] Producer userId: "cmcatjzt1000lwv90pqpivme9"
+[2025-07-05T10:34:11.315Z] Montant total pour ce producteur: {
+  "itemsTotal": 4,
+  "bookingsTotal": 0,
+  "total": 4
+}
+[2025-07-05T10:34:11.318Z] Notification créée avec ID: "cmcq3w0l1000f12eescyofytc"
+[2025-07-05T10:34:11.320Z] NotificationService: Fin de l'envoi de notification 
+[2025-07-05T10:40:28.882Z] Requête de création de commande reçue {
+  "userId": "cmcatiyko000iwv90l96okrc5",
+  "hasItems": false
+}
+[2025-07-05T10:40:28.894Z] Erreur création commande {
+  "userId": "cmcatiyko000iwv90l96okrc5",
+  "error": "Aucun item à traiter pour la commande"
+}
+[2025-07-05T11:20:22.587Z] Requête de création de commande reçue {
+  "userId": "cmcatiyko000iwv90l96okrc5",
+  "hasItems": true
+}
+[2025-07-05T11:20:22.599Z] Items qui seront utilisés {
+  "itemsCount": 1
+}
+[2025-07-05T11:20:22.653Z] Commande créée avec succès {
+  "orderId": "cmcq5jexb000k12eef3luipjv",
+  "userId": "cmcatiyko000iwv90l96okrc5",
+  "itemsCount": 1,
+  "total": 1
+}
+[2025-07-05T11:20:22.654Z] NotificationService: Début envoi notification commande {
+  "orderId": "cmcq5jexb000k12eef3luipjv"
+}
+[2025-07-05T11:20:22.656Z] Items dans la commande: 1
+[2025-07-05T11:20:22.657Z] Traitement item produit: {
+  "productId": "cmcatkrx6000owv90q7y0a99y",
+  "productName": "Frederic ragaigne"
+}
+[2025-07-05T11:20:22.658Z] Producer ID directement ajouté: "cmcatjzt1000mwv909rwul0k6"
+[2025-07-05T11:20:22.659Z] Bookings dans la commande: 
+[2025-07-05T11:20:22.660Z] Nombre de producteurs à notifier: 1
+[2025-07-05T11:20:22.662Z] Liste des IDs producteurs: [
+  "cmcatjzt1000mwv909rwul0k6"
+]
+[2025-07-05T11:20:22.663Z] Traitement du producteur: "cmcatjzt1000mwv909rwul0k6"
+[2025-07-05T11:20:22.665Z] Producer userId: "cmcatjzt1000lwv90pqpivme9"
+[2025-07-05T11:20:22.667Z] Montant total pour ce producteur: {
+  "itemsTotal": 1,
+  "bookingsTotal": 0,
+  "total": 1
+}
+[2025-07-05T11:20:22.671Z] Notification créée avec ID: "cmcq5jez1000n12ee9jftmdsb"
+[2025-07-05T11:20:22.672Z] NotificationService: Fin de l'envoi de notification 
+[2025-07-05T11:20:22.673Z] Notification envoyée {
+  "orderId": "cmcq5jexb000k12eef3luipjv"
+}
+[2025-07-05T11:28:13.012Z] NotificationService: Début envoi notification commande {
+  "orderId": "cmcq5jexb000k12eef3luipjv"
+}
+[2025-07-05T11:28:13.014Z] Items dans la commande: 1
+[2025-07-05T11:28:13.016Z] Traitement item produit: {
+  "productId": "cmcatkrx6000owv90q7y0a99y",
+  "productName": "Frederic ragaigne"
+}
+[2025-07-05T11:28:13.017Z] Producer ID directement ajouté: "cmcatjzt1000mwv909rwul0k6"
+[2025-07-05T11:28:13.018Z] Bookings dans la commande: 
+[2025-07-05T11:28:13.019Z] Nombre de producteurs à notifier: 1
+[2025-07-05T11:28:13.020Z] Liste des IDs producteurs: [
+  "cmcatjzt1000mwv909rwul0k6"
+]
+[2025-07-05T11:28:13.021Z] Traitement du producteur: "cmcatjzt1000mwv909rwul0k6"
+[2025-07-05T11:28:13.024Z] Producer userId: "cmcatjzt1000lwv90pqpivme9"
+[2025-07-05T11:28:13.025Z] Montant total pour ce producteur: {
+  "itemsTotal": 2,
+  "bookingsTotal": 0,
+  "total": 2
+}
+[2025-07-05T11:28:13.029Z] Notification créée avec ID: "cmcq5thwj000t12eekevwpely"
+[2025-07-05T11:28:13.030Z] NotificationService: Fin de l'envoi de notification 
+[2025-07-05T11:28:13.133Z] Notification de création de facture envoyée au client: {
+  "userId": "cmcatiyko000iwv90l96okrc5",
+  "invoiceId": "cmcq5thva000r12eettw93cjy"
+}
+[2025-07-05T11:28:41.538Z] Notification de changement de statut créée pour le client: "cmcatiyko000iwv90l96okrc5"

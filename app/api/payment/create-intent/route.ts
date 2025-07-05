@@ -1,23 +1,31 @@
 // app/api/payment/create-intent/route.ts
 import { NextRequest, NextResponse } from "next/server"
-import { apiAuthMiddleware } from "@/lib/api-middleware"
+import { withClientSecurity } from "@/lib/api-security"
+import { validateInput, paymentSchemas } from "@/lib/validation-schemas"
+import { handleError, createError } from "@/lib/error-handler"
 import { stripe, STRIPE_CONFIG } from "@/lib/stripe"
 import { prisma } from "@/lib/prisma"
 
-export const POST = apiAuthMiddleware(async (req: NextRequest, session) => {
+export const POST = withClientSecurity(async (request: NextRequest, session) => {
   try {
-    const { amount, orderId } = await req.json()
+    // 1. Validation des données d'entrée avec Zod
+    const rawData = await request.json()
+    const { amount, orderId } = validateInput(paymentSchemas.createIntent, rawData)
     
-    // Validation
-    if (!amount || !orderId) {
-      return new NextResponse("Montant et ID de commande requis", { status: 400 })
+    // 2. Validation métier supplémentaire
+    // CORRECTION: Le montant est déjà en centimes depuis le frontend
+    const amountInCents = Math.round(amount)
+    const amountInFrancs = amount / 100
+    
+    if (amountInFrancs < 0.5) {
+      throw createError.validation("Montant minimum 0.50 CHF")
     }
     
-    if (amount < 50) { // Minimum 0.50 CHF en centimes
-      return new NextResponse("Montant minimum 0.50 CHF", { status: 400 })
+    if (amountInCents < 50) { // Minimum 0.50 CHF en centimes
+      throw createError.validation("Montant minimum 0.50 CHF")
     }
     
-    // Vérifier que la commande existe et appartient à l'utilisateur
+    // 3. Vérification de l'existence et des droits sur la commande
     const order = await prisma.order.findFirst({
       where: {
         id: orderId,
@@ -25,17 +33,44 @@ export const POST = apiAuthMiddleware(async (req: NextRequest, session) => {
         status: 'DRAFT' // Seulement les commandes en brouillon
       },
       include: {
-        user: true
+        user: {
+          select: {
+            id: true,
+            email: true,
+            name: true
+          }
+        },
+        items: {
+          select: {
+            id: true,
+            quantity: true,
+            price: true
+          }
+        }
       }
     })
     
     if (!order) {
-      return new NextResponse("Commande non trouvée ou déjà traitée", { status: 404 })
+      throw createError.notFound("Commande non trouvée ou déjà traitée")
     }
     
-    // Créer le PaymentIntent Stripe
+    // 4. Vérification de cohérence du montant
+    const calculatedTotal = order.items.reduce((sum, item) => 
+      sum + (item.price * item.quantity), 0
+    )
+    
+    // Utiliser la variable déjà déclarée plus haut
+    if (Math.abs(calculatedTotal - amountInFrancs) > 0.01) { // Tolérance de 1 centime
+      throw createError.validation(
+        `Montant incohérent. Attendu: ${calculatedTotal.toFixed(2)} CHF, reçu: ${amountInFrancs.toFixed(2)} CHF`
+      )
+    }
+    
+    console.log(`💰 Validation montant - DB: ${calculatedTotal} CHF, Reçu: ${amountInFrancs} CHF, Stripe: ${amountInCents} centimes`)
+    
+    // 5. Création du PaymentIntent Stripe avec métadonnées enrichies
     const paymentIntent = await stripe.paymentIntents.create({
-      amount, // Déjà en centimes
+      amount: amountInCents,
       currency: STRIPE_CONFIG.currency,
       automatic_payment_methods: {
         enabled: true,
@@ -44,42 +79,61 @@ export const POST = apiAuthMiddleware(async (req: NextRequest, session) => {
         orderId: order.id,
         userId: session.user.id,
         userEmail: session.user.email || '',
-        orderTotal: (amount / 100).toString() // Pour référence
+        orderTotal: amountInFrancs.toString(), // En francs pour les métadonnées
+        itemsCount: order.items.length.toString(),
+        environment: process.env.NODE_ENV || 'development',
+        timestamp: new Date().toISOString()
       },
       description: `Commande Mushroom Marketplace #${order.id.substring(0, 8)}`,
       receipt_email: session.user.email || undefined,
-      setup_future_usage: undefined, // Pas de sauvegarde de carte pour l'instant
+      setup_future_usage: undefined, // Pas de sauvegarde de carte
     })
     
-    // Optionnel: Sauvegarder l'intent ID dans la commande pour suivi
-    await prisma.order.update({
-      where: { id: order.id },
-      data: {
-        metadata: JSON.stringify({
-          ...JSON.parse(order.metadata || '{}'),
-          stripePaymentIntentId: paymentIntent.id,
-          paymentMethod: 'card'
-        })
+    // 6. Sauvegarde sécurisée des métadonnées dans la commande
+    try {
+      const existingMetadata = order.metadata ? JSON.parse(order.metadata) : {}
+      const updatedMetadata = {
+        ...existingMetadata,
+        stripePaymentIntentId: paymentIntent.id,
+        paymentMethod: 'card',
+        paymentCreatedAt: new Date().toISOString(),
+        userAgent: request.headers.get('user-agent')?.substring(0, 255) || 'unknown'
       }
-    })
+      
+      await prisma.order.update({
+        where: { id: order.id },
+        data: {
+          metadata: JSON.stringify(updatedMetadata)
+        }
+      })
+    } catch (metadataError) {
+      // Log l'erreur mais ne pas faire échouer la création du payment intent
+      console.warn("Erreur lors de la sauvegarde des métadonnées:", metadataError)
+    }
     
-    console.log(`PaymentIntent créé: ${paymentIntent.id} pour commande ${order.id}`)
+    // 7. Log sécurisé pour audit
+    console.log(`✅ PaymentIntent créé: ${paymentIntent.id} pour commande ${order.id} (user: ${session.user.id})`)
     
+    // 8. Réponse sécurisée (ne pas exposer d'infos sensibles)
     return NextResponse.json({
       client_secret: paymentIntent.client_secret,
-      payment_intent_id: paymentIntent.id
+      payment_intent_id: paymentIntent.id,
+      amount: amountInFrancs, // Retourner en francs
+      currency: STRIPE_CONFIG.currency
     })
     
   } catch (error) {
-    console.error("Erreur lors de la création du PaymentIntent:", error)
+    // 9. Gestion d'erreur centralisée avec le système de sécurité
+    console.error("❌ Erreur création PaymentIntent:", error)
     
-    if (error instanceof Error) {
-      // Erreurs Stripe spécifiques
-      if (error.message.includes('stripe')) {
-        return new NextResponse(`Erreur Stripe: ${error.message}`, { status: 400 })
-      }
+    // Log supplémentaire pour les erreurs Stripe
+    if (error instanceof Error && error.message.includes('stripe')) {
+      console.error("Erreur Stripe détaillée:", {
+        message: error.message,
+        stack: error.stack
+      })
     }
     
-    return new NextResponse("Erreur lors de la création du paiement", { status: 500 })
+    return handleError(error, request.url)
   }
-}, ["CLIENT"])
+})

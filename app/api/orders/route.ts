@@ -1,136 +1,207 @@
-// app/api/orders/route.ts - CORRECTION pour exclure les DRAFT de façon cohérente
+// app/api/orders/route.ts - Version sécurisée
 import { NextRequest, NextResponse } from "next/server"
+import { withClientSecurity } from "@/lib/api-security"
+import { validateInput, orderSchemas } from "@/lib/validation-schemas"
+import { handleError, createError } from "@/lib/error-handler"
 import { prisma } from "@/lib/prisma"
-import { apiAuthMiddleware } from "@/lib/api-middleware"
-import { Session } from "next-auth"
 import { OrderStatus, ProductType, Prisma } from "@prisma/client"
 import { NotificationService } from '@/lib/notification-service'
-import fs from 'fs/promises';
-import path from 'path';
+import fs from 'fs/promises'
+import path from 'path'
 
-// Fonction d'aide pour les logs de débogage
+// Fonction d'aide pour les logs de débogage sécurisés
 async function logDebug(message: string, data?: any): Promise<void> {
   try {
-    const logMessage = `[${new Date().toISOString()}] ${message} ${data ? JSON.stringify(data, null, 2) : ''}`;
+    // Filtrer les données sensibles des logs
+    const sanitizedData = data ? JSON.stringify(data, (key, value) => {
+      // Ne pas logger les informations sensibles
+      if (['password', 'token', 'secret', 'key'].includes(key.toLowerCase())) {
+        return '[REDACTED]'
+      }
+      return value
+    }, 2) : ''
+    
+    const logMessage = `[${new Date().toISOString()}] ${message} ${sanitizedData}`
     await fs.appendFile(
       path.join(process.cwd(), 'debug.log'), 
       logMessage + '\n'
-    );
+    )
   } catch (error) {
-    console.error('Erreur d\'écriture dans le fichier de log:', error);
+    console.error('Erreur d\'écriture dans le fichier de log:', error)
   }
 }
 
+// Types pour la validation
 interface OrderItem {
- productId: string
- quantity: number
- price: number
-}
-
-interface DeliveryBooking {
- slotId: string
- quantity: number
+  productId: string
+  quantity: number
+  price: number
 }
 
 interface CreateOrderBody {
- items: {
-   productId: string
-   quantity: number
-   slotId?: string
- }[]
+  items: {
+    productId: string
+    quantity: number
+    slotId?: string
+  }[]
 }
 
-export const GET = apiAuthMiddleware(async (req: NextRequest, session: Session) => {
- try {
-   const { searchParams } = new URL(req.url)
-   const statusParam = searchParams.get('status') as OrderStatus | null
-   const page = parseInt(searchParams.get('page') ?? '1')
-   const limit = parseInt(searchParams.get('limit') ?? '10')
-
-   // ✅ CORRECTION: Base de la requête avec exclusion systématique des DRAFT
-   const baseWhere: any = {
-     ...(session.user.role === 'CLIENT' && {
-       userId: session.user.id
-     }),
-     // Toujours exclure les DRAFT sauf si explicitement demandé
-     ...(statusParam !== OrderStatus.DRAFT && {
-       status: statusParam ? statusParam : { not: OrderStatus.DRAFT }
-     }),
-     // Si on demande explicitement les DRAFT, les inclure
-     ...(statusParam === OrderStatus.DRAFT && {
-       status: OrderStatus.DRAFT
-     })
-   }
-
-   console.log("Filtres appliqués pour les commandes:", baseWhere)
-
-   // Récupérer les commandes avec pagination
-   const [orders, total] = await Promise.all([
-     prisma.order.findMany({
-       where: baseWhere,
-       include: {
-         user: {
-           select: {
-             name: true,
-             email: true,
-             phone: true,
-           }
-         },
-         items: {
-           include: {
-             product: true
-           }
-         },
-         bookings: {
-           include: {
-             deliverySlot: {
-               include: {
-                 product: true
-               }
-             }
-           }
-         },
-         invoice: true
-       },
-       orderBy: {
-         createdAt: 'desc'
-       },
-       skip: (page - 1) * limit,
-       take: limit
-     }),
-     prisma.order.count({
-       where: baseWhere
-     })
-   ])
-
-   // Retourner directement le tableau d'ordres, comme attendu par le client
-   return NextResponse.json(orders)
- } catch (error) {
-   console.error("Erreur lors de la récupération des commandes:", error)
-   return new NextResponse("Erreur lors de la récupération des commandes", { status: 500 })
- }
-})
-
-export const POST = apiAuthMiddleware(async (req: NextRequest, session: Session) => {
+// GET: Récupérer les commandes de l'utilisateur
+export const GET = withClientSecurity(async (request: NextRequest, session) => {
   try {
-    const body = await req.json()
-    await logDebug("Requête de création de commande reçue", body);
+    const { searchParams } = new URL(request.url)
     
-    // Si le body contient des items, les logger en détail
-    if (body.items && body.items.length > 0) {
-      await logDebug("Détails des items reçus dans la requête:", body.items);
-    } else {
-      await logDebug("ATTENTION: Requête reçue sans items");
+    // Validation des paramètres de requête
+    const queryParams = {
+      status: searchParams.get('status'),
+      page: searchParams.get('page') ? parseInt(searchParams.get('page')!) : 1,
+      limit: searchParams.get('limit') ? parseInt(searchParams.get('limit')!) : 10
     }
     
-    // Vérifier s'il y a des items dans le panier
-    let cartItems: {
-      productId: string;
-      quantity: number;
-      price: number;
-    }[] = [];
+    // Validation avec notre schéma
+    const validatedQuery = validateInput(orderSchemas.search, {
+      ...queryParams,
+      userId: session.user.id // Forcer l'ID de l'utilisateur connecté
+    })
+    
+    // Construction sécurisée de la requête
+    const baseWhere: any = {
+      userId: session.user.id, // SÉCURITÉ: Toujours filtrer par utilisateur connecté
+    }
+    
+    // Gestion des statuts avec validation
+    if (validatedQuery.status) {
+      // Vérifier que le statut est valide
+      if (!Object.values(OrderStatus).includes(validatedQuery.status as OrderStatus)) {
+        throw createError.validation(`Statut invalide: ${validatedQuery.status}`)
+      }
+      baseWhere.status = validatedQuery.status
+    } else {
+      // Par défaut, exclure les DRAFT
+      baseWhere.status = { not: OrderStatus.DRAFT }
+    }
+    
+    await logDebug("Requête GET /api/orders", {
+      userId: session.user.id,
+      filters: baseWhere,
+      page: validatedQuery.page,
+      limit: validatedQuery.limit
+    })
+    
+    // Pagination sécurisée
+    const maxLimit = 50 // Limite maximale pour éviter les surcharges
+    const safeLimit = Math.min(validatedQuery.limit || 10, maxLimit)
+    const safePage = Math.max(validatedQuery.page || 1, 1)
+    
+    // Récupération sécurisée des données
+    const [orders, total] = await Promise.all([
+      prisma.order.findMany({
+        where: baseWhere,
+        include: {
+          user: {
+            select: {
+              id: true,
+              name: true,
+              email: true,
+              phone: true,
+            }
+          },
+          items: {
+            include: {
+              product: {
+                select: {
+                  id: true,
+                  name: true,
+                  price: true,
+                  unit: true,
+                  image: true,
+                  producerId: true
+                }
+              }
+            }
+          },
+          bookings: {
+            include: {
+              deliverySlot: {
+                include: {
+                  product: {
+                    select: {
+                      id: true,
+                      name: true,
+                      price: true,
+                      unit: true,
+                      image: true
+                    }
+                  }
+                }
+              }
+            }
+          },
+          invoice: {
+            select: {
+              id: true,
+              amount: true,
+              status: true,
+              dueDate: true,
+              paidAt: true
+            }
+          }
+        },
+        orderBy: {
+          createdAt: 'desc'
+        },
+        skip: (safePage - 1) * safeLimit,
+        take: safeLimit
+      }),
+      prisma.order.count({
+        where: baseWhere
+      })
+    ])
+    
+    // Log pour audit
+    await logDebug("Commandes récupérées", {
+      userId: session.user.id,
+      count: orders.length,
+      total,
+      page: safePage
+    })
+    
+    return NextResponse.json({
+      orders,
+      pagination: {
+        page: safePage,
+        limit: safeLimit,
+        total,
+        totalPages: Math.ceil(total / safeLimit)
+      }
+    })
+    
+  } catch (error) {
+    await logDebug("Erreur GET /api/orders", { error: error instanceof Error ? error.message : 'Unknown error' })
+    return handleError(error, request.url)
+  }
+})
+
+// POST: Créer une nouvelle commande
+export const POST = withClientSecurity(async (request: NextRequest, session) => {
+  try {
+    // Validation des données d'entrée
+    const rawData = await request.json()
+    await logDebug("Requête de création de commande reçue", {
+      userId: session.user.id,
+      hasItems: rawData.items && rawData.items.length > 0
+    })
+    
+    // Validation avec schéma si des items sont fournis
+    let validatedData: any = null
+    if (rawData.items && rawData.items.length > 0) {
+      validatedData = validateInput(orderSchemas.create, rawData)
+    }
+    
+    // Récupération sécurisée du panier existant
+    let cartItems: OrderItem[] = []
+    
     try {
-      // Récupérer les items du panier actuel de l'utilisateur (DRAFT)
       const cart = await prisma.order.findFirst({
         where: {
           userId: session.user.id,
@@ -139,115 +210,190 @@ export const POST = apiAuthMiddleware(async (req: NextRequest, session: Session)
         include: {
           items: {
             include: {
-              product: true
+              product: {
+                select: {
+                  id: true,
+                  name: true,
+                  price: true,
+                  available: true,
+                  producerId: true
+                }
+              }
             }
           }
         },
         orderBy: {
           createdAt: 'desc'
         }
-      });
+      })
       
       if (cart && cart.items.length > 0) {
-        await logDebug("Items trouvés dans le panier existant:", cart.items);
+        // Validation que les produits sont toujours disponibles
+        const unavailableProducts = cart.items.filter(item => !item.product.available)
+        if (unavailableProducts.length > 0) {
+          throw createError.validation(
+            `Certains produits ne sont plus disponibles: ${unavailableProducts.map(p => p.product.name).join(', ')}`
+          )
+        }
+        
         cartItems = cart.items.map(item => ({
           productId: item.productId,
           quantity: item.quantity,
           price: item.price
-        }));
-      } else {
-        await logDebug("Aucun panier existant avec des items trouvé");
+        }))
+        
+        await logDebug("Items trouvés dans le panier existant", { itemsCount: cartItems.length })
       }
-    } catch (e) {
-      const error = e as Error;
-      await logDebug("Erreur lors de la récupération du panier:", {
-        error: error.message,
-        stack: error.stack
-      });
+    } catch (error) {
+      if (error instanceof Error && error.message.includes('validation')) {
+        throw error // Re-lancer les erreurs de validation
+      }
+      await logDebug("Erreur lors de la récupération du panier", { error: error instanceof Error ? error.message : 'Unknown' })
     }
     
-    // Utiliser les items du body ou du panier existant
-    const itemsToCreate = (body.items && body.items.length > 0) ? body.items : cartItems;
+    // Déterminer les items à utiliser
+    const itemsToCreate = validatedData?.items || cartItems
     
-    await logDebug("Items qui seront utilisés pour créer la commande:", itemsToCreate);
-    
-    // Créer la nouvelle commande
-    let totalAmount = 0;
-    
-    // Calculer le montant total des items
-    for (const item of itemsToCreate) {
-      totalAmount += item.price * item.quantity;
-    }
-    
-    // Créer la commande
-    const order = await prisma.order.create({
-      data: {
-        userId: session.user.id,
-        total: totalAmount,
-        status: OrderStatus.DRAFT
-      },
-      include: {
-        items: {
-          include: {
-            product: {
-              include: {
-                producer: true
-              }
-            }
-          }
-        },
-        user: {
-          select: {
-            name: true,
-            email: true,
-            phone: true
-          }
-        },
-        bookings: {
-          include: {
-            deliverySlot: {
-              include: {
-                product: {
-                  include: {
-                    producer: true
-                  }
-                }
-              }
-            }
-          }
-        }
-      }
-    });
-    
-    await logDebug("Commande créée avec ID:", order.id);
-    
-    // Créer les items de commande
-    for (const item of itemsToCreate) {
-      await prisma.orderItem.create({
+    // ✅ CORRECTION TEMPORAIRE: Permettre la création de paniers vides pour compatibilité
+    if (itemsToCreate.length === 0) {
+      console.log('🛒 Création d\'un panier vide (mode compatibilité)')
+      
+      // Créer un panier vide pour la compatibilité avec l'ancien système
+      const order = await prisma.order.create({
         data: {
-          orderId: order.id,
+          userId: session.user.id,
+          total: 0,
+          status: OrderStatus.DRAFT,
+          metadata: JSON.stringify({
+            createdByAPI: true,
+            emptyCart: true,
+            userAgent: request.headers.get('user-agent')?.substring(0, 255),
+            createdAt: new Date().toISOString()
+          })
+        },
+        include: {
+          items: true,
+          user: {
+            select: {
+              id: true,
+              name: true,
+              email: true,
+              phone: true
+            }
+          },
+          bookings: true
+        }
+      })
+      
+      await logDebug("Panier vide créé (compatibilité)", {
+        orderId: order.id,
+        userId: session.user.id
+      })
+      
+      return NextResponse.json(order)
+    }
+    
+    await logDebug("Items qui seront utilisés", { itemsCount: itemsToCreate.length })
+    
+    // Validation des produits et calcul sécurisé du total
+    let totalAmount = 0
+    const validatedItems: OrderItem[] = []
+    
+    for (const item of itemsToCreate) {
+      // Vérifier que le produit existe et est disponible
+      const product = await prisma.product.findUnique({
+        where: { id: item.productId },
+        select: {
+          id: true,
+          name: true,
+          price: true,
+          available: true,
+          minOrderQuantity: true,
+          producerId: true
+        }
+      })
+      
+      if (!product) {
+        throw createError.notFound(`Produit non trouvé: ${item.productId}`)
+      }
+      
+      if (!product.available) {
+        throw createError.validation(`Produit non disponible: ${product.name}`)
+      }
+      
+      if (item.quantity < product.minOrderQuantity) {
+        throw createError.validation(
+          `Quantité insuffisante pour ${product.name}. Minimum: ${product.minOrderQuantity}`
+        )
+      }
+      
+      // Vérifier la cohérence du prix (sécurité importante !)
+      if (Math.abs(item.price - product.price) > 0.01) {
+        throw createError.validation(
+          `Prix incohérent pour ${product.name}. Attendu: ${product.price}, reçu: ${item.price}`
+        )
+      }
+      
+      validatedItems.push({
+        productId: item.productId,
+        quantity: item.quantity,
+        price: product.price // Utiliser le prix de la DB pour la sécurité
+      })
+      
+      totalAmount += product.price * item.quantity
+    }
+    
+    // Transaction sécurisée pour la création
+    const order = await prisma.$transaction(async (tx) => {
+      // Créer la commande
+      const newOrder = await tx.order.create({
+        data: {
+          userId: session.user.id,
+          total: totalAmount,
+          status: OrderStatus.DRAFT,
+          metadata: JSON.stringify({
+            createdByAPI: true,
+            userAgent: request.headers.get('user-agent')?.substring(0, 255),
+            createdAt: new Date().toISOString()
+          })
+        }
+      })
+      
+      // Créer les items
+      await tx.orderItem.createMany({
+        data: validatedItems.map(item => ({
+          orderId: newOrder.id,
           productId: item.productId,
           quantity: item.quantity,
           price: item.price
-        }
-      });
-    }
+        }))
+      })
+      
+      return newOrder
+    })
     
-    // Récupérer la commande mise à jour avec les items
-    const updatedOrder = await prisma.order.findUnique({
+    // Récupération de la commande complète
+    const completeOrder = await prisma.order.findUnique({
       where: { id: order.id },
       include: {
         items: {
           include: {
             product: {
               include: {
-                producer: true
+                producer: {
+                  select: {
+                    id: true,
+                    companyName: true,
+                    userId: true
+                  }
+                }
               }
             }
           }
         },
         user: {
           select: {
+            id: true,
             name: true,
             email: true,
             phone: true
@@ -259,7 +405,12 @@ export const POST = apiAuthMiddleware(async (req: NextRequest, session: Session)
               include: {
                 product: {
                   include: {
-                    producer: true
+                    producer: {
+                      select: {
+                        id: true,
+                        companyName: true
+                      }
+                    }
                   }
                 }
               }
@@ -267,39 +418,36 @@ export const POST = apiAuthMiddleware(async (req: NextRequest, session: Session)
           }
         }
       }
-    });
+    })
     
-    await logDebug("Contenu de l'objet order.items:", updatedOrder?.items);
+    await logDebug("Commande créée avec succès", {
+      orderId: order.id,
+      userId: session.user.id,
+      itemsCount: validatedItems.length,
+      total: totalAmount
+    })
     
-    // Vérifier que la commande a été créée correctement
-    const verifyItems = await prisma.orderItem.findMany({
-      where: { orderId: order.id }
-    });
-    
-    await logDebug("Vérification des items dans la base de données:", verifyItems);
-    
-    await logDebug("Commande créée", {
-      id: order.id,
-      itemsCount: verifyItems.length,
-      bookingsCount: updatedOrder?.bookings.length || 0
-    });
-    
-    // Si la commande a des items, envoyer une notification
-    if (verifyItems.length > 0) {
+    // Notification sécurisée
+    if (completeOrder && completeOrder.items.length > 0) {
       try {
-        await NotificationService.sendNewOrderNotification(updatedOrder!);
+        await NotificationService.sendNewOrderNotification(completeOrder)
+        await logDebug("Notification envoyée", { orderId: order.id })
       } catch (notificationError) {
-        await logDebug("Erreur lors de l'envoi de notification:", notificationError);
-        // Ne pas faire échouer la création de commande pour une erreur de notification
+        await logDebug("Erreur notification (non critique)", { 
+          orderId: order.id,
+          error: notificationError instanceof Error ? notificationError.message : 'Unknown'
+        })
+        // Ne pas faire échouer la création pour une erreur de notification
       }
-    } else {
-      await logDebug("Aucun item dans la commande - pas de notification à créer");
     }
-
-    return NextResponse.json(updatedOrder);
+    
+    return NextResponse.json(completeOrder)
+    
   } catch (error) {
-    await logDebug("Erreur lors de la création de commande:", error);
-    console.error("Erreur lors de la création de la commande:", error)
-    return new NextResponse("Erreur lors de la création de la commande", { status: 500 })
+    await logDebug("Erreur création commande", {
+      userId: session.user.id,
+      error: error instanceof Error ? error.message : 'Unknown error'
+    })
+    return handleError(error, request.url)
   }
 })

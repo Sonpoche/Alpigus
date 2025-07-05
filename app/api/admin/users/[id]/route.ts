@@ -1,198 +1,333 @@
-// app/api/admin/users/[id]/route.ts
+// app/api/admin/users/[id]/route.ts - Version sécurisée
 import { NextRequest, NextResponse } from "next/server"
+import { withAdminSecurity } from "@/lib/api-security"
+import { validateInput, userSchemas } from "@/lib/validation-schemas"
+import { handleError, createError } from "@/lib/error-handler"
 import { prisma } from "@/lib/prisma"
-import { apiAuthMiddleware } from "@/lib/api-middleware"
-import { Session } from "next-auth"
 import { isValidPhoneNumber } from 'libphonenumber-js'
 import { UserRole } from "@prisma/client"
+import { z } from 'zod'
+
+// Schémas de validation spécifiques pour l'admin
+const adminUserUpdateSchema = z.object({
+  name: z.string().min(2, 'Nom trop court').max(100, 'Nom trop long').optional(),
+  email: z.string().email('Email invalide').max(255, 'Email trop long').optional(),
+  phone: z.string().min(10, 'Téléphone invalide').max(20, 'Téléphone trop long').optional(),
+  role: z.nativeEnum(UserRole, { errorMap: () => ({ message: 'Rôle invalide' }) }).optional(),
+  producer: z.object({
+    companyName: z.string().max(255, 'Nom entreprise trop long').optional(),
+    description: z.string().max(2000, 'Description trop longue').optional(),
+    address: z.string().max(500, 'Adresse trop longue').optional()
+  }).optional()
+}).strict() // Empêche les champs non définis
 
 // GET: Récupérer un utilisateur spécifique
-export const GET = apiAuthMiddleware(async (
-  req: NextRequest,
-  session: Session,
-  context: { params: { [key: string]: string } }
+export const GET = withAdminSecurity(async (
+  request: NextRequest,
+  session
 ) => {
   try {
-    // Vérifier que l'utilisateur est admin
-    if (session.user.role !== 'ADMIN') {
-      return new NextResponse("Non autorisé", { status: 403 })
+    // Récupérer l'ID utilisateur depuis l'URL
+    const url = new URL(request.url)
+    const pathParts = url.pathname.split('/')
+    const userId = pathParts[pathParts.indexOf('users') + 1]
+    
+    // Validation de l'ID
+    if (!userId || !userId.match(/^[a-zA-Z0-9]+$/)) {
+      throw createError.validation("ID utilisateur invalide")
     }
-
+    
+    console.log(`👤 Admin ${session.user.id} consulte l'utilisateur ${userId}`)
+    
+    // Récupération sécurisée avec limitation des données sensibles
     const user = await prisma.user.findUnique({
-      where: { id: context.params.id },
-      include: {
-        producer: true
+      where: { id: userId },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        phone: true,
+        role: true,
+        profileCompleted: true,
+        createdAt: true,
+        updatedAt: true,
+        producer: {
+          select: {
+            id: true,
+            companyName: true,
+            address: true,
+            description: true,
+            bankName: true,
+            bankAccountName: true,
+            iban: true,
+            bic: true
+          }
+        },
+        // Statistiques utiles pour l'admin
+        _count: {
+          select: {
+            orders: true,
+            notifications: true,
+            invoices: true
+          }
+        }
       }
     })
 
     if (!user) {
-      return new NextResponse("Utilisateur non trouvé", { status: 404 })
+      throw createError.notFound("Utilisateur non trouvé")
     }
 
-    // Ne pas renvoyer le mot de passe
-    const { password, ...userWithoutPassword } = user
+    // Log d'audit pour traçabilité
+    console.log(`✅ Consultation utilisateur par admin:`, {
+      adminId: session.user.id,
+      targetUserId: userId,
+      targetUserEmail: user.email,
+      timestamp: new Date().toISOString()
+    })
 
-    return NextResponse.json(userWithoutPassword)
+    // Ne jamais exposer de données sensibles comme les mots de passe
+    return NextResponse.json(user)
+    
   } catch (error) {
-    console.error("Erreur lors de la récupération de l'utilisateur:", error)
-    return new NextResponse(
-      "Erreur lors de la récupération de l'utilisateur", 
-      { status: 500 }
-    )
+    console.error("❌ Erreur consultation utilisateur:", error)
+    return handleError(error, request.url)
   }
-}, ["ADMIN"])
+})
 
 // PATCH: Mettre à jour un utilisateur
-export const PATCH = apiAuthMiddleware(async (
-  req: NextRequest,
-  session: Session,
-  context: { params: { [key: string]: string } }
+export const PATCH = withAdminSecurity(async (
+  request: NextRequest,
+  session
 ) => {
   try {
-    // Vérifier que l'utilisateur est admin
-    if (session.user.role !== 'ADMIN') {
-      return new NextResponse("Non autorisé", { status: 403 })
-    }
-
-    const userId = context.params.id
+    // Récupérer l'ID utilisateur
+    const url = new URL(request.url)
+    const pathParts = url.pathname.split('/')
+    const userId = pathParts[pathParts.indexOf('users') + 1]
     
-    // Vérifier si l'utilisateur existe
+    if (!userId || !userId.match(/^[a-zA-Z0-9]+$/)) {
+      throw createError.validation("ID utilisateur invalide")
+    }
+    
+    // Validation des données d'entrée
+    const rawData = await request.json()
+    const validatedData = validateInput(adminUserUpdateSchema, rawData)
+    
+    console.log(`✏️ Admin ${session.user.id} modifie l'utilisateur ${userId}`)
+    
+    // Vérifier que l'utilisateur existe
     const existingUser = await prisma.user.findUnique({
       where: { id: userId },
-      include: { producer: true }
+      include: { 
+        producer: true,
+        _count: {
+          select: {
+            orders: true,
+            invoices: true
+          }
+        }
+      }
     })
 
     if (!existingUser) {
-      return new NextResponse("Utilisateur non trouvé", { status: 404 })
+      throw createError.notFound("Utilisateur non trouvé")
     }
-
-    const body = await req.json()
-    const { name, email, phone, role, producer } = body
-
-    // Validation
-    if (email && email !== existingUser.email) {
+    
+    // SÉCURITÉ: Empêcher l'auto-modification du rôle admin
+    if (userId === session.user.id && validatedData.role && validatedData.role !== 'ADMIN') {
+      throw createError.validation("Vous ne pouvez pas modifier votre propre rôle d'administrateur")
+    }
+    
+    // Validation métier avancée
+    if (validatedData.email && validatedData.email !== existingUser.email) {
       const userWithEmail = await prisma.user.findUnique({
-        where: { email }
+        where: { email: validatedData.email }
       })
       if (userWithEmail) {
-        return new NextResponse("Cet email est déjà utilisé", { status: 400 })
+        throw createError.conflict("Cet email est déjà utilisé par un autre utilisateur")
       }
     }
 
     // Validation du téléphone si fourni
-    if (phone) {
+    if (validatedData.phone && validatedData.phone.trim()) {
       try {
-        if (!isValidPhoneNumber(phone)) {
-          return new NextResponse(
-            "Format de téléphone invalide", 
-            { status: 400 }
-          )
+        if (!isValidPhoneNumber(validatedData.phone)) {
+          throw createError.validation("Format de téléphone invalide")
         }
       } catch (e) {
-        return new NextResponse(
-          "Format de téléphone invalide", 
-          { status: 400 }
-        )
+        throw createError.validation("Format de téléphone invalide")
       }
     }
+    
+    // SÉCURITÉ: Log avant modification pour audit
+    const changeLog = {
+      adminId: session.user.id,
+      targetUserId: userId,
+      targetUserEmail: existingUser.email,
+      changes: {} as any,
+      timestamp: new Date().toISOString()
+    }
+    
+    // Tracer les modifications
+    if (validatedData.name && validatedData.name !== existingUser.name) {
+      changeLog.changes.name = { from: existingUser.name, to: validatedData.name }
+    }
+    if (validatedData.email && validatedData.email !== existingUser.email) {
+      changeLog.changes.email = { from: existingUser.email, to: validatedData.email }
+    }
+    if (validatedData.role && validatedData.role !== existingUser.role) {
+      changeLog.changes.role = { from: existingUser.role, to: validatedData.role }
+    }
 
-    // Préparer les données à mettre à jour
+    // Préparer les données de mise à jour
     const updateData: any = {}
-    if (name !== undefined) updateData.name = name
-    if (email !== undefined) updateData.email = email
-    if (phone !== undefined) updateData.phone = phone
-    if (role !== undefined) updateData.role = role
+    if (validatedData.name !== undefined) updateData.name = validatedData.name
+    if (validatedData.email !== undefined) updateData.email = validatedData.email
+    if (validatedData.phone !== undefined) updateData.phone = validatedData.phone || null
+    if (validatedData.role !== undefined) updateData.role = validatedData.role
 
-    // Gestion du changement de rôle
-    if (role !== undefined && role !== existingUser.role) {
-      // Si on passe de producteur à un autre rôle, supprimer l'entrée producer
-      if (existingUser.role === 'PRODUCER' && role !== 'PRODUCER') {
-        if (existingUser.producer) {
-          await prisma.producer.delete({
-            where: { id: existingUser.producer.id }
+    // Transaction atomique pour la mise à jour complexe
+    const updatedUser = await prisma.$transaction(async (tx) => {
+      // Gestion sécurisée du changement de rôle
+      if (validatedData.role && validatedData.role !== existingUser.role) {
+        console.log(`🔄 Changement de rôle: ${existingUser.role} → ${validatedData.role}`)
+        
+        // Si on passe de producteur à un autre rôle
+        if (existingUser.role === 'PRODUCER' && validatedData.role !== 'PRODUCER') {
+          if (existingUser.producer) {
+            // Vérifier s'il n'y a pas de commandes en cours avant suppression
+            if (existingUser._count.orders > 0) {
+              console.warn(`⚠️ Suppression producteur avec ${existingUser._count.orders} commandes`)
+            }
+            
+            await tx.producer.delete({
+              where: { id: existingUser.producer.id }
+            })
+            console.log(`🗑️ Profil producteur supprimé pour ${userId}`)
+          }
+        }
+        // Si on passe à producteur
+        else if (validatedData.role === 'PRODUCER' && existingUser.role !== 'PRODUCER') {
+          await tx.producer.create({
+            data: {
+              userId: userId,
+              companyName: validatedData.producer?.companyName || '',
+              description: validatedData.producer?.description || '',
+              address: validatedData.producer?.address || ''
+            }
           })
+          console.log(`✅ Profil producteur créé pour ${userId}`)
         }
       }
-      // Si on passe à producteur, créer l'entrée producer
-      else if (role === 'PRODUCER' && existingUser.role !== 'PRODUCER') {
-        await prisma.producer.create({
+
+      // Mettre à jour l'utilisateur
+      const user = await tx.user.update({
+        where: { id: userId },
+        data: updateData,
+        include: {
+          producer: true
+        }
+      })
+      
+      // Mettre à jour les données du producteur si nécessaire
+      if (validatedData.producer && user.role === 'PRODUCER' && user.producer) {
+        await tx.producer.update({
+          where: { id: user.producer.id },
           data: {
-            userId: userId,
-            companyName: '',
-            description: '',
-            address: ''
+            companyName: validatedData.producer.companyName || user.producer.companyName,
+            description: validatedData.producer.description !== undefined 
+              ? validatedData.producer.description 
+              : user.producer.description,
+            address: validatedData.producer.address !== undefined 
+              ? validatedData.producer.address 
+              : user.producer.address
           }
         })
       }
-    }
-
-    // Mettre à jour l'utilisateur
-    const updatedUser = await prisma.user.update({
-      where: { id: userId },
-      data: updateData,
-      include: {
-        producer: true
-      }
+      
+      return user
     })
 
-    // Mettre à jour les données du producteur si nécessaire
-    if (producer && updatedUser.role === 'PRODUCER' && updatedUser.producer) {
-      await prisma.producer.update({
-        where: { id: updatedUser.producer.id },
+    // Log d'audit détaillé
+    console.log(`✅ Utilisateur modifié par admin:`, changeLog)
+    
+    // Créer un log admin dans la base
+    try {
+      await prisma.adminLog.create({
         data: {
-          companyName: producer.companyName || '',
-          ...(producer.description !== undefined && { description: producer.description }),
-          ...(producer.address !== undefined && { address: producer.address })
+          adminId: session.user.id,
+          action: 'UPDATE_USER',
+          entityType: 'User',
+          entityId: userId,
+          details: JSON.stringify({
+            changes: changeLog.changes,
+            targetUserEmail: existingUser.email
+          })
         }
       })
+    } catch (logError) {
+      console.error('⚠️ Erreur log admin (non critique):', logError)
     }
 
-    // Récupérer l'utilisateur mis à jour avec les données du producteur
+    // Récupérer l'utilisateur final avec toutes les relations
     const finalUser = await prisma.user.findUnique({
       where: { id: userId },
-      include: {
-        producer: true
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        phone: true,
+        role: true,
+        profileCompleted: true,
+        createdAt: true,
+        updatedAt: true,
+        producer: {
+          select: {
+            id: true,
+            companyName: true,
+            address: true,
+            description: true,
+            bankName: true,
+            bankAccountName: true,
+            iban: true,
+            bic: true
+          }
+        }
       }
     })
 
-    // Ne pas renvoyer le mot de passe
-    const { password, ...userWithoutPassword } = finalUser as any
-
-    return NextResponse.json(userWithoutPassword)
+    return NextResponse.json(finalUser)
+    
   } catch (error) {
-    console.error("Erreur lors de la mise à jour de l'utilisateur:", error)
-    return new NextResponse(
-      "Erreur lors de la mise à jour de l'utilisateur", 
-      { status: 500 }
-    )
+    console.error("❌ Erreur modification utilisateur:", error)
+    return handleError(error, request.url)
   }
-}, ["ADMIN"])
-
-// app/api/admin/users/[id]/route.ts - Remplacer la méthode DELETE
+})
 
 // DELETE: Supprimer un utilisateur
-export const DELETE = apiAuthMiddleware(async (
-  req: NextRequest,
-  session: Session,
-  context: { params: { [key: string]: string } }
+export const DELETE = withAdminSecurity(async (
+  request: NextRequest,
+  session
 ) => {
   try {
-    // Vérifier que l'utilisateur est admin
-    if (session.user.role !== 'ADMIN') {
-      return new NextResponse("Non autorisé", { status: 403 })
-    }
-
-    const userId = context.params.id
+    // Récupérer l'ID utilisateur
+    const url = new URL(request.url)
+    const pathParts = url.pathname.split('/')
+    const userId = pathParts[pathParts.indexOf('users') + 1]
     
-    // Empêcher de supprimer son propre compte
+    if (!userId || !userId.match(/^[a-zA-Z0-9]+$/)) {
+      throw createError.validation("ID utilisateur invalide")
+    }
+    
+    console.log(`🗑️ Admin ${session.user.id} tente de supprimer l'utilisateur ${userId}`)
+    
+    // SÉCURITÉ CRITIQUE: Empêcher l'auto-suppression
     if (userId === session.user.id) {
-      return new NextResponse(
-        "Vous ne pouvez pas supprimer votre propre compte", 
-        { status: 400 }
-      )
+      throw createError.validation("Vous ne pouvez pas supprimer votre propre compte administrateur")
     }
     
-    // Vérifier si l'utilisateur existe
+    // Vérifier que l'utilisateur existe et récupérer ses dépendances
     const user = await prisma.user.findUnique({
       where: { id: userId },
       include: {
@@ -205,17 +340,35 @@ export const DELETE = apiAuthMiddleware(async (
         },
         adminLogs: true,
         notifications: true,
-        invoices: true
+        invoices: true,
+        _count: {
+          select: {
+            orders: true,
+            invoices: true
+          }
+        }
       }
     })
 
     if (!user) {
-      return new NextResponse("Utilisateur non trouvé", { status: 404 })
+      throw createError.notFound("Utilisateur non trouvé")
+    }
+    
+    // SÉCURITÉ: Empêcher la suppression d'autres admins (optionnel)
+    if (user.role === 'ADMIN') {
+      throw createError.validation("La suppression d'autres administrateurs n'est pas autorisée")
+    }
+    
+    // Avertissement si l'utilisateur a des données importantes
+    if (user._count.orders > 0) {
+      console.warn(`⚠️ Suppression utilisateur avec ${user._count.orders} commandes et ${user._count.invoices} factures`)
     }
 
-    // Supprimer dans une transaction pour garantir la cohérence
+    // Transaction atomique massive pour la suppression en cascade
     await prisma.$transaction(async (tx) => {
-      // 1. Supprimer les logs admin créés PAR cet utilisateur (s'il était admin)
+      console.log(`🧹 Début suppression en cascade pour ${user.email}`)
+      
+      // 1. Supprimer les logs admin créés PAR cet utilisateur
       await tx.adminLog.deleteMany({
         where: { adminId: userId }
       })
@@ -258,9 +411,10 @@ export const DELETE = apiAuthMiddleware(async (
         where: { userId: userId }
       })
 
-      // 5. Si c'est un producteur, supprimer toutes ses dépendances
+      // 5. Si c'est un producteur, suppression complète des dépendances
       if (user.producer) {
         const producerId = user.producer.id
+        console.log(`🏭 Suppression producteur et dépendances: ${producerId}`)
 
         // Supprimer le portefeuille et ses dépendances
         const wallet = await tx.wallet.findUnique({
@@ -268,45 +422,39 @@ export const DELETE = apiAuthMiddleware(async (
         })
         
         if (wallet) {
-          // Supprimer les retraits
           await tx.withdrawal.deleteMany({
             where: { walletId: wallet.id }
           })
           
-          // Supprimer les transactions de portefeuille
           await tx.walletTransaction.deleteMany({
             where: { walletId: wallet.id }
           })
           
-          // Supprimer le portefeuille
           await tx.wallet.delete({
             where: { id: wallet.id }
           })
         }
         
-        // Récupérer tous les produits du producteur
+        // Récupérer et supprimer tous les produits
         const products = await tx.product.findMany({
           where: { producerId: producerId }
         })
         
-        // Supprimer les dépendances de chaque produit
         for (const product of products) {
-          // Supprimer les alertes de stock
+          // Supprimer toutes les dépendances du produit
           await tx.stockAlert.deleteMany({
             where: { productId: product.id }
           })
           
-          // Supprimer l'historique des stocks
           await tx.stockHistory.deleteMany({
             where: { productId: product.id }
           })
           
-          // Supprimer les plannings de production
           await tx.productionSchedule.deleteMany({
             where: { productId: product.id }
           })
           
-          // Supprimer les créneaux de livraison et leurs réservations
+          // Créneaux de livraison et réservations
           const deliverySlots = await tx.deliverySlot.findMany({
             where: { productId: product.id }
           })
@@ -321,18 +469,16 @@ export const DELETE = apiAuthMiddleware(async (
             where: { productId: product.id }
           })
           
-          // Supprimer le stock
           await tx.stock.deleteMany({
             where: { productId: product.id }
           })
           
-          // Supprimer les items de commande référençant ce produit
           await tx.orderItem.deleteMany({
             where: { productId: product.id }
           })
         }
         
-        // Supprimer tous les produits
+        // Supprimer les produits
         await tx.product.deleteMany({
           where: { producerId: producerId }
         })
@@ -348,7 +494,7 @@ export const DELETE = apiAuthMiddleware(async (
         })
       }
 
-      // 6. Supprimer les comptes et sessions liés
+      // 6. Supprimer les comptes et sessions OAuth
       await tx.account.deleteMany({
         where: { userId: userId }
       })
@@ -361,9 +507,25 @@ export const DELETE = apiAuthMiddleware(async (
       await tx.user.delete({
         where: { id: userId }
       })
+      
+      console.log(`✅ Suppression terminée pour ${user.email}`)
     })
 
-    // Log de l'action
+    // Log d'audit critique
+    const auditLog = {
+      adminId: session.user.id,
+      action: 'DELETE_USER',
+      targetUserId: userId,
+      targetUserEmail: user.email,
+      targetUserRole: user.role,
+      wasProducer: !!user.producer,
+      ordersCount: user._count.orders,
+      invoicesCount: user._count.invoices,
+      timestamp: new Date().toISOString()
+    }
+    
+    console.log(`🔥 SUPPRESSION UTILISATEUR PAR ADMIN:`, auditLog)
+    
     try {
       await prisma.adminLog.create({
         data: {
@@ -371,26 +533,18 @@ export const DELETE = apiAuthMiddleware(async (
           action: 'DELETE_USER',
           entityType: 'User',
           entityId: userId,
-          details: JSON.stringify({
-            action: `Suppression de l'utilisateur: ${user.email}`,
-            userEmail: user.email,
-            userName: user.name,
-            userRole: user.role,
-            wasProducer: !!user.producer
-          })
+          details: JSON.stringify(auditLog)
         }
       })
     } catch (logError) {
-      console.error('Erreur lors de la création du log:', logError)
-      // Ne pas faire échouer pour un problème de log
+      console.error('⚠️ Erreur log admin (critique):', logError)
+      // Pour une suppression, l'échec du log est grave mais on continue
     }
 
     return new NextResponse(null, { status: 204 })
+    
   } catch (error) {
-    console.error("Erreur lors de la suppression de l'utilisateur:", error)
-    return new NextResponse(
-      "Erreur lors de la suppression de l'utilisateur: " + (error instanceof Error ? error.message : 'Erreur inconnue'), 
-      { status: 500 }
-    )
+    console.error("❌ Erreur suppression utilisateur:", error)
+    return handleError(error, request.url)
   }
-}, ["ADMIN"])
+})
