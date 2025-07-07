@@ -152,8 +152,22 @@ export default function OrdersPage() {
         
         const data = await response.json()
         
-        // Filtrer explicitement les commandes pour exclure les DRAFT
-        const filteredOrders = data.filter((order: Order) => order.status !== OrderStatus.DRAFT)
+        // ✅ CORRECTION: Gérer le nouveau format de réponse de l'API sécurisée
+        let ordersArray: Order[] = []
+        
+        if (Array.isArray(data)) {
+          // Ancien format (tableau direct) - pour compatibilité
+          ordersArray = data
+        } else if (data.orders && Array.isArray(data.orders)) {
+          // Nouveau format (objet avec orders et pagination)
+          ordersArray = data.orders
+        } else {
+          console.warn('Format de réponse API inattendu:', data)
+          ordersArray = []
+        }
+        
+        // Filtrer explicitement les commandes pour exclure les DRAFT (sécurité côté client)
+        const filteredOrders = ordersArray.filter((order: Order) => order.status !== OrderStatus.DRAFT)
         
         // Trier les commandes par date (plus récentes en premier)
         const sortedOrders = filteredOrders.sort((a: Order, b: Order) => {
@@ -161,6 +175,13 @@ export default function OrdersPage() {
         })
         
         setOrders(sortedOrders)
+        
+        // ✅ BONUS: Afficher les infos de pagination si disponibles
+        if (data.pagination) {
+          console.log('Pagination:', data.pagination)
+          // Vous pouvez utiliser ces infos pour ajouter une pagination dans votre UI
+        }
+        
       } catch (error) {
         console.error('Erreur:', error)
         toast({

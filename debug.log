@@ -2410,3 +2410,23 @@
   "invoiceId": "cmcq5thva000r12eettw93cjy"
 }
 [2025-07-05T11:28:41.538Z] Notification de changement de statut créée pour le client: "cmcatiyko000iwv90l96okrc5"
+[2025-07-07T13:25:33.576Z] Erreur GET /api/orders {
+  "error": "Validation failed: status: Expected 'DRAFT' | 'PENDING' | 'CONFIRMED' | 'SHIPPED' | 'DELIVERED' | 'CANCELLED' | 'INVOICE_PENDING' | 'INVOICE_PAID' | 'INVOICE_OVERDUE', received null"
+}
+[2025-07-07T13:25:33.644Z] Erreur GET /api/orders {
+  "error": "Validation failed: status: Expected 'DRAFT' | 'PENDING' | 'CONFIRMED' | 'SHIPPED' | 'DELIVERED' | 'CANCELLED' | 'INVOICE_PENDING' | 'INVOICE_PAID' | 'INVOICE_OVERDUE', received null"
+}
+[2025-07-07T13:25:58.063Z] Notification de changement de statut créée pour le client: "cmcatiyko000iwv90l96okrc5"
+[2025-07-07T13:26:54.101Z] Notification de changement de statut créée pour le client: "cmcatiyko000iwv90l96okrc5"
+[2025-07-07T13:27:17.439Z] Erreur GET /api/orders {
+  "error": "Validation failed: status: Expected 'DRAFT' | 'PENDING' | 'CONFIRMED' | 'SHIPPED' | 'DELIVERED' | 'CANCELLED' | 'INVOICE_PENDING' | 'INVOICE_PAID' | 'INVOICE_OVERDUE', received null"
+}
+[2025-07-07T13:27:17.474Z] Erreur GET /api/orders {
+  "error": "Validation failed: status: Expected 'DRAFT' | 'PENDING' | 'CONFIRMED' | 'SHIPPED' | 'DELIVERED' | 'CANCELLED' | 'INVOICE_PENDING' | 'INVOICE_PAID' | 'INVOICE_OVERDUE', received null"
+}
+[2025-07-07T13:28:00.787Z] Erreur GET /api/orders {
+  "error": "Validation failed: status: Expected 'DRAFT' | 'PENDING' | 'CONFIRMED' | 'SHIPPED' | 'DELIVERED' | 'CANCELLED' | 'INVOICE_PENDING' | 'INVOICE_PAID' | 'INVOICE_OVERDUE', received null"
+}
+[2025-07-07T13:28:00.930Z] Erreur GET /api/orders {
+  "error": "Validation failed: status: Expected 'DRAFT' | 'PENDING' | 'CONFIRMED' | 'SHIPPED' | 'DELIVERED' | 'CANCELLED' | 'INVOICE_PENDING' | 'INVOICE_PAID' | 'INVOICE_OVERDUE', received null"
+}

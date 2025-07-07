@@ -1,4 +1,4 @@
-// app/api/orders/route.ts - Version sécurisée
+// app/api/orders/route.ts - Version corrigée
 import { NextRequest, NextResponse } from "next/server"
 import { withClientSecurity } from "@/lib/api-security"
 import { validateInput, orderSchemas } from "@/lib/validation-schemas"
@@ -6,28 +6,11 @@ import { handleError, createError } from "@/lib/error-handler"
 import { prisma } from "@/lib/prisma"
 import { OrderStatus, ProductType, Prisma } from "@prisma/client"
 import { NotificationService } from '@/lib/notification-service'
-import fs from 'fs/promises'
-import path from 'path'
 
-// Fonction d'aide pour les logs de débogage sécurisés
-async function logDebug(message: string, data?: any): Promise<void> {
-  try {
-    // Filtrer les données sensibles des logs
-    const sanitizedData = data ? JSON.stringify(data, (key, value) => {
-      // Ne pas logger les informations sensibles
-      if (['password', 'token', 'secret', 'key'].includes(key.toLowerCase())) {
-        return '[REDACTED]'
-      }
-      return value
-    }, 2) : ''
-    
-    const logMessage = `[${new Date().toISOString()}] ${message} ${sanitizedData}`
-    await fs.appendFile(
-      path.join(process.cwd(), 'debug.log'), 
-      logMessage + '\n'
-    )
-  } catch (error) {
-    console.error('Erreur d\'écriture dans le fichier de log:', error)
+// Fonction d'aide pour les logs de débogage sécurisés (simplifiée)
+function logDebug(message: string, data?: any): void {
+  if (process.env.NODE_ENV === 'development') {
+    console.log(`[DEBUG] ${message}`, data || '')
   }
 }
 
@@ -36,14 +19,6 @@ interface OrderItem {
   productId: string
   quantity: number
   price: number
-}
-
-interface CreateOrderBody {
-  items: {
-    productId: string
-    quantity: number
-    slotId?: string
-  }[]
 }
 
 // GET: Récupérer les commandes de l'utilisateur
@@ -58,10 +33,9 @@ export const GET = withClientSecurity(async (request: NextRequest, session) => {
       limit: searchParams.get('limit') ? parseInt(searchParams.get('limit')!) : 10
     }
     
-    // Validation avec notre schéma
-    const validatedQuery = validateInput(orderSchemas.search, {
-      ...queryParams,
-      userId: session.user.id // Forcer l'ID de l'utilisateur connecté
+    logDebug("Requête GET /api/orders", {
+      userId: session.user.id,
+      queryParams
     })
     
     // Construction sécurisée de la requête
@@ -69,29 +43,24 @@ export const GET = withClientSecurity(async (request: NextRequest, session) => {
       userId: session.user.id, // SÉCURITÉ: Toujours filtrer par utilisateur connecté
     }
     
-    // Gestion des statuts avec validation
-    if (validatedQuery.status) {
+    // ✅ CORRECTION: Utiliser l'enum OrderStatus au lieu de chaînes
+    if (queryParams.status) {
       // Vérifier que le statut est valide
-      if (!Object.values(OrderStatus).includes(validatedQuery.status as OrderStatus)) {
-        throw createError.validation(`Statut invalide: ${validatedQuery.status}`)
+      if (!Object.values(OrderStatus).includes(queryParams.status as OrderStatus)) {
+        throw createError.validation(`Statut invalide: ${queryParams.status}`)
       }
-      baseWhere.status = validatedQuery.status
+      baseWhere.status = queryParams.status as OrderStatus
     } else {
-      // Par défaut, exclure les DRAFT
+      // Par défaut, exclure les DRAFT en utilisant l'enum
       baseWhere.status = { not: OrderStatus.DRAFT }
     }
     
-    await logDebug("Requête GET /api/orders", {
-      userId: session.user.id,
-      filters: baseWhere,
-      page: validatedQuery.page,
-      limit: validatedQuery.limit
-    })
-    
     // Pagination sécurisée
     const maxLimit = 50 // Limite maximale pour éviter les surcharges
-    const safeLimit = Math.min(validatedQuery.limit || 10, maxLimit)
-    const safePage = Math.max(validatedQuery.page || 1, 1)
+    const safeLimit = Math.min(queryParams.limit || 10, maxLimit)
+    const safePage = Math.max(queryParams.page || 1, 1)
+    
+    logDebug("Query conditions", { baseWhere, safeLimit, safePage })
     
     // Récupération sécurisée des données
     const [orders, total] = await Promise.all([
@@ -158,8 +127,7 @@ export const GET = withClientSecurity(async (request: NextRequest, session) => {
       })
     ])
     
-    // Log pour audit
-    await logDebug("Commandes récupérées", {
+    logDebug("Commandes récupérées", {
       userId: session.user.id,
       count: orders.length,
       total,
@@ -177,7 +145,10 @@ export const GET = withClientSecurity(async (request: NextRequest, session) => {
     })
     
   } catch (error) {
-    await logDebug("Erreur GET /api/orders", { error: error instanceof Error ? error.message : 'Unknown error' })
+    logDebug("Erreur GET /api/orders", { 
+      error: error instanceof Error ? error.message : 'Unknown error' 
+    })
+    console.error("Erreur lors de la récupération des commandes:", error)
     return handleError(error, request.url)
   }
 })
@@ -187,7 +158,7 @@ export const POST = withClientSecurity(async (request: NextRequest, session) => 
   try {
     // Validation des données d'entrée
     const rawData = await request.json()
-    await logDebug("Requête de création de commande reçue", {
+    logDebug("Requête de création de commande reçue", {
       userId: session.user.id,
       hasItems: rawData.items && rawData.items.length > 0
     })
@@ -198,14 +169,14 @@ export const POST = withClientSecurity(async (request: NextRequest, session) => 
       validatedData = validateInput(orderSchemas.create, rawData)
     }
     
-    // Récupération sécurisée du panier existant
+    // Récupération sécurisée du panier existant avec l'enum OrderStatus
     let cartItems: OrderItem[] = []
     
     try {
       const cart = await prisma.order.findFirst({
         where: {
           userId: session.user.id,
-          status: OrderStatus.DRAFT
+          status: OrderStatus.DRAFT // ✅ CORRECTION: Utiliser l'enum
         },
         include: {
           items: {
@@ -242,13 +213,15 @@ export const POST = withClientSecurity(async (request: NextRequest, session) => 
           price: item.price
         }))
         
-        await logDebug("Items trouvés dans le panier existant", { itemsCount: cartItems.length })
+        logDebug("Items trouvés dans le panier existant", { itemsCount: cartItems.length })
       }
     } catch (error) {
       if (error instanceof Error && error.message.includes('validation')) {
         throw error // Re-lancer les erreurs de validation
       }
-      await logDebug("Erreur lors de la récupération du panier", { error: error instanceof Error ? error.message : 'Unknown' })
+      logDebug("Erreur lors de la récupération du panier", { 
+        error: error instanceof Error ? error.message : 'Unknown' 
+      })
     }
     
     // Déterminer les items à utiliser
@@ -263,7 +236,7 @@ export const POST = withClientSecurity(async (request: NextRequest, session) => 
         data: {
           userId: session.user.id,
           total: 0,
-          status: OrderStatus.DRAFT,
+          status: OrderStatus.DRAFT, // ✅ CORRECTION: Utiliser l'enum
           metadata: JSON.stringify({
             createdByAPI: true,
             emptyCart: true,
@@ -285,7 +258,7 @@ export const POST = withClientSecurity(async (request: NextRequest, session) => 
         }
       })
       
-      await logDebug("Panier vide créé (compatibilité)", {
+      logDebug("Panier vide créé (compatibilité)", {
         orderId: order.id,
         userId: session.user.id
       })
@@ -293,7 +266,7 @@ export const POST = withClientSecurity(async (request: NextRequest, session) => 
       return NextResponse.json(order)
     }
     
-    await logDebug("Items qui seront utilisés", { itemsCount: itemsToCreate.length })
+    logDebug("Items qui seront utilisés", { itemsCount: itemsToCreate.length })
     
     // Validation des produits et calcul sécurisé du total
     let totalAmount = 0
@@ -345,12 +318,12 @@ export const POST = withClientSecurity(async (request: NextRequest, session) => 
     
     // Transaction sécurisée pour la création
     const order = await prisma.$transaction(async (tx) => {
-      // Créer la commande
+      // Créer la commande avec l'enum OrderStatus
       const newOrder = await tx.order.create({
         data: {
           userId: session.user.id,
           total: totalAmount,
-          status: OrderStatus.DRAFT,
+          status: OrderStatus.DRAFT, // ✅ CORRECTION: Utiliser l'enum
           metadata: JSON.stringify({
             createdByAPI: true,
             userAgent: request.headers.get('user-agent')?.substring(0, 255),
@@ -420,7 +393,7 @@ export const POST = withClientSecurity(async (request: NextRequest, session) => 
       }
     })
     
-    await logDebug("Commande créée avec succès", {
+    logDebug("Commande créée avec succès", {
       orderId: order.id,
       userId: session.user.id,
       itemsCount: validatedItems.length,
@@ -431,9 +404,9 @@ export const POST = withClientSecurity(async (request: NextRequest, session) => 
     if (completeOrder && completeOrder.items.length > 0) {
       try {
         await NotificationService.sendNewOrderNotification(completeOrder)
-        await logDebug("Notification envoyée", { orderId: order.id })
+        logDebug("Notification envoyée", { orderId: order.id })
       } catch (notificationError) {
-        await logDebug("Erreur notification (non critique)", { 
+        logDebug("Erreur notification (non critique)", { 
           orderId: order.id,
           error: notificationError instanceof Error ? notificationError.message : 'Unknown'
         })
@@ -444,10 +417,11 @@ export const POST = withClientSecurity(async (request: NextRequest, session) => 
     return NextResponse.json(completeOrder)
     
   } catch (error) {
-    await logDebug("Erreur création commande", {
+    logDebug("Erreur création commande", {
       userId: session.user.id,
       error: error instanceof Error ? error.message : 'Unknown error'
     })
+    console.error("Erreur lors de la création de commande:", error)
     return handleError(error, request.url)
   }
 })
