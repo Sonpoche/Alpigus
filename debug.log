@@ -2430,3 +2430,141 @@
 [2025-07-07T13:28:00.930Z] Erreur GET /api/orders {
   "error": "Validation failed: status: Expected 'DRAFT' | 'PENDING' | 'CONFIRMED' | 'SHIPPED' | 'DELIVERED' | 'CANCELLED' | 'INVOICE_PENDING' | 'INVOICE_PAID' | 'INVOICE_OVERDUE', received null"
 }
+[2025-07-07T14:05:06.070Z] NotificationService: Début envoi notification commande {
+  "orderId": "cmct6aycp0008vxnok7685y3o"
+}
+[2025-07-07T14:05:06.071Z] Items dans la commande: 1
+[2025-07-07T14:05:06.073Z] Traitement item produit: {
+  "productId": "cmcatkrx6000owv90q7y0a99y",
+  "productName": "Frederic ragaigne"
+}
+[2025-07-07T14:05:06.074Z] Producer ID directement ajouté: "cmcatjzt1000mwv909rwul0k6"
+[2025-07-07T14:05:06.075Z] Bookings dans la commande: 
+[2025-07-07T14:05:06.076Z] Nombre de producteurs à notifier: 1
+[2025-07-07T14:05:06.077Z] Liste des IDs producteurs: [
+  "cmcatjzt1000mwv909rwul0k6"
+]
+[2025-07-07T14:05:06.078Z] Traitement du producteur: "cmcatjzt1000mwv909rwul0k6"
+[2025-07-07T14:05:06.081Z] Producer userId: "cmcatjzt1000lwv90pqpivme9"
+[2025-07-07T14:05:06.082Z] Montant total pour ce producteur: {
+  "itemsTotal": 1,
+  "bookingsTotal": 0,
+  "total": 1
+}
+[2025-07-07T14:05:06.085Z] Notification créée avec ID: "cmct6ayec000bvxnohpdt8tpr"
+[2025-07-07T14:05:06.086Z] NotificationService: Fin de l'envoi de notification 
+[2025-07-07T14:06:46.019Z] NotificationService: Début envoi notification commande {
+  "orderId": "cmct6aycp0008vxnok7685y3o"
+}
+[2025-07-07T14:06:46.021Z] Items dans la commande: 1
+[2025-07-07T14:06:46.022Z] Traitement item produit: {
+  "productId": "cmcatkrx6000owv90q7y0a99y",
+  "productName": "Frederic ragaigne"
+}
+[2025-07-07T14:06:46.023Z] Producer ID directement ajouté: "cmcatjzt1000mwv909rwul0k6"
+[2025-07-07T14:06:46.024Z] Bookings dans la commande: 
+[2025-07-07T14:06:46.025Z] Nombre de producteurs à notifier: 1
+[2025-07-07T14:06:46.026Z] Liste des IDs producteurs: [
+  "cmcatjzt1000mwv909rwul0k6"
+]
+[2025-07-07T14:06:46.027Z] Traitement du producteur: "cmcatjzt1000mwv909rwul0k6"
+[2025-07-07T14:06:46.031Z] Producer userId: "cmcatjzt1000lwv90pqpivme9"
+[2025-07-07T14:06:46.033Z] Montant total pour ce producteur: {
+  "itemsTotal": 7,
+  "bookingsTotal": 0,
+  "total": 7
+}
+[2025-07-07T14:06:46.037Z] Notification créée avec ID: "cmct6d3ir000nvxnom08k79kc"
+[2025-07-07T14:06:46.038Z] NotificationService: Fin de l'envoi de notification 
+[2025-07-07T14:06:46.143Z] Notification de création de facture envoyée au client: {
+  "userId": "cmcatiyko000iwv90l96okrc5",
+  "invoiceId": "cmct6d3i7000lvxnoxlt4c2y6"
+}
+[2025-07-07T14:07:43.290Z] Notification de changement de statut créée pour le client: "cmcatiyko000iwv90l96okrc5"
+[2025-07-07T14:12:21.208Z] NotificationService: Début envoi notification commande {
+  "orderId": "cmct6ka430002aqi127r3p8zp"
+}
+[2025-07-07T14:12:21.210Z] Items dans la commande: 1
+[2025-07-07T14:12:21.211Z] Traitement item produit: {
+  "productId": "cmcatkrx6000owv90q7y0a99y",
+  "productName": "Frederic ragaigne"
+}
+[2025-07-07T14:12:21.213Z] Producer ID directement ajouté: "cmcatjzt1000mwv909rwul0k6"
+[2025-07-07T14:12:21.214Z] Bookings dans la commande: 
+[2025-07-07T14:12:21.215Z] Nombre de producteurs à notifier: 1
+[2025-07-07T14:12:21.216Z] Liste des IDs producteurs: [
+  "cmcatjzt1000mwv909rwul0k6"
+]
+[2025-07-07T14:12:21.217Z] Traitement du producteur: "cmcatjzt1000mwv909rwul0k6"
+[2025-07-07T14:12:21.220Z] Producer userId: "cmcatjzt1000lwv90pqpivme9"
+[2025-07-07T14:12:21.222Z] Montant total pour ce producteur: {
+  "itemsTotal": 10,
+  "bookingsTotal": 0,
+  "total": 10
+}
+[2025-07-07T14:12:21.225Z] Notification créée avec ID: "cmct6ka5j0005aqi13cjpbdot"
+[2025-07-07T14:12:21.227Z] NotificationService: Fin de l'envoi de notification 
+[2025-07-07T14:12:48.418Z] NotificationService: Début envoi notification commande {
+  "orderId": "cmct6ka430002aqi127r3p8zp"
+}
+[2025-07-07T14:12:48.420Z] Items dans la commande: 1
+[2025-07-07T14:12:48.421Z] Traitement item produit: {
+  "productId": "cmcatkrx6000owv90q7y0a99y",
+  "productName": "Frederic ragaigne"
+}
+[2025-07-07T14:12:48.422Z] Producer ID directement ajouté: "cmcatjzt1000mwv909rwul0k6"
+[2025-07-07T14:12:48.423Z] Bookings dans la commande: 
+[2025-07-07T14:12:48.424Z] Nombre de producteurs à notifier: 1
+[2025-07-07T14:12:48.425Z] Liste des IDs producteurs: [
+  "cmcatjzt1000mwv909rwul0k6"
+]
+[2025-07-07T14:12:48.427Z] Traitement du producteur: "cmcatjzt1000mwv909rwul0k6"
+[2025-07-07T14:12:48.429Z] Producer userId: "cmcatjzt1000lwv90pqpivme9"
+[2025-07-07T14:12:48.430Z] Montant total pour ce producteur: {
+  "itemsTotal": 5,
+  "bookingsTotal": 0,
+  "total": 5
+}
+[2025-07-07T14:12:48.434Z] Notification créée avec ID: "cmct6kv5c000aaqi19iqp4z9g"
+[2025-07-07T14:12:48.435Z] NotificationService: Fin de l'envoi de notification 
+[2025-07-07T14:21:38.907Z] Début notification changement de statut {
+  "orderId": "cmct6ka430002aqi127r3p8zp",
+  "oldStatus": "CONFIRMED",
+  "newStatus": "SHIPPED"
+}
+[2025-07-07T14:21:38.912Z] Notification changement statut créée {
+  "id": "cmct6w8gv000eaqi14usz2cyk"
+}
+[2025-07-07T14:21:38.917Z] Notification de changement de statut créée pour le client: "cmcatiyko000iwv90l96okrc5"
+[2025-07-07T14:21:39.682Z] Début notification changement de statut {
+  "orderId": "cmct6ka430002aqi127r3p8zp",
+  "oldStatus": "SHIPPED",
+  "newStatus": "DELIVERED"
+}
+[2025-07-07T14:21:39.686Z] Notification changement statut créée {
+  "id": "cmct6w92d000iaqi1jd1gkkw3"
+}
+[2025-07-07T14:21:39.689Z] Notification de changement de statut créée pour le client: "cmcatiyko000iwv90l96okrc5"
+[2025-07-07T15:12:25.672Z] NotificationService: Début envoi notification commande {
+  "orderId": "cmct8pjc6000naqi1xa3wfndu"
+}
+[2025-07-07T15:12:25.674Z] Items dans la commande: 1
+[2025-07-07T15:12:25.676Z] Traitement item produit: {
+  "productId": "cmcatkrx6000owv90q7y0a99y",
+  "productName": "Frederic ragaigne"
+}
+[2025-07-07T15:12:25.680Z] Producer ID directement ajouté: "cmcatjzt1000mwv909rwul0k6"
+[2025-07-07T15:12:25.681Z] Bookings dans la commande: 
+[2025-07-07T15:12:25.682Z] Nombre de producteurs à notifier: 1
+[2025-07-07T15:12:25.684Z] Liste des IDs producteurs: [
+  "cmcatjzt1000mwv909rwul0k6"
+]
+[2025-07-07T15:12:25.686Z] Traitement du producteur: "cmcatjzt1000mwv909rwul0k6"
+[2025-07-07T15:12:25.688Z] Producer userId: "cmcatjzt1000lwv90pqpivme9"
+[2025-07-07T15:12:25.690Z] Montant total pour ce producteur: {
+  "itemsTotal": 1,
+  "bookingsTotal": 0,
+  "total": 1
+}
+[2025-07-07T15:12:25.694Z] Notification créée avec ID: "cmct8pjdo000qaqi1i9yeoy3f"
+[2025-07-07T15:12:25.696Z] NotificationService: Fin de l'envoi de notification 

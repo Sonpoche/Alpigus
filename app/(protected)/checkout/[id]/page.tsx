@@ -1,4 +1,4 @@
-// app/(protected)/checkout/[id]/page.tsx - VERSION COMPLÈTE CORRIGÉE AVEC FIX BADGE FACTURES
+// app/(protected)/checkout/[id]/page.tsx - VERSION COMPLÈTE CORRIGÉE
 'use client'
 
 import { useState, useEffect, useMemo } from 'react'
@@ -106,7 +106,7 @@ export default function CheckoutPage({ params }: CheckoutProps) {
   const [isUpdating, setIsUpdating] = useState(false)
   const [formErrors, setFormErrors] = useState<Record<string, string>>({})
   
-  // CORRECTION : Calculs de commission avec frais de livraison
+  // Calculs de commission avec frais de livraison
   const commissionBreakdown = useMemo((): (CommissionBreakdown & { deliveryFee: number; grandTotal: number }) | null => {
     if (!order) return null
     
@@ -119,8 +119,7 @@ export default function CheckoutPage({ params }: CheckoutProps) {
     const subtotal = itemsTotal + bookingsTotal
     const deliveryFee = deliveryType === 'delivery' ? 15 : 0
     
-    // CORRECTION : Le client paie seulement subtotal + frais de livraison
-    // La commission est une répartition interne, pas un coût supplémentaire
+    // Le client paie seulement subtotal + frais de livraison
     const grandTotal = subtotal + deliveryFee
     
     // Calcul de la commission pour la répartition interne (non visible au client)
@@ -129,7 +128,7 @@ export default function CheckoutPage({ params }: CheckoutProps) {
     return {
       ...breakdown,
       deliveryFee,
-      grandTotal // = subtotal + deliveryFee (PAS + commission)
+      grandTotal
     }
   }, [order, deliveryType])
   
@@ -298,31 +297,49 @@ export default function CheckoutPage({ params }: CheckoutProps) {
     }
   }
 
-  // Validation du formulaire de livraison
+  // Validation du formulaire de livraison - VERSION CORRIGÉE
   const validateDeliveryForm = (): boolean => {
+    // Si ce n'est pas une livraison, pas besoin de valider le formulaire
     if (deliveryType !== 'delivery') return true
     
-    const errors: Record<string, string> = {};
-    const requiredFields: (keyof DeliveryFormData)[] = ['fullName', 'address', 'postalCode', 'city', 'phone'];
+    const errors: Record<string, string> = {}
+    const requiredFields: (keyof DeliveryFormData)[] = ['fullName', 'address', 'postalCode', 'city', 'phone']
     
     for (const field of requiredFields) {
       if (!deliveryFormData[field] || deliveryFormData[field].trim() === '') {
-        errors[field] = 'Ce champ est obligatoire';
+        errors[field] = 'Ce champ est obligatoire'
       }
     }
 
     // Validation du code postal (format suisse)
-    if (deliveryFormData.postalCode && !/^\d{4}$/.test(deliveryFormData.postalCode)) {
-      errors.postalCode = 'Code postal invalide (format: 1234)';
+    if (deliveryFormData.postalCode && !/^\d{4}$/.test(deliveryFormData.postalCode.trim())) {
+      errors.postalCode = 'Code postal invalide (format: 1234)'
     }
 
     // Validation du numéro de téléphone
-    if (deliveryFormData.phone && !/^(\+\d{1,3}\s?)?(\d{2,3}\s?){2,4}\d{2,3}$/.test(deliveryFormData.phone)) {
-      errors.phone = 'Numéro de téléphone invalide';
+    if (deliveryFormData.phone && !/^(\+\d{1,3}\s?)?(\d{2,3}\s?){2,4}\d{2,3}$/.test(deliveryFormData.phone.trim())) {
+      errors.phone = 'Numéro de téléphone invalide'
     }
 
-    setFormErrors(errors);
-    return Object.keys(errors).length === 0;
+    setFormErrors(errors)
+    
+    // NE PAS logger les erreurs ici car ça crée une boucle infinie
+    return Object.keys(errors).length === 0
+  }
+
+  // Fonction séparée pour valider ET afficher les erreurs
+  const validateAndShowErrors = (): boolean => {
+    const isValid = validateDeliveryForm()
+    
+    if (!isValid && deliveryType === 'delivery') {
+      toast({
+        title: "Formulaire incomplet",
+        description: "Veuillez remplir tous les champs obligatoires de livraison",
+        variant: "destructive"
+      })
+    }
+    
+    return isValid
   }
   
   // Gestion du paiement par carte Stripe
@@ -330,9 +347,9 @@ export default function CheckoutPage({ params }: CheckoutProps) {
     if (!order || !commissionBreakdown) return
     
     try {
-      // Finaliser la commande avec le paiement confirmé
       await finalizeOrder('card', paymentIntent.id)
     } catch (error) {
+      console.error('Erreur paiement Stripe:', error)
       toast({
         title: 'Erreur',
         description: 'Erreur lors de la finalisation de la commande',
@@ -342,6 +359,7 @@ export default function CheckoutPage({ params }: CheckoutProps) {
   }
 
   const handleStripePaymentError = (error: string) => {
+    console.error('Erreur Stripe:', error)
     toast({
       title: 'Erreur de paiement',
       description: error,
@@ -356,6 +374,7 @@ export default function CheckoutPage({ params }: CheckoutProps) {
     try {
       await finalizeOrder('bank_transfer')
     } catch (error) {
+      console.error('Erreur virement bancaire:', error)
       toast({
         title: 'Erreur',
         description: 'Erreur lors de la confirmation du virement',
@@ -364,102 +383,135 @@ export default function CheckoutPage({ params }: CheckoutProps) {
     }
   }
 
-  // Finaliser la commande
+  // Finaliser la commande - VERSION CORRIGÉE
   const finalizeOrder = async (method: PaymentMethodType, paymentIntentId?: string) => {
-  if (!order || !commissionBreakdown) return
-
-  if (!validateDeliveryForm()) {
-    toast({
-      title: "Formulaire incomplet",
-      description: "Veuillez remplir tous les champs obligatoires",
-      variant: "destructive"
-    });
-    return;
-  }
-
-  try {
-    setIsProcessing(true)
-    
-    const checkoutData = {
-      deliveryType,
-      deliveryInfo: deliveryType === 'delivery' ? deliveryFormData : null,
-      paymentMethod: method,
-      paymentStatus: method === 'invoice' ? 'PENDING' : 'PAID',
-      paymentIntentId,
-      commission: commissionBreakdown
+    if (!order || !commissionBreakdown) {
+      console.error('Données manquantes:', { order: !!order, commissionBreakdown: !!commissionBreakdown })
+      toast({
+        title: "Erreur",
+        description: "Informations de commande manquantes",
+        variant: "destructive"
+      })
+      return
     }
-    
-    const response = await fetch(`/api/orders/${order.id}/checkout`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(checkoutData)
-    })
-    
-    if (!response.ok) {
-      const errorData = await response.text();
-      throw new Error(errorData || 'Erreur lors de la finalisation de la commande');
+
+    // Valider le formulaire de livraison avec gestion d'erreurs
+    if (!validateAndShowErrors()) {
+      return
     }
-    
-    // Supprimer l'ID de commande du localStorage
-    localStorage.removeItem('currentOrderId')
-    
-    // Déclencher un événement pour vider le panier dans la navigation
-    window.dispatchEvent(new CustomEvent('cart:cleared'))
-    
-    // Déclencher aussi l'événement cart:updated pour s'assurer que tous les composants se mettent à jour
-    window.dispatchEvent(new CustomEvent('cart:updated'))
-    
-    // ÉVÉNEMENTS POUR LES FACTURES (clients)
-    setTimeout(() => {
-      window.dispatchEvent(new CustomEvent('invoice:created', {
-        detail: { 
-          orderId: order.id,
-          paymentMethod: method,
-          timestamp: Date.now()
-        }
-      }))
+
+    // Vérifier si tous les produits acceptent le paiement différé pour 'invoice'
+    if (method === 'invoice' && !allProductsAcceptDeferred) {
+      toast({
+        title: "Paiement différé non disponible",
+        description: "Certains produits de votre commande n'acceptent pas le paiement sous 30 jours",
+        variant: "destructive"
+      })
+      return
+    }
+
+    try {
+      setIsProcessing(true)
       
-      window.dispatchEvent(new CustomEvent('invoice:updated', {
-        detail: { 
-          orderId: order.id,
-          action: 'created',
-          timestamp: Date.now()
-        }
-      }))
-    }, 1000) // Délai de 1 seconde pour laisser le temps à la facture d'être créée
-    
-    // ÉVÉNEMENTS POUR LES COMMANDES (producteurs)
-    setTimeout(() => {
-      window.dispatchEvent(new CustomEvent('order:created', {
-        detail: { 
-          orderId: order.id,
-          paymentMethod: method,
-          timestamp: Date.now()
-        }
-      }))
+      const checkoutData = {
+        deliveryType,
+        deliveryInfo: deliveryType === 'delivery' ? deliveryFormData : null,
+        paymentMethod: method,
+        paymentStatus: method === 'invoice' ? 'PENDING' : 'PAID',
+        paymentIntentId,
+        commission: commissionBreakdown
+      }
       
-      window.dispatchEvent(new CustomEvent('order:updated', {
-        detail: { 
-          orderId: order.id,
-          action: 'created',
-          timestamp: Date.now()
+      console.log('Envoi des données checkout:', checkoutData)
+      
+      const response = await fetch(`/api/orders/${order.id}/checkout`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(checkoutData)
+      })
+      
+      if (!response.ok) {
+        let errorMessage = 'Erreur lors de la finalisation de la commande'
+        
+        try {
+          const errorData = await response.json()
+          errorMessage = errorData.error || errorMessage
+          console.error('Erreur API checkout:', errorData)
+        } catch (parseError) {
+          const errorText = await response.text()
+          errorMessage = errorText || errorMessage
+          console.error('Erreur API checkout (text):', errorText)
         }
-      }))
-    }, 1200) // Légèrement décalé par rapport aux factures
-    
-    // Rediriger vers la page de confirmation
-    router.push(`/confirmation/${order.id}`)
-  } catch (error) {
-    console.error('Erreur:', error)
-    throw error
-  } finally {
-    setIsProcessing(false)
+        
+        throw new Error(errorMessage)
+      }
+      
+      const result = await response.json()
+      console.log('Résultat checkout:', result)
+      
+      // Supprimer l'ID de commande du localStorage
+      localStorage.removeItem('currentOrderId')
+      
+      // Déclencher les événements pour vider le panier
+      window.dispatchEvent(new CustomEvent('cart:cleared'))
+      window.dispatchEvent(new CustomEvent('cart:updated'))
+      
+      // Événements pour les factures et commandes
+      setTimeout(() => {
+        window.dispatchEvent(new CustomEvent('invoice:created', {
+          detail: { 
+            orderId: order.id,
+            paymentMethod: method,
+            timestamp: Date.now()
+          }
+        }))
+        
+        window.dispatchEvent(new CustomEvent('order:created', {
+          detail: { 
+            orderId: order.id,
+            paymentMethod: method,
+            timestamp: Date.now()
+          }
+        }))
+      }, 1000)
+      
+      // Rediriger vers la page de confirmation
+      router.push(`/confirmation/${order.id}`)
+      
+    } catch (error) {
+      console.error('Erreur finalizeOrder:', error)
+      toast({
+        title: 'Erreur',
+        description: error instanceof Error ? error.message : 'Erreur lors de la finalisation',
+        variant: 'destructive'
+      })
+    } finally {
+      setIsProcessing(false)
+    }
   }
-}
   
-  // Gestion du checkout traditionnel (facture)
+  // Gestion du checkout traditionnel (facture) - VERSION CORRIGÉE
   const handleTraditionalCheckout = async () => {
-    if (!order || !commissionBreakdown) return
+    if (!order || !commissionBreakdown) {
+      toast({
+        title: "Erreur",
+        description: "Informations de commande manquantes",
+        variant: "destructive"
+      })
+      return
+    }
+
+    // Vérifier si tous les produits acceptent le paiement différé
+    if (!allProductsAcceptDeferred) {
+      toast({
+        title: "Paiement différé non disponible",
+        description: "Certains produits de votre commande n'acceptent pas le paiement sous 30 jours",
+        variant: "destructive"
+      })
+      return
+    }
+
+    // La validation sera faite dans finalizeOrder
     await finalizeOrder('invoice')
   }
 
@@ -471,10 +523,24 @@ export default function CheckoutPage({ params }: CheckoutProps) {
     )
   }
 
+  if (!order) {
+    return (
+      <div className="text-center p-8">
+        <p>Commande non trouvée</p>
+        <Link href="/cart" className="text-custom-accent hover:underline">
+          Retour au panier
+        </Link>
+      </div>
+    )
+  }
+
   if (!commissionBreakdown) {
     return (
       <div className="text-center p-8">
         <p>Erreur lors du calcul des montants</p>
+        <button onClick={() => window.location.reload()} className="text-custom-accent hover:underline">
+          Recharger la page
+        </button>
       </div>
     )
   }
@@ -841,7 +907,7 @@ export default function CheckoutPage({ params }: CheckoutProps) {
           </div>
         </div>
         
-        {/* RÉSUMÉ DE LA COMMANDE - VERSION CORRIGÉE SANS COMMISSION VISIBLE */}
+        {/* RÉSUMÉ DE LA COMMANDE */}
         <div className="lg:col-span-1">
           <div className="bg-background border border-foreground/10 rounded-lg p-6 sticky top-4">
             <h2 className="text-lg font-semibold mb-4">Résumé de la commande</h2>
@@ -925,7 +991,7 @@ export default function CheckoutPage({ params }: CheckoutProps) {
               ))}
             </div>
             
-            {/* DÉTAIL DE LA COMMANDE - VERSION SIMPLIFIÉE POUR LE CLIENT */}
+            {/* DÉTAIL DE LA COMMANDE */}
             <div className="border-t border-foreground/10 pt-4 mt-4 space-y-2">
               <div className="flex justify-between text-sm">
                 <span>Sous-total produits</span>
@@ -944,7 +1010,7 @@ export default function CheckoutPage({ params }: CheckoutProps) {
                 <span>{commissionBreakdown.grandTotal.toFixed(2)} CHF</span>
               </div>
               
-              {/* Information optionnelle sur la plateforme (si vous voulez être transparent) */}
+              {/* Information optionnelle sur la plateforme */}
               <div className="mt-3 p-2 bg-blue-50 dark:bg-blue-900/20 rounded-md">
                 <div className="flex items-center gap-2 mb-1">
                   <Info className="h-4 w-4 text-blue-600 dark:text-blue-400" />
@@ -971,7 +1037,7 @@ export default function CheckoutPage({ params }: CheckoutProps) {
               <LoadingButton
                 onClick={handleTraditionalCheckout}
                 isLoading={isProcessing}
-                disabled={isProcessing || isUpdating || !validateDeliveryForm()}
+                disabled={isProcessing || isUpdating}
                 className="w-full flex items-center justify-center gap-2 mt-6"
               >
                 <Receipt className="h-5 w-5" />

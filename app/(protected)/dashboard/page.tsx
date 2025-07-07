@@ -1,4 +1,4 @@
-// app/(protected)/dashboard/page.tsx
+// app/(protected)/dashboard/page.tsx - VERSION COMPLÈTE CORRIGÉE
 'use client'
 
 import { useSession } from "next-auth/react"
@@ -175,121 +175,287 @@ export default function DashboardPage() {
    }
  }, [session, router, toast])
 
- // Récupérer les données pour un producteur
+ // Récupérer les données pour un producteur - VERSION CORRIGÉE
  const fetchProducerData = async () => {
-   // Récupérer les produits du producteur
-   const productsResponse = await fetch('/api/products')
-   const productsData = await productsResponse.json()
-   const products = productsData.products || []
-   
-   // Récupérer les commandes du producteur
-   const ordersResponse = await fetch('/api/orders/producer')
-   const orders = await ordersResponse.json()
-   
-   // Récupérer les créneaux de livraison
-   const deliverySlotsResponse = await fetch('/api/delivery-slots')
-   const deliverySlotsData = await deliverySlotsResponse.json()
-   const deliverySlots = deliverySlotsData.slots || []
-   
-   // Calculer les statistiques
-   const pendingOrdersCount = orders.filter((order: any) => 
-     order.status === OrderStatus.PENDING || order.status === OrderStatus.CONFIRMED
-   ).length
-   
-   const totalProductsCount = products.length
-   
-   // Filtrer les livraisons à venir (aujourd'hui ou futur)
-   const now = new Date()
-   const upcomingDeliveriesData = deliverySlots.filter((slot: any) => {
-     const slotDate = new Date(slot.date)
-     return slotDate >= now
-   })
-   
-   // Calculer le revenu mensuel (somme des commandes des 30 derniers jours)
-   const thirtyDaysAgo = new Date()
-   thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30)
-   
-   const recentOrders = orders.filter((order: any) => {
-     const orderDate = new Date(order.createdAt)
-     return orderDate >= thirtyDaysAgo && 
-       (order.status === OrderStatus.CONFIRMED || 
-        order.status === OrderStatus.SHIPPED || 
-        order.status === OrderStatus.DELIVERED)
-   })
-   
-   const monthlyRevenue = recentOrders.reduce((sum: number, order: any) => sum + order.total, 0)
-   
-   // Produits avec stock bas
-   const lowStockProductsData = products.filter((product: any) => {
-     if (!product.stock) return false
-     // Considérer comme bas si < 10% du stock ou < 5 unités
-     const threshold = Math.min(5, product.stock.quantity * 0.1)
-     return product.stock.quantity <= threshold
-   }).slice(0, 3) // Limiter à 3 produits
-   
-   // Construire les activités récentes
-   const recentActivities: RecentActivity[] = []
-   
-   // Ajouter les commandes récentes
-   recentOrders.slice(0, 3).forEach((order: any) => {
-     recentActivities.push({
-       id: `order-${order.id}`,
-       type: 'order',
-       title: `Nouvelle commande #${order.id.substring(0, 8).toUpperCase()}`,
-       description: `Commande de ${order.user.name || order.user.email}`,
-       date: new Date(order.createdAt),
-       status: getOrderStatusLabel(order.status),
-       link: `/producer/orders?modal=${order.id}`
+   try {
+     console.log('Début fetchProducerData')
+     
+     // Récupérer les produits du producteur
+     const productsResponse = await fetch('/api/products')
+     console.log('Réponse products:', productsResponse.status)
+     
+     if (!productsResponse.ok) {
+       throw new Error(`Erreur API products: ${productsResponse.status}`)
+     }
+     
+     const productsData = await productsResponse.json()
+     console.log('Données products brutes:', productsData)
+     
+     // ✅ CORRECTION: Gérer différents formats de réponse
+     let products: any[] = []
+     if (Array.isArray(productsData)) {
+       products = productsData
+     } else if (productsData && Array.isArray(productsData.products)) {
+       products = productsData.products
+     } else if (productsData && Array.isArray(productsData.data)) {
+       products = productsData.data
+     } else {
+       console.warn('Format de réponse products inattendu:', productsData)
+       products = []
+     }
+     
+     // Récupérer les commandes du producteur
+     let orders: any[] = []
+     try {
+       const ordersResponse = await fetch('/api/orders/producer')
+       if (ordersResponse.ok) {
+         const ordersData = await ordersResponse.json()
+         console.log('Données orders brutes:', ordersData)
+         
+         if (Array.isArray(ordersData)) {
+           orders = ordersData
+         } else if (ordersData && Array.isArray(ordersData.orders)) {
+           orders = ordersData.orders
+         } else if (ordersData && Array.isArray(ordersData.data)) {
+           orders = ordersData.data
+         } else {
+           orders = []
+         }
+       }
+     } catch (ordersError) {
+       console.warn('Erreur lors de la récupération des commandes producteur:', ordersError)
+       orders = []
+     }
+     
+     // Récupérer les créneaux de livraison
+     let deliverySlots: any[] = []
+     try {
+       const deliverySlotsResponse = await fetch('/api/delivery-slots')
+       if (deliverySlotsResponse.ok) {
+         const deliverySlotsData = await deliverySlotsResponse.json()
+         console.log('Données delivery-slots brutes:', deliverySlotsData)
+         
+         if (Array.isArray(deliverySlotsData)) {
+           deliverySlots = deliverySlotsData
+         } else if (deliverySlotsData && Array.isArray(deliverySlotsData.slots)) {
+           deliverySlots = deliverySlotsData.slots
+         } else if (deliverySlotsData && Array.isArray(deliverySlotsData.data)) {
+           deliverySlots = deliverySlotsData.data
+         } else {
+           deliverySlots = []
+         }
+       }
+     } catch (slotsError) {
+       console.warn('Erreur lors de la récupération des créneaux:', slotsError)
+       deliverySlots = []
+     }
+     
+     // Calculer les statistiques
+     const pendingOrdersCount = orders.filter((order: any) => 
+       order.status === OrderStatus.PENDING || order.status === OrderStatus.CONFIRMED
+     ).length
+     
+     const totalProductsCount = products.length
+     
+     // Filtrer les livraisons à venir (aujourd'hui ou futur)
+     const now = new Date()
+     const upcomingDeliveriesData = deliverySlots.filter((slot: any) => {
+       try {
+         const slotDate = new Date(slot.date)
+         return slotDate >= now
+       } catch {
+         return false
+       }
      })
-   })
-   
-   // Ajouter les disponibilités produits frais
-   upcomingDeliveriesData.slice(0, 3).forEach((slot: any) => {
-     recentActivities.push({
-       id: `delivery-${slot.id}`,
-       type: 'delivery',
-       title: `Disponibilité produit frais`,
-       description: `${slot.product.name} - ${slot.maxCapacity - slot.reserved} ${slot.product.unit} disponible`,
-       date: new Date(slot.date),
-       status: 'pending'
+     
+     // Calculer le revenu mensuel (somme des commandes des 30 derniers jours)
+     const thirtyDaysAgo = new Date()
+     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30)
+     
+     const recentOrders = orders.filter((order: any) => {
+       try {
+         const orderDate = new Date(order.createdAt)
+         return orderDate >= thirtyDaysAgo && 
+           (order.status === OrderStatus.CONFIRMED || 
+            order.status === OrderStatus.SHIPPED || 
+            order.status === OrderStatus.DELIVERED)
+       } catch {
+         return false
+       }
      })
-   })
-   
-   // Tri par date décroissante
-   recentActivities.sort((a, b) => b.date.getTime() - a.date.getTime())
-   
-   // Mettre à jour l'état
-   setStats({
-     pendingOrders: pendingOrdersCount,
-     totalProducts: totalProductsCount,
-     upcomingDeliveries: upcomingDeliveriesData.length,
-     monthlyRevenue: monthlyRevenue
-   })
-   
-   setActivities(recentActivities)
-   setLowStockProducts(lowStockProductsData)
-   setUpcomingDeliveries(upcomingDeliveriesData.slice(0, 3))
+     
+     const monthlyRevenue = recentOrders.reduce((sum: number, order: any) => {
+       const total = Number(order.total) || 0
+       return sum + total
+     }, 0)
+     
+     // Produits avec stock bas
+     const lowStockProductsData = products.filter((product: any) => {
+       if (!product.stock) return false
+       try {
+         // Considérer comme bas si < 10% du stock ou < 5 unités
+         const threshold = Math.min(5, product.stock.quantity * 0.1)
+         return product.stock.quantity <= threshold
+       } catch {
+         return false
+       }
+     }).slice(0, 3) // Limiter à 3 produits
+     
+     // Construire les activités récentes
+     const recentActivities: RecentActivity[] = []
+     
+     // Ajouter les commandes récentes
+     recentOrders.slice(0, 3).forEach((order: any) => {
+       if (order.id && order.user) {
+         recentActivities.push({
+           id: `order-${order.id}`,
+           type: 'order',
+           title: `Nouvelle commande #${order.id.substring(0, 8).toUpperCase()}`,
+           description: `Commande de ${order.user.name || order.user.email}`,
+           date: new Date(order.createdAt || Date.now()),
+           status: getOrderStatusLabel(order.status),
+           link: `/producer/orders?modal=${order.id}`
+         })
+       }
+     })
+     
+     // Ajouter les disponibilités produits frais
+     upcomingDeliveriesData.slice(0, 3).forEach((slot: any) => {
+       if (slot.id && slot.product) {
+         recentActivities.push({
+           id: `delivery-${slot.id}`,
+           type: 'delivery',
+           title: `Disponibilité produit frais`,
+           description: `${slot.product.name} - ${slot.maxCapacity - slot.reserved} ${slot.product.unit} disponible`,
+           date: new Date(slot.date || Date.now()),
+           status: 'pending'
+         })
+       }
+     })
+     
+     // Tri par date décroissante
+     recentActivities.sort((a, b) => b.date.getTime() - a.date.getTime())
+     
+     console.log('Statistiques producteur calculées:', {
+       pendingOrdersCount,
+       totalProductsCount,
+       upcomingDeliveries: upcomingDeliveriesData.length,
+       monthlyRevenue
+     })
+     
+     // Mettre à jour l'état
+     setStats({
+       pendingOrders: pendingOrdersCount,
+       totalProducts: totalProductsCount,
+       upcomingDeliveries: upcomingDeliveriesData.length,
+       monthlyRevenue: monthlyRevenue
+     })
+     
+     setActivities(recentActivities)
+     setLowStockProducts(lowStockProductsData)
+     setUpcomingDeliveries(upcomingDeliveriesData.slice(0, 3))
+     
+   } catch (error) {
+     console.error("Erreur lors du chargement des données producteur:", error)
+     
+     // En cas d'erreur, initialiser avec des valeurs par défaut
+     setStats({
+       pendingOrders: 0,
+       totalProducts: 0,
+       upcomingDeliveries: 0,
+       monthlyRevenue: 0
+     })
+     setActivities([])
+     setLowStockProducts([])
+     setUpcomingDeliveries([])
+     
+     throw error
+   }
  }
 
- // Récupérer les données pour un client
+ // Récupérer les données pour un client - VERSION CORRIGÉE
  const fetchClientData = async () => {
    try {
+     console.log('Début fetchClientData')
+     
      // Récupérer les commandes du client
      const ordersResponse = await fetch('/api/orders')
-     const orders = await ordersResponse.json()
+     console.log('Réponse orders:', ordersResponse.status)
+     
+     if (!ordersResponse.ok) {
+       throw new Error(`Erreur API orders: ${ordersResponse.status}`)
+     }
+     
+     const ordersData = await ordersResponse.json()
+     console.log('Données orders brutes:', ordersData)
+     
+     // ✅ CORRECTION: Gérer différents formats de réponse
+     let orders: any[] = []
+     
+     if (Array.isArray(ordersData)) {
+       // Format direct : tableau
+       orders = ordersData
+     } else if (ordersData && Array.isArray(ordersData.orders)) {
+       // Format objet avec propriété 'orders'
+       orders = ordersData.orders
+     } else if (ordersData && Array.isArray(ordersData.data)) {
+       // Format objet avec propriété 'data'
+       orders = ordersData.data
+     } else {
+       // Format inconnu, initialiser un tableau vide
+       console.warn('Format de réponse orders inattendu:', ordersData)
+       orders = []
+     }
+     
+     console.log('Orders après parsing:', orders.length)
      
      // Récupérer les créneaux de livraison RÉSERVÉS PAR LE CLIENT
-     const myDeliveriesResponse = await fetch('/api/delivery-slots/booked')
-     let deliveries = []
-     if (myDeliveriesResponse.ok) {
-       const deliveriesData = await myDeliveriesResponse.json()
-       deliveries = deliveriesData.slots || []
+     let deliveries: any[] = []
+     try {
+       const myDeliveriesResponse = await fetch('/api/delivery-slots/booked')
+       if (myDeliveriesResponse.ok) {
+         const deliveriesData = await myDeliveriesResponse.json()
+         console.log('Données deliveries brutes:', deliveriesData)
+         
+         // Même logique de parsing pour les livraisons
+         if (Array.isArray(deliveriesData)) {
+           deliveries = deliveriesData
+         } else if (deliveriesData && Array.isArray(deliveriesData.slots)) {
+           deliveries = deliveriesData.slots
+         } else if (deliveriesData && Array.isArray(deliveriesData.data)) {
+           deliveries = deliveriesData.data
+         } else {
+           deliveries = []
+         }
+       }
+     } catch (deliveryError) {
+       console.warn('Erreur lors de la récupération des livraisons:', deliveryError)
+       deliveries = []
      }
      
      // Récupérer les produits disponibles pour le client
-     const productsResponse = await fetch('/api/products?available=true')
-     const productsData = await productsResponse.json()
-     const availableProducts = productsData.products || []
+     let availableProducts: any[] = []
+     try {
+       const productsResponse = await fetch('/api/products?available=true')
+       if (productsResponse.ok) {
+         const productsData = await productsResponse.json()
+         console.log('Données products brutes:', productsData)
+         
+         // Même logique de parsing pour les produits
+         if (Array.isArray(productsData)) {
+           availableProducts = productsData
+         } else if (productsData && Array.isArray(productsData.products)) {
+           availableProducts = productsData.products
+         } else if (productsData && Array.isArray(productsData.data)) {
+           availableProducts = productsData.data
+         } else {
+           availableProducts = []
+         }
+       }
+     } catch (productsError) {
+       console.warn('Erreur lors de la récupération des produits:', productsError)
+       availableProducts = []
+     }
      
      // Calculer les statistiques
      const pendingOrdersCount = orders.filter((order: any) => 
@@ -299,8 +465,12 @@ export default function DashboardPage() {
      // Filtrer les livraisons à venir (aujourd'hui ou futur)
      const now = new Date()
      const upcomingDeliveriesData = deliveries.filter((delivery: any) => {
-       const deliveryDate = new Date(delivery.date)
-       return deliveryDate >= now
+       try {
+         const deliveryDate = new Date(delivery.date)
+         return deliveryDate >= now
+       } catch {
+         return false
+       }
      })
      
      // Calculer le total dépensé ce mois-ci
@@ -309,29 +479,38 @@ export default function DashboardPage() {
      firstDayOfMonth.setHours(0, 0, 0, 0)
      
      const ordersThisMonth = orders.filter((order: any) => {
-       const orderDate = new Date(order.createdAt)
-       return orderDate >= firstDayOfMonth && 
-         (order.status === OrderStatus.CONFIRMED || 
-          order.status === OrderStatus.SHIPPED || 
-          order.status === OrderStatus.DELIVERED)
+       try {
+         const orderDate = new Date(order.createdAt)
+         return orderDate >= firstDayOfMonth && 
+           (order.status === OrderStatus.CONFIRMED || 
+            order.status === OrderStatus.SHIPPED || 
+            order.status === OrderStatus.DELIVERED)
+       } catch {
+         return false
+       }
      })
      
-     const monthlySpent = ordersThisMonth.reduce((sum: number, order: any) => sum + order.total, 0)
+     const monthlySpent = ordersThisMonth.reduce((sum: number, order: any) => {
+       const total = Number(order.total) || 0
+       return sum + total
+     }, 0)
      
      // Construire les activités récentes
      const recentActivities: RecentActivity[] = []
      
-     // Ajouter les commandes récentes
+     // Ajouter les commandes récentes (maximum 3)
      orders.slice(0, 3).forEach((order: any) => {
-       recentActivities.push({
-         id: `order-${order.id}`,
-         type: 'order',
-         title: `Commande #${order.id.substring(0, 8).toUpperCase()}`,
-         description: `Statut: ${getOrderStatusTranslation(order.status)}`,
-         date: new Date(order.createdAt),
-         status: getOrderStatusLabel(order.status),
-         link: `/orders?modal=${order.id}`
-       })
+       if (order.id && order.status) {
+         recentActivities.push({
+           id: `order-${order.id}`,
+           type: 'order',
+           title: `Commande #${order.id.substring(0, 8).toUpperCase()}`,
+           description: `Statut: ${getOrderStatusTranslation(order.status)}`,
+           date: new Date(order.createdAt || Date.now()),
+           status: getOrderStatusLabel(order.status),
+           link: `/orders?modal=${order.id}`
+         })
+       }
      })
      
      // Ajouter les produits frais réservés
@@ -342,8 +521,8 @@ export default function DashboardPage() {
            id: `delivery-${delivery.id}`,
            type: 'delivery',
            title: `Produit frais réservé`,
-           description: `${delivery.product.name} - ${delivery.booking.quantity} ${delivery.product.unit}`,
-           date: new Date(delivery.date),
+           description: `${delivery.product?.name || 'Produit'} - ${delivery.booking.quantity} ${delivery.product?.unit || ''}`,
+           date: new Date(delivery.date || Date.now()),
            status: 'pending'
          })
        }
@@ -351,6 +530,13 @@ export default function DashboardPage() {
      
      // Tri par date décroissante
      recentActivities.sort((a, b) => b.date.getTime() - a.date.getTime())
+     
+     console.log('Statistiques calculées:', {
+       pendingOrdersCount,
+       totalProducts: availableProducts.length,
+       upcomingDeliveries: upcomingDeliveriesData.length,
+       monthlySpent
+     })
      
      // Mettre à jour l'état
      setStats({
@@ -362,8 +548,21 @@ export default function DashboardPage() {
      
      setActivities(recentActivities)
      setUpcomingDeliveries(upcomingDeliveriesData)
+     
    } catch (error) {
      console.error("Erreur lors du chargement des données client:", error)
+     
+     // En cas d'erreur, initialiser avec des valeurs par défaut
+     setStats({
+       pendingOrders: 0,
+       totalProducts: 0,
+       upcomingDeliveries: 0,
+       monthlyRevenue: 0
+     })
+     setActivities([])
+     setUpcomingDeliveries([])
+     
+     throw error // Re-lancer l'erreur pour qu'elle soit gérée par le useEffect
    }
  }
 
@@ -591,7 +790,7 @@ export default function DashboardPage() {
                        <div>
                          <p className="font-medium text-sm sm:text-base">{product.name}</p>
                          <p className="text-xs sm:text-sm text-amber-700 dark:text-amber-300">
-                           Stock bas: {product.stock.quantity} {product.unit}
+                           Stock bas: {product.stock?.quantity || 0} {product.unit}
                          </p>
                        </div>
                      </div>
@@ -748,7 +947,7 @@ export default function DashboardPage() {
                  </div>
                  <p className="text-xs text-muted-foreground line-clamp-2">
                    {session?.user?.role === UserRole.PRODUCER
-                     ? `Produit frais: ${upcomingDeliveries[0].maxCapacity - upcomingDeliveries[0].reserved} ${upcomingDeliveries[0].product.unit} disponible de ${upcomingDeliveries[0].product.name}`
+                     ? `Produit frais: ${(upcomingDeliveries[0].maxCapacity || 0) - (upcomingDeliveries[0].reserved || 0)} ${upcomingDeliveries[0].product?.unit || ''} disponible de ${upcomingDeliveries[0].product?.name || ''}`
                      : `Produit frais réservé: ${upcomingDeliveries[0].booking?.quantity || ''} ${upcomingDeliveries[0].product?.unit || ''} de ${upcomingDeliveries[0].product?.name || ''}`
                    }
                  </p>

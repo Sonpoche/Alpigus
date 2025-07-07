@@ -67,11 +67,6 @@ export default function ClientMenu({ currentPath }: ClientMenuProps) {
       label: 'Profil',
       icon: <User className="h-5 w-5" />
     },
-    {
-      href: '/settings',
-      label: 'Paramètres',
-      icon: <Settings className="h-5 w-5" />
-    }
   ]
 
   // Fonction centralisée pour déterminer l'état actif

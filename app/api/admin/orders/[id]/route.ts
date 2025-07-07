@@ -1,23 +1,25 @@
-// app/api/admin/orders/[id]/route.ts - CORRECTION pour afficher le statut de paiement correct
+// app/api/admin/orders/[id]/route.ts
 import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
-import { apiAuthMiddleware } from "@/lib/api-middleware"
-import { Session } from "next-auth"
+import { withAdminSecurity } from "@/lib/api-security"
 
-export const GET = apiAuthMiddleware(async (
-  req: NextRequest,
-  session: Session,
-  context: { params: { [key: string]: string } }
+export const GET = withAdminSecurity(async (
+  request: NextRequest,
+  session
 ) => {
   try {
-    // Vérifier que l'utilisateur est admin
-    if (session.user.role !== 'ADMIN') {
-      return new NextResponse("Non autorisé", { status: 403 })
+    // Extraire l'ID de la commande depuis l'URL
+    const url = new URL(request.url)
+    const orderId = url.pathname.split('/').slice(-1)[0]
+
+    if (!orderId) {
+      return NextResponse.json(
+        { error: 'ID de commande manquant', code: 'MISSING_ORDER_ID' },
+        { status: 400 }
+      )
     }
 
-    const orderId = context.params.id
-
-    // ✅ CORRECTION: Récupérer la commande avec la facture actualisée
+    // Récupérer la commande avec la facture actualisée
     const order = await prisma.order.findUnique({
       where: { id: orderId },
       include: {
@@ -73,7 +75,7 @@ export const GET = apiAuthMiddleware(async (
             }
           }
         },
-        // ✅ CORRECTION: Inclure la facture avec toutes ses informations de paiement
+        // Inclure la facture avec toutes ses informations de paiement
         invoice: {
           select: {
             id: true,
@@ -89,10 +91,13 @@ export const GET = apiAuthMiddleware(async (
     })
 
     if (!order) {
-      return new NextResponse("Commande introuvable", { status: 404 })
+      return NextResponse.json(
+        { error: 'Commande non trouvée', code: 'ORDER_NOT_FOUND' },
+        { status: 404 }
+      )
     }
 
-    // ✅ CORRECTION: Détecter automatiquement le statut de paiement actuel
+    // Détecter automatiquement le statut de paiement actuel
     let actualPaymentStatus = order.status
     let paymentInfo = null
 
@@ -112,7 +117,7 @@ export const GET = apiAuthMiddleware(async (
       }
     }
 
-    // ✅ CORRECTION: Mettre à jour le statut de la commande si nécessaire
+    // Mettre à jour le statut de la commande si nécessaire
     if (actualPaymentStatus !== order.status) {
       console.log(`Mise à jour du statut de la commande ${orderId}: ${order.status} → ${actualPaymentStatus}`)
       
@@ -126,7 +131,7 @@ export const GET = apiAuthMiddleware(async (
     const metadata = order.metadata ? JSON.parse(order.metadata) : {}
     const adminNotes = metadata.adminNotes || []
 
-    // ✅ CORRECTION: Ajouter les informations de paiement à la réponse
+    // Ajouter les informations de paiement à la réponse
     const orderWithNotes = {
       ...order,
       status: actualPaymentStatus, // Utiliser le statut actualisé
@@ -142,9 +147,15 @@ export const GET = apiAuthMiddleware(async (
 
   } catch (error) {
     console.error("Erreur lors de la récupération de la commande:", error)
-    return new NextResponse(
-      "Erreur lors de la récupération de la commande", 
+    return NextResponse.json(
+      { 
+        error: 'Erreur lors de la récupération de la commande', 
+        code: 'INTERNAL_SERVER_ERROR',
+        ...(process.env.NODE_ENV === 'development' && { 
+          details: error instanceof Error ? error.message : 'Erreur inconnue' 
+        })
+      },
       { status: 500 }
     )
   }
-}, ["ADMIN"])
+})

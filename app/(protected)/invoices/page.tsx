@@ -1,4 +1,4 @@
-// app/(protected)/invoices/page.tsx - VERSION COMPLÈTE AVEC REDIRECTION
+// app/(protected)/invoices/page.tsx - VERSION AVEC PAGINATION
 'use client'
 
 import { useState, useEffect } from 'react'
@@ -23,7 +23,9 @@ import {
   Eye,
   DollarSign,
   Building2,
-  Receipt
+  Receipt,
+  ChevronLeft,
+  ChevronRight
 } from 'lucide-react'
 import { formatDateToFrench } from '@/lib/date-utils'
 import { Badge } from '@/components/ui/badge'
@@ -54,6 +56,9 @@ interface Invoice {
   }
 }
 
+// Constante pour la pagination
+const ITEMS_PER_PAGE = 5
+
 export default function InvoicesPage() {
   const { data: session, status } = useSession()
   const router = useRouter()
@@ -67,6 +72,11 @@ export default function InvoicesPage() {
   const [searchQuery, setSearchQuery] = useState('')
   const [statusFilter, setStatusFilter] = useState<string>('all')
   const [sortBy, setSortBy] = useState<string>('dueDate_desc')
+  
+  // États pour la pagination
+  const [currentPage, setCurrentPage] = useState(1)
+  const [totalPages, setTotalPages] = useState(0)
+  const [paginatedInvoices, setPaginatedInvoices] = useState<Invoice[]>([])
   
   // États pour la modal de paiement
   const [showPaymentModal, setShowPaymentModal] = useState(false)
@@ -82,12 +92,11 @@ export default function InvoicesPage() {
     }
   }, [status, router])
 
-  // ✅ CORRECTION: Récupérer les factures avec événement de mise à jour
+  // Récupérer les factures avec événement de mise à jour
   const fetchInvoices = async () => {
     try {
       setIsLoading(true)
       const response = await fetch('/api/invoices', {
-        // ✅ CORRECTION: Empêcher la mise en cache
         cache: 'no-store',
         headers: {
           'pragma': 'no-cache',
@@ -103,7 +112,7 @@ export default function InvoicesPage() {
       setInvoices(data.invoices || [])
       setFilteredInvoices(data.invoices || [])
       
-      // ✅ CORRECTION: Déclencher l'événement après le chargement
+      // Déclencher l'événement après le chargement
       setTimeout(() => {
         window.dispatchEvent(new CustomEvent('invoice:updated', {
           detail: { type: 'loaded', count: data.invoices?.length || 0 }
@@ -158,7 +167,76 @@ export default function InvoicesPage() {
     })
     
     setFilteredInvoices(result)
+    setCurrentPage(1) // Remettre à la première page lors d'un changement de filtre
   }, [invoices, searchQuery, statusFilter, sortBy])
+
+  // ✅ NOUVEAU: Gestion de la pagination
+  useEffect(() => {
+    const totalItems = filteredInvoices.length
+    const pages = Math.ceil(totalItems / ITEMS_PER_PAGE)
+    setTotalPages(pages)
+
+    // Calculer les éléments pour la page actuelle
+    const startIndex = (currentPage - 1) * ITEMS_PER_PAGE
+    const endIndex = startIndex + ITEMS_PER_PAGE
+    const currentItems = filteredInvoices.slice(startIndex, endIndex)
+    
+    setPaginatedInvoices(currentItems)
+  }, [filteredInvoices, currentPage])
+
+  // ✅ NOUVEAU: Fonctions de navigation de pagination
+  const goToPage = (page: number) => {
+    if (page >= 1 && page <= totalPages) {
+      setCurrentPage(page)
+      // Scroll vers le haut pour voir les nouvelles factures
+      window.scrollTo({ top: 0, behavior: 'smooth' })
+    }
+  }
+
+  const nextPage = () => {
+    if (currentPage < totalPages) {
+      goToPage(currentPage + 1)
+    }
+  }
+
+  const prevPage = () => {
+    if (currentPage > 1) {
+      goToPage(currentPage - 1)
+    }
+  }
+
+  // ✅ NOUVEAU: Génerer les numéros de pages à afficher
+  const getPageNumbers = () => {
+    const pages = []
+    const maxVisiblePages = 5
+    
+    if (totalPages <= maxVisiblePages) {
+      // Afficher toutes les pages si peu de pages
+      for (let i = 1; i <= totalPages; i++) {
+        pages.push(i)
+      }
+    } else {
+      // Logique pour afficher ... quand beaucoup de pages
+      const start = Math.max(1, currentPage - 2)
+      const end = Math.min(totalPages, currentPage + 2)
+      
+      if (start > 1) {
+        pages.push(1)
+        if (start > 2) pages.push('...')
+      }
+      
+      for (let i = start; i <= end; i++) {
+        pages.push(i)
+      }
+      
+      if (end < totalPages) {
+        if (end < totalPages - 1) pages.push('...')
+        pages.push(totalPages)
+      }
+    }
+    
+    return pages
+  }
 
   // Ouvrir la modal de paiement
   const openPaymentModal = (invoice: Invoice) => {
@@ -173,7 +251,7 @@ export default function InvoicesPage() {
     setPaymentMethod('card')
   }
 
-  // ✅ NOUVEAU: Gestion du paiement par carte Stripe avec redirection
+  // Gestion du paiement par carte Stripe avec redirection
   const handleStripePaymentSuccess = async (paymentIntent: any) => {
     if (!selectedInvoice) return
     
@@ -199,7 +277,7 @@ export default function InvoicesPage() {
       // Rafraîchir le compteur de factures en attente
       refreshPendingCount()
       
-      // ✅ CORRECTION: Déclencher l'événement global
+      // Déclencher l'événement global
       setTimeout(() => {
         window.dispatchEvent(new CustomEvent('invoice:paid', {
           detail: { 
@@ -210,7 +288,7 @@ export default function InvoicesPage() {
         }))
       }, 100)
       
-      // ✅ NOUVEAU: Rediriger vers la page de remerciement
+      // Rediriger vers la page de remerciement
       const params = new URLSearchParams({
         invoice_id: selectedInvoice.id,
         payment_method: 'card',
@@ -240,7 +318,7 @@ export default function InvoicesPage() {
     })
   }
 
-  // ✅ NOUVEAU: Gestion du virement bancaire avec redirection
+  // Gestion du virement bancaire avec redirection
   const handleBankTransferConfirm = async () => {
     if (!selectedInvoice) return
     
@@ -266,7 +344,7 @@ export default function InvoicesPage() {
       // Rafraîchir le compteur de factures en attente
       refreshPendingCount()
       
-      // ✅ CORRECTION: Déclencher l'événement global
+      // Déclencher l'événement global
       setTimeout(() => {
         window.dispatchEvent(new CustomEvent('invoice:paid', {
           detail: { 
@@ -277,7 +355,7 @@ export default function InvoicesPage() {
         }))
       }, 100)
       
-      // ✅ NOUVEAU: Rediriger vers la page de remerciement
+      // Rediriger vers la page de remerciement
       const params = new URLSearchParams({
         invoice_id: selectedInvoice.id,
         payment_method: 'bank_transfer',
@@ -406,6 +484,11 @@ export default function InvoicesPage() {
         <h1 className="text-xl sm:text-2xl font-bold mb-2">Mes factures</h1>
         <p className="text-sm sm:text-base text-muted-foreground">
           Consultez et gérez toutes vos factures
+          {filteredInvoices.length > 0 && (
+            <span className="ml-2 text-custom-accent font-medium">
+              ({filteredInvoices.length} facture{filteredInvoices.length > 1 ? 's' : ''})
+            </span>
+          )}
         </p>
       </div>
 
@@ -492,7 +575,7 @@ export default function InvoicesPage() {
         <>
           {/* Version mobile - Cards */}
           <div className="lg:hidden space-y-4">
-            {filteredInvoices.map(invoice => (
+            {paginatedInvoices.map(invoice => (
               <div 
                 key={invoice.id} 
                 className="bg-background border border-foreground/10 rounded-lg p-4 shadow-sm hover:shadow-md transition-shadow"
@@ -599,7 +682,7 @@ export default function InvoicesPage() {
 
           {/* Version desktop - Cards améliorées */}
           <div className="hidden lg:block space-y-4">
-            {filteredInvoices.map(invoice => (
+            {paginatedInvoices.map(invoice => (
               <div 
                 key={invoice.id} 
                 className="bg-background border border-foreground/10 rounded-lg overflow-hidden shadow-sm hover:shadow-md transition-shadow"
@@ -695,6 +778,69 @@ export default function InvoicesPage() {
               </div>
             ))}
           </div>
+
+          {/* ✅ NOUVEAU: Composant de pagination */}
+          {totalPages > 1 && (
+            <div className="mt-8 flex flex-col sm:flex-row items-center justify-between gap-4">
+              {/* Informations sur la pagination */}
+              <div className="text-sm text-muted-foreground">
+                Affichage de {((currentPage - 1) * ITEMS_PER_PAGE) + 1} à {Math.min(currentPage * ITEMS_PER_PAGE, filteredInvoices.length)} sur {filteredInvoices.length} factures
+              </div>
+
+              {/* Contrôles de pagination */}
+              <div className="flex items-center gap-2">
+                {/* Bouton précédent */}
+                <button
+                  onClick={prevPage}
+                  disabled={currentPage === 1}
+                  className={`flex items-center gap-1 px-3 py-2 text-sm border rounded-md transition-colors ${
+                    currentPage === 1
+                      ? 'border-foreground/10 text-muted-foreground cursor-not-allowed'
+                      : 'border-foreground/10 hover:bg-foreground/5 text-foreground'
+                  }`}
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                  <span className="hidden sm:inline">Précédent</span>
+                </button>
+
+                {/* Numéros de pages */}
+                <div className="flex items-center gap-1">
+                  {getPageNumbers().map((page, index) => (
+                    <div key={index}>
+                      {page === '...' ? (
+                        <span className="px-2 py-1 text-muted-foreground">...</span>
+                      ) : (
+                        <button
+                          onClick={() => goToPage(page as number)}
+                          className={`w-8 h-8 text-sm rounded-md transition-colors ${
+                            currentPage === page
+                              ? 'bg-custom-accent text-white'
+                              : 'border border-foreground/10 hover:bg-foreground/5 text-foreground'
+                          }`}
+                        >
+                          {page}
+                        </button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+
+                {/* Bouton suivant */}
+                <button
+                  onClick={nextPage}
+                  disabled={currentPage === totalPages}
+                  className={`flex items-center gap-1 px-3 py-2 text-sm border rounded-md transition-colors ${
+                    currentPage === totalPages
+                      ? 'border-foreground/10 text-muted-foreground cursor-not-allowed'
+                      : 'border-foreground/10 hover:bg-foreground/5 text-foreground'
+                  }`}
+                >
+                  <span className="hidden sm:inline">Suivant</span>
+                  <ChevronRight className="h-4 w-4" />
+                </button>
+              </div>
+            </div>
+          )}
         </>
       )}
 
