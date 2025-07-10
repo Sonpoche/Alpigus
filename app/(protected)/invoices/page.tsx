@@ -1,4 +1,4 @@
-// app/(protected)/invoices/page.tsx - VERSION AVEC PAGINATION
+// app/(protected)/invoices/page.tsx - VERSION AVEC PAGINATION ET TRI PAR PRIORITÉ
 'use client'
 
 import { useState, useEffect } from 'react'
@@ -59,6 +59,58 @@ interface Invoice {
 // Constante pour la pagination
 const ITEMS_PER_PAGE = 5
 
+// ✅ NOUVELLE FONCTION UTILITAIRE POUR CALCULER L'URGENCE
+const getUrgencyLevel = (invoice: Invoice) => {
+  if (invoice.status !== 'PENDING' && invoice.status !== 'OVERDUE') {
+    return 'none'
+  }
+  
+  const today = new Date()
+  const dueDate = new Date(invoice.dueDate)
+  const daysUntilDue = Math.ceil((dueDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24))
+  
+  if (daysUntilDue < 0) return 'overdue'
+  if (daysUntilDue <= 3) return 'urgent'
+  if (daysUntilDue <= 7) return 'warning'
+  return 'normal'
+}
+
+// ✅ NOUVEAU COMPOSANT INDICATEUR D'URGENCE
+const UrgencyIndicator = ({ invoice }: { invoice: Invoice }) => {
+  const urgency = getUrgencyLevel(invoice)
+  
+  if (urgency === 'none') return null
+  
+  const styles = {
+    overdue: 'bg-red-500',
+    urgent: 'bg-orange-500',
+    warning: 'bg-yellow-500',
+    normal: 'bg-blue-500'
+  }
+  
+  const labels = {
+    overdue: 'En retard',
+    urgent: 'Urgent (≤3j)',
+    warning: 'Bientôt (≤7j)',
+    normal: 'Normal'
+  }
+  
+  return (
+    <div className="flex items-center gap-2">
+      <div className={`w-2 h-2 rounded-full ${styles[urgency]}`} 
+           title={labels[urgency]} />
+      <span className={`text-xs font-medium ${
+        urgency === 'overdue' ? 'text-red-600' :
+        urgency === 'urgent' ? 'text-orange-600' :
+        urgency === 'warning' ? 'text-yellow-600' :
+        'text-blue-600'
+      }`}>
+        {labels[urgency]}
+      </span>
+    </div>
+  )
+}
+
 export default function InvoicesPage() {
   const { data: session, status } = useSession()
   const router = useRouter()
@@ -71,7 +123,9 @@ export default function InvoicesPage() {
   const [processingInvoiceId, setProcessingInvoiceId] = useState<string | null>(null)
   const [searchQuery, setSearchQuery] = useState('')
   const [statusFilter, setStatusFilter] = useState<string>('all')
-  const [sortBy, setSortBy] = useState<string>('dueDate_desc')
+  
+  // ✅ MODIFICATION: État initial du tri changé pour priorité
+  const [sortBy, setSortBy] = useState<string>('priority')
   
   // États pour la pagination
   const [currentPage, setCurrentPage] = useState(1)
@@ -131,7 +185,7 @@ export default function InvoicesPage() {
     }
   }
 
-  // Filtrer les factures
+  // ✅ NOUVELLE LOGIQUE DE FILTRAGE ET TRI
   useEffect(() => {
     let result = [...invoices]
     
@@ -149,28 +203,73 @@ export default function InvoicesPage() {
       )
     }
     
-    // Tri
+    // ✅ NOUVELLE LOGIQUE DE TRI - Priorité aux factures à payer avec échéance proche
     result.sort((a, b) => {
-      const [field, direction] = sortBy.split('_')
-      
-      if (field === 'amount') {
-        return direction === 'asc' ? a.amount - b.amount : b.amount - a.amount
-      } else if (field === 'dueDate') {
-        return direction === 'asc' 
-          ? new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime()
-          : new Date(b.dueDate).getTime() - new Date(a.dueDate).getTime()
-      } else { // date
-        return direction === 'asc'
-          ? new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
-          : new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+      // Si l'utilisateur a sélectionné un tri spécifique autre que priorité, l'appliquer
+      if (sortBy !== 'priority') {
+        const [field, direction] = sortBy.split('_')
+        
+        if (field === 'amount') {
+          return direction === 'asc' ? a.amount - b.amount : b.amount - a.amount
+        } else if (field === 'dueDate') {
+          return direction === 'asc' 
+            ? new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime()
+            : new Date(b.dueDate).getTime() - new Date(a.dueDate).getTime()
+        } else { // date
+          return direction === 'asc'
+            ? new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+            : new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+        }
       }
+      
+      // ✅ TRI PAR PRIORITÉ (nouveau tri par défaut)
+      const today = new Date()
+      const aDueDate = new Date(a.dueDate)
+      const bDueDate = new Date(b.dueDate)
+      
+      // 1. Factures PENDING/OVERDUE avec échéance la plus proche en premier
+      if ((a.status === 'PENDING' || a.status === 'OVERDUE') && 
+          (b.status === 'PENDING' || b.status === 'OVERDUE')) {
+        // Les deux sont à payer, trier par échéance (plus proche = plus urgent)
+        return aDueDate.getTime() - bDueDate.getTime()
+      }
+      
+      // 2. Factures à payer (PENDING/OVERDUE) avant les autres
+      if ((a.status === 'PENDING' || a.status === 'OVERDUE') && 
+          (b.status !== 'PENDING' && b.status !== 'OVERDUE')) {
+        return -1 // a vient avant b
+      }
+      
+      if ((b.status === 'PENDING' || b.status === 'OVERDUE') && 
+          (a.status !== 'PENDING' && a.status !== 'OVERDUE')) {
+        return 1 // b vient avant a
+      }
+      
+      // 3. Factures payées : les plus récentes en premier (par date de paiement si disponible)
+      if (a.status === 'PAID' && b.status === 'PAID') {
+        const aPaidDate = a.paidAt ? new Date(a.paidAt) : new Date(a.createdAt)
+        const bPaidDate = b.paidAt ? new Date(b.paidAt) : new Date(b.createdAt)
+        return bPaidDate.getTime() - aPaidDate.getTime() // Plus récent en premier
+      }
+      
+      // 4. Factures payées avant les annulées
+      if (a.status === 'PAID' && b.status === 'CANCELLED') {
+        return -1
+      }
+      
+      if (b.status === 'PAID' && a.status === 'CANCELLED') {
+        return 1
+      }
+      
+      // 5. Pour tous les autres cas, trier par date de création (plus récent en premier)
+      return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
     })
     
     setFilteredInvoices(result)
     setCurrentPage(1) // Remettre à la première page lors d'un changement de filtre
   }, [invoices, searchQuery, statusFilter, sortBy])
 
-  // ✅ NOUVEAU: Gestion de la pagination
+  // Gestion de la pagination
   useEffect(() => {
     const totalItems = filteredInvoices.length
     const pages = Math.ceil(totalItems / ITEMS_PER_PAGE)
@@ -184,7 +283,7 @@ export default function InvoicesPage() {
     setPaginatedInvoices(currentItems)
   }, [filteredInvoices, currentPage])
 
-  // ✅ NOUVEAU: Fonctions de navigation de pagination
+  // Fonctions de navigation de pagination
   const goToPage = (page: number) => {
     if (page >= 1 && page <= totalPages) {
       setCurrentPage(page)
@@ -205,7 +304,7 @@ export default function InvoicesPage() {
     }
   }
 
-  // ✅ NOUVEAU: Génerer les numéros de pages à afficher
+  // Génerer les numéros de pages à afficher
   const getPageNumbers = () => {
     const pages = []
     const maxVisiblePages = 5
@@ -525,30 +624,31 @@ export default function InvoicesPage() {
             <ChevronDown className="absolute right-2 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
           </div>
           
-          {/* Tri */}
-          <div className="relative flex-1 sm:flex-none sm:w-52">
+          {/* ✅ MODIFICATION: Nouvelles options de tri */}
+          <div className="relative flex-1 sm:flex-none sm:w-64">
             <select
               value={sortBy}
               onChange={(e) => setSortBy(e.target.value)}
               className="w-full appearance-none border border-foreground/10 rounded-md px-3 py-2 pr-8 text-sm bg-background [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
               style={{ backgroundImage: 'none' }}
             >
-              <option value="dueDate_desc">Échéance (récente)</option>
-              <option value="dueDate_asc">Échéance (ancienne)</option>
-              <option value="amount_desc">Montant (décroissant)</option>
-              <option value="amount_asc">Montant (croissant)</option>
-              <option value="date_desc">Date (récente)</option>
-              <option value="date_asc">Date (ancienne)</option>
+              <option value="priority"> Priorité (recommandé)</option>
+              <option value="dueDate_asc"> Échéance (proche en premier)</option>
+              <option value="dueDate_desc"> Échéance (lointaine en premier)</option>
+              <option value="amount_desc"> Montant (décroissant)</option>
+              <option value="amount_asc"> Montant (croissant)</option>
+              <option value="date_desc"> Date (récente)</option>
+              <option value="date_asc"> Date (ancienne)</option>
             </select>
             <ChevronDown className="absolute right-2 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
           </div>
           
-          {/* Bouton reset */}
+          {/* ✅ MODIFICATION: Bouton reset mis à jour */}
           <button
             onClick={() => {
               setStatusFilter('all')
               setSearchQuery('')
-              setSortBy('dueDate_desc')
+              setSortBy('priority')
             }}
             className="px-3 py-2 border border-foreground/10 rounded-md hover:bg-foreground/5 transition-colors flex items-center justify-center gap-2 text-sm"
           >
@@ -587,9 +687,13 @@ export default function InvoicesPage() {
                       {getStatusIcon(invoice.status)}
                     </div>
                     <div className="min-w-0 flex-1">
-                      <h3 className="font-medium text-sm truncate">
-                        Facture #{invoice.id.substring(0, 8).toUpperCase()}
-                      </h3>
+                      <div className="flex items-center gap-2 mb-1">
+                        <h3 className="font-medium text-sm truncate">
+                          Facture #{invoice.id.substring(0, 8).toUpperCase()}
+                        </h3>
+                        {/* ✅ AJOUT: Indicateur d'urgence sur mobile */}
+                        <UrgencyIndicator invoice={invoice} />
+                      </div>
                       <p className="text-xs text-muted-foreground truncate">
                         Commande #{invoice.orderId.substring(0, 8).toUpperCase()}
                       </p>
@@ -698,6 +802,8 @@ export default function InvoicesPage() {
                         <div className="flex items-center gap-3 mb-1">
                           <h3 className="font-medium text-lg">Facture #{invoice.id.substring(0, 8).toUpperCase()}</h3>
                           {getStatusBadge(invoice.status)}
+                          {/* ✅ AJOUT: Indicateur d'urgence sur desktop */}
+                          <UrgencyIndicator invoice={invoice} />
                         </div>
                         <p className="text-sm text-muted-foreground">
                           Commande #{invoice.orderId.substring(0, 8).toUpperCase()} • {formatDateToFrench(new Date(invoice.createdAt))}
@@ -779,7 +885,7 @@ export default function InvoicesPage() {
             ))}
           </div>
 
-          {/* ✅ NOUVEAU: Composant de pagination */}
+          {/* Composant de pagination */}
           {totalPages > 1 && (
             <div className="mt-8 flex flex-col sm:flex-row items-center justify-between gap-4">
               {/* Informations sur la pagination */}

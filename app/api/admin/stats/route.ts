@@ -1,4 +1,4 @@
-// app/api/admin/stats/route.ts - CORRECTION pour exclure les DRAFT
+// app/api/admin/stats/route.ts - CODE COMPLET CORRIGÉ
 import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { apiAuthMiddleware } from "@/lib/api-middleware"
@@ -17,10 +17,8 @@ export const GET = apiAuthMiddleware(
       }
 
       // --- Statistiques des utilisateurs ---
-      // Compter le nombre total d'utilisateurs
       const totalUsers = await prisma.user.count();
       
-      // Compter par rôle
       const usersByRole = await prisma.user.groupBy({
         by: ['role'],
         _count: {
@@ -28,7 +26,6 @@ export const GET = apiAuthMiddleware(
         }
       });
       
-      // Utilisateurs récemment inscrits (30 derniers jours)
       const thirtyDaysAgo = new Date();
       thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
       
@@ -40,8 +37,7 @@ export const GET = apiAuthMiddleware(
         }
       });
       
-      // ✅ CORRECTION: --- Statistiques des commandes (SANS les DRAFT) ---
-      // Total des commandes (SANS les DRAFT)
+      // --- Statistiques des commandes (SANS les DRAFT) ---
       const totalOrders = await prisma.order.count({
         where: {
           status: {
@@ -50,7 +46,6 @@ export const GET = apiAuthMiddleware(
         }
       });
       
-      // ✅ CORRECTION: Commandes par statut (SANS les DRAFT)
       const ordersByStatus = await prisma.order.groupBy({
         by: ['status'],
         where: {
@@ -63,7 +58,6 @@ export const GET = apiAuthMiddleware(
         }
       });
       
-      // ✅ CORRECTION: Commandes récentes 30 derniers jours (SANS les DRAFT)
       const newOrders = await prisma.order.count({
         where: {
           AND: [
@@ -81,7 +75,6 @@ export const GET = apiAuthMiddleware(
         }
       });
       
-      // ✅ CORRECTION: Valeur totale des commandes (SANS les DRAFT)
       const totalOrdersValue = await prisma.order.aggregate({
         where: {
           status: {
@@ -94,10 +87,8 @@ export const GET = apiAuthMiddleware(
       });
       
       // --- Statistiques des produits ---
-      // Total des produits
       const totalProducts = await prisma.product.count();
       
-      // Produits par type
       const productsByType = await prisma.product.groupBy({
         by: ['type'],
         _count: {
@@ -105,8 +96,8 @@ export const GET = apiAuthMiddleware(
         }
       });
       
-      // ✅ CORRECTION: Top produits basé sur les vraies commandes (SANS les DRAFT)
-      const topProducts = await prisma.orderItem.groupBy({
+      // ✅ Top produits avec calcul correct et simple
+      const topProductsRaw = await prisma.orderItem.groupBy({
         by: ['productId'],
         where: {
           order: {
@@ -126,26 +117,65 @@ export const GET = apiAuthMiddleware(
             quantity: 'desc'
           }
         },
-        take: 5
+        take: 10
       });
+
+      // ✅ Mapping simplifié et direct
+      const topProductsWithDetails = [];
+
+      for (const item of topProductsRaw) {
+        if (!item._sum.quantity || item._sum.quantity <= 0) continue;
+        
+        const product = await prisma.product.findUnique({
+          where: { id: item.productId },
+          select: { 
+            id: true,
+            name: true, 
+            type: true,
+            unit: true 
+          }
+        });
+        
+        if (!product) continue;
+        
+        // Compter le nombre de commandes uniques pour ce produit
+        const uniqueOrders = await prisma.order.count({
+          where: {
+            AND: [
+              {
+                status: {
+                  not: OrderStatus.DRAFT
+                }
+              },
+              {
+                items: {
+                  some: {
+                    productId: item.productId
+                  }
+                }
+              }
+            ]
+          }
+        });
+        
+        // ✅ Structure finale correcte
+        const productData = {
+          id: item.productId,
+          name: product.name,
+          type: product.type,
+          unit: product.unit,
+          totalQuantity: item._sum.quantity, // ✅ Quantité totale commandée
+          totalOrders: uniqueOrders, // ✅ Nombre de commandes uniques
+          orderItems: item._count.id // ✅ Nombre de lignes de commande
+        };
+        
+        topProductsWithDetails.push(productData);
+      }
+
+      const topProducts = topProductsWithDetails.slice(0, 5);
       
-      // Récupérer les informations des produits pour le top
-      const topProductsWithNames = await Promise.all(
-        topProducts.map(async (item) => {
-          const product = await prisma.product.findUnique({
-            where: { id: item.productId },
-            select: { name: true, type: true }
-          });
-          return {
-            ...item,
-            name: product?.name || 'Produit inconnu',
-            type: product?.type || 'Type inconnu'
-          };
-        })
-      );
-      
-      // ✅ CORRECTION: Commandes par type de produit (SANS les DRAFT)
-      const ordersByProductType = await prisma.orderItem.groupBy({
+      // ✅ Commandes par type de produit avec meilleure logique
+      const ordersByProductTypeRaw = await prisma.orderItem.groupBy({
         by: ['productId'],
         where: {
           order: {
@@ -156,13 +186,16 @@ export const GET = apiAuthMiddleware(
         },
         _count: {
           id: true
+        },
+        _sum: {
+          quantity: true
         }
       });
       
       // Regrouper par type de produit
       const ordersByProductTypeMap: Record<string, number> = {};
       
-      for (const item of ordersByProductType) {
+      for (const item of ordersByProductTypeRaw) {
         const product = await prisma.product.findUnique({
           where: { id: item.productId },
           select: { type: true }
@@ -182,11 +215,10 @@ export const GET = apiAuthMiddleware(
         count
       }));
       
-      // ✅ CORRECTION: Ventes mensuelles (SANS les DRAFT)
+      // ✅ Ventes mensuelles (SANS les DRAFT)
       const sixMonthsAgo = new Date();
       sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
       
-      // Récupérer les commandes des 6 derniers mois (SANS les DRAFT)
       const orders = await prisma.order.findMany({
         where: {
           AND: [
@@ -211,12 +243,11 @@ export const GET = apiAuthMiddleware(
         }
       });
       
-      // Regrouper manuellement les commandes par mois
       const salesByMonthMap: Record<string, number> = {};
       
       orders.forEach(order => {
         const date = new Date(order.createdAt);
-        const month = date.toLocaleDateString('default', { month: 'long', year: 'numeric' });
+        const month = date.toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' });
         
         if (!salesByMonthMap[month]) {
           salesByMonthMap[month] = 0;
@@ -225,12 +256,12 @@ export const GET = apiAuthMiddleware(
         salesByMonthMap[month] += order.total;
       });
       
-      // Convertir en tableau pour le front-end
       const salesByMonth = Object.entries(salesByMonthMap).map(([month, value]) => ({
         month,
         value
       }));
       
+      // ✅ Réponse finale avec structure correcte
       return NextResponse.json({
         users: {
           total: totalUsers,
@@ -246,11 +277,12 @@ export const GET = apiAuthMiddleware(
         products: {
           total: totalProducts,
           byType: productsByType,
-          topProducts: topProductsWithNames
+          topProducts: topProducts // ✅ Données correctement formatées
         },
         ordersByProductType: ordersByProductTypeArray,
         salesByMonth
       });
+      
     } catch (error) {
       console.error("Erreur lors de la récupération des statistiques:", error);
       return new NextResponse("Erreur lors de la récupération des statistiques", { status: 500 });

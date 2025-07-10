@@ -1,4 +1,4 @@
-// app/(protected)/admin/wallets/[id]/page.tsx
+// app/(protected)/admin/wallets/[id]/page.tsx - VERSION AVEC PAGINATION
 'use client'
 
 import { useState, useEffect } from 'react'
@@ -18,11 +18,16 @@ import {
   ArrowUp,
   Calendar,
   AlertCircle,
-  Download
+  Download,
+  ChevronLeft,
+  ChevronRight,
+  Activity,
+  CreditCard
 } from 'lucide-react'
 import Link from 'next/link'
 import { LoadingButton } from '@/components/ui/loading-button'
 import { Badge } from '@/components/ui/badge'
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { format } from 'date-fns'
 import { fr } from 'date-fns/locale'
 import { formatPrice } from '@/lib/number-utils'
@@ -79,6 +84,9 @@ interface WalletDetail {
   transactions: TransactionData[]
 }
 
+// Constantes pour la pagination
+const ITEMS_PER_PAGE = 5
+
 export default function WalletDetailPage({ params }: PageProps) {
   const router = useRouter()
   const { toast } = useToast()
@@ -89,6 +97,10 @@ export default function WalletDetailPage({ params }: PageProps) {
   const [withdrawalNote, setWithdrawalNote] = useState('')
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [modalAction, setModalAction] = useState<'approve' | 'reject'>('approve')
+  
+  // ✅ NOUVEAU: États pour la pagination
+  const [transactionsPage, setTransactionsPage] = useState(1)
+  const [withdrawalsPage, setWithdrawalsPage] = useState(1)
 
   useEffect(() => {
     if (params.id) {
@@ -160,7 +172,7 @@ export default function WalletDetailPage({ params }: PageProps) {
       console.error('Erreur:', error)
       toast({
         title: 'Erreur',
-        description: error instanceof Error ? error.message : 'Une erreur est survenue',
+        description: error instanceof Error ? error.message : 'Erreur lors du traitement',
         variant: 'destructive'
       })
     } finally {
@@ -168,22 +180,177 @@ export default function WalletDetailPage({ params }: PageProps) {
     }
   }
 
-  const openModal = (withdrawalId: string, action: 'approve' | 'reject') => {
+  const openWithdrawalModal = (withdrawalId: string, action: 'approve' | 'reject') => {
     setSelectedWithdrawalId(withdrawalId)
     setModalAction(action)
-    setWithdrawalNote('')
     setIsModalOpen(true)
   }
 
-  // Filtrer les retraits en attente
-  const pendingWithdrawals = walletData?.withdrawals.filter(
-    withdrawal => withdrawal.status === 'PENDING'
-  ) || []
+  // ✅ NOUVEAU: Fonctions de pagination pour les transactions
+  const getPaginatedTransactions = () => {
+    if (!walletData?.transactions) return []
+    const startIndex = (transactionsPage - 1) * ITEMS_PER_PAGE
+    const endIndex = startIndex + ITEMS_PER_PAGE
+    return walletData.transactions.slice(startIndex, endIndex)
+  }
+
+  const getTotalTransactionPages = () => {
+    if (!walletData?.transactions) return 0
+    return Math.ceil(walletData.transactions.length / ITEMS_PER_PAGE)
+  }
+
+  const goToTransactionPage = (page: number) => {
+    const totalPages = getTotalTransactionPages()
+    if (page >= 1 && page <= totalPages) {
+      setTransactionsPage(page)
+    }
+  }
+
+  // ✅ NOUVEAU: Fonctions de pagination pour les retraits
+  const getPaginatedWithdrawals = () => {
+    if (!walletData?.withdrawals) return []
+    const startIndex = (withdrawalsPage - 1) * ITEMS_PER_PAGE
+    const endIndex = startIndex + ITEMS_PER_PAGE
+    return walletData.withdrawals.slice(startIndex, endIndex)
+  }
+
+  const getTotalWithdrawalPages = () => {
+    if (!walletData?.withdrawals) return 0
+    return Math.ceil(walletData.withdrawals.length / ITEMS_PER_PAGE)
+  }
+
+  const goToWithdrawalPage = (page: number) => {
+    const totalPages = getTotalWithdrawalPages()
+    if (page >= 1 && page <= totalPages) {
+      setWithdrawalsPage(page)
+    }
+  }
+
+  // ✅ NOUVEAU: Composant de pagination réutilisable
+  const PaginationControls = ({ 
+    currentPage, 
+    totalPages, 
+    onPageChange, 
+    itemName 
+  }: {
+    currentPage: number
+    totalPages: number
+    onPageChange: (page: number) => void
+    itemName: string
+  }) => {
+    if (totalPages <= 1) return null
+
+    const getPageNumbers = () => {
+      const pages = []
+      const maxVisible = 5
+      
+      if (totalPages <= maxVisible) {
+        for (let i = 1; i <= totalPages; i++) {
+          pages.push(i)
+        }
+      } else {
+        const start = Math.max(1, currentPage - 2)
+        const end = Math.min(totalPages, currentPage + 2)
+        
+        if (start > 1) {
+          pages.push(1)
+          if (start > 2) pages.push('...')
+        }
+        
+        for (let i = start; i <= end; i++) {
+          pages.push(i)
+        }
+        
+        if (end < totalPages) {
+          if (end < totalPages - 1) pages.push('...')
+          pages.push(totalPages)
+        }
+      }
+      
+      return pages
+    }
+
+    return (
+      <div className="flex items-center justify-between mt-4 pt-4 border-t border-foreground/10">
+        <div className="text-sm text-muted-foreground">
+          Affichage de {((currentPage - 1) * ITEMS_PER_PAGE) + 1} à {Math.min(currentPage * ITEMS_PER_PAGE, totalPages * ITEMS_PER_PAGE)} sur {totalPages * ITEMS_PER_PAGE} {itemName}
+        </div>
+        
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => onPageChange(currentPage - 1)}
+            disabled={currentPage === 1}
+            className={`flex items-center gap-1 px-3 py-2 text-sm border rounded-md transition-colors ${
+              currentPage === 1
+                ? 'border-foreground/10 text-muted-foreground cursor-not-allowed'
+                : 'border-foreground/10 hover:bg-foreground/5 text-foreground'
+            }`}
+          >
+            <ChevronLeft className="h-4 w-4" />
+            Précédent
+          </button>
+
+          <div className="flex items-center gap-1">
+            {getPageNumbers().map((page, index) => (
+              <div key={index}>
+                {page === '...' ? (
+                  <span className="px-2 py-1 text-muted-foreground">...</span>
+                ) : (
+                  <button
+                    onClick={() => onPageChange(page as number)}
+                    className={`w-8 h-8 text-sm rounded-md transition-colors ${
+                      currentPage === page
+                        ? 'bg-custom-accent text-white'
+                        : 'border border-foreground/10 hover:bg-foreground/5 text-foreground'
+                    }`}
+                  >
+                    {page}
+                  </button>
+                )}
+              </div>
+            ))}
+          </div>
+
+          <button
+            onClick={() => onPageChange(currentPage + 1)}
+            disabled={currentPage === totalPages}
+            className={`flex items-center gap-1 px-3 py-2 text-sm border rounded-md transition-colors ${
+              currentPage === totalPages
+                ? 'border-foreground/10 text-muted-foreground cursor-not-allowed'
+                : 'border-foreground/10 hover:bg-foreground/5 text-foreground'
+            }`}
+          >
+            Suivant
+            <ChevronRight className="h-4 w-4" />
+          </button>
+        </div>
+      </div>
+    )
+  }
+
+  const getStatusBadge = (status: string, type: 'withdrawal' | 'transaction') => {
+    const baseClass = "text-xs font-medium px-2 py-1 rounded-full"
+    
+    switch (status) {
+      case 'PENDING':
+        return <Badge className={`${baseClass} bg-yellow-100 text-yellow-800 dark:bg-yellow-900/20 dark:text-yellow-300`}>En attente</Badge>
+      case 'COMPLETED':
+        return <Badge className={`${baseClass} bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-300`}>Terminé</Badge>
+      case 'REJECTED':
+        return <Badge className={`${baseClass} bg-red-100 text-red-800 dark:bg-red-900/20 dark:text-red-300`}>Rejeté</Badge>
+      case 'CANCELLED':
+        return <Badge className={`${baseClass} bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300`}>Annulé</Badge>
+      default:
+        return <Badge className={`${baseClass} bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300`}>{status}</Badge>
+    }
+  }
 
   if (isLoading) {
     return (
-      <div className="flex justify-center items-center min-h-[400px]">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-custom-accent" />
+      <div className="p-8">
+        <div className="flex items-center justify-center min-h-[400px]">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-custom-accent" />
+        </div>
       </div>
     )
   }
@@ -191,21 +358,19 @@ export default function WalletDetailPage({ params }: PageProps) {
   if (!walletData) {
     return (
       <div className="p-8">
-        <div className="flex justify-center items-center min-h-[400px]">
-          <div className="text-center">
-            <AlertCircle className="h-12 w-12 text-destructive mx-auto mb-4" />
-            <h2 className="text-xl font-semibold mb-2">Portefeuille non trouvé</h2>
-            <p className="text-muted-foreground mb-4">
-              Ce portefeuille n'existe pas ou a été supprimé.
-            </p>
-            <Link
-              href="/admin/wallets"
-              className="inline-flex items-center text-custom-accent hover:underline"
-            >
-              <ArrowLeft className="h-4 w-4 mr-2" />
-              Retour à la liste des portefeuilles
-            </Link>
-          </div>
+        <div className="text-center">
+          <AlertCircle className="h-12 w-12 text-red-500 mx-auto mb-4" />
+          <h2 className="text-xl font-bold mb-2">Portefeuille non trouvé</h2>
+          <p className="text-muted-foreground mb-4">
+            Le portefeuille demandé n'existe pas ou a été supprimé.
+          </p>
+          <Link
+            href="/admin/wallets"
+            className="inline-flex items-center text-custom-accent hover:underline"
+          >
+            <ArrowLeft className="h-4 w-4 mr-2" />
+            Retour à la liste des portefeuilles
+          </Link>
         </div>
       </div>
     )
@@ -227,14 +392,6 @@ export default function WalletDetailPage({ params }: PageProps) {
         <h1 className="text-2xl font-bold">
           {walletData.producer.companyName || "Entreprise sans nom"}
         </h1>
-        
-        <button 
-          onClick={() => window.print()}
-          className="inline-flex items-center gap-2 px-4 py-2 border border-input bg-background rounded-md hover:bg-accent hover:text-accent-foreground"
-        >
-          <Download className="h-4 w-4" /> 
-          Exporter
-        </button>
       </div>
       
       {/* Résumé du portefeuille */}
@@ -251,8 +408,8 @@ export default function WalletDetailPage({ params }: PageProps) {
         
         <div className="bg-background border border-foreground/10 rounded-lg p-6 shadow-sm">
           <div className="flex items-center gap-4 mb-1">
-            <div className="p-3 bg-blue-100 dark:bg-blue-900/20 rounded-full">
-              <Clock className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+            <div className="p-3 bg-orange-100 dark:bg-orange-900/20 rounded-full">
+              <Clock className="h-5 w-5 text-orange-600 dark:text-orange-400" />
             </div>
             <span className="text-sm text-muted-foreground">En attente</span>
           </div>
@@ -262,452 +419,322 @@ export default function WalletDetailPage({ params }: PageProps) {
         <div className="bg-background border border-foreground/10 rounded-lg p-6 shadow-sm">
           <div className="flex items-center gap-4 mb-1">
             <div className="p-3 bg-green-100 dark:bg-green-900/20 rounded-full">
-              <ArrowDown className="h-5 w-5 text-green-600 dark:text-green-400" />
-            </div>
-            <span className="text-sm text-muted-foreground">Total retiré</span>
-          </div>
-          <p className="text-2xl font-semibold pl-12">{formatPrice(walletData.totalWithdrawn)}</p>
-        </div>
-        
-        <div className="bg-background border border-foreground/10 rounded-lg p-6 shadow-sm">
-          <div className="flex items-center gap-4 mb-1">
-            <div className="p-3 bg-purple-100 dark:bg-purple-900/20 rounded-full">
-              <ArrowUp className="h-5 w-5 text-purple-600 dark:text-purple-400" />
+              <ArrowUp className="h-5 w-5 text-green-600 dark:text-green-400" />
             </div>
             <span className="text-sm text-muted-foreground">Total gagné</span>
           </div>
           <p className="text-2xl font-semibold pl-12">{formatPrice(walletData.totalEarned)}</p>
         </div>
+        
+        <div className="bg-background border border-foreground/10 rounded-lg p-6 shadow-sm">
+          <div className="flex items-center gap-4 mb-1">
+            <div className="p-3 bg-red-100 dark:bg-red-900/20 rounded-full">
+              <ArrowDown className="h-5 w-5 text-red-600 dark:text-red-400" />
+            </div>
+            <span className="text-sm text-muted-foreground">Total retiré</span>
+          </div>
+          <p className="text-2xl font-semibold pl-12">{formatPrice(walletData.totalWithdrawn)}</p>
+        </div>
       </div>
-      
+
       {/* Informations du producteur */}
       <div className="bg-background border border-foreground/10 rounded-lg p-6 shadow-sm mb-8">
-        <h2 className="text-lg font-semibold mb-4">Informations du producteur</h2>
+        <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
+          <Building className="h-5 w-5" />
+          Informations du producteur
+        </h2>
         
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div>
-            <h3 className="text-sm font-medium text-muted-foreground mb-3">Contact</h3>
-            <div className="space-y-3">
-              <div className="flex items-center gap-3">
-                <Building className="h-5 w-5 text-muted-foreground" />
-                <div>
-                  <p className="text-sm text-muted-foreground">Entreprise</p>
-                  <p className="font-medium">{walletData.producer.companyName || "Non renseigné"}</p>
-                </div>
+            <h3 className="font-medium mb-3">Contact</h3>
+            <div className="space-y-2">
+              <div className="flex items-center gap-2">
+                <Building className="h-4 w-4 text-muted-foreground" />
+                <span>{walletData.producer.companyName}</span>
               </div>
-              
-              <div className="flex items-center gap-3">
-                <Mail className="h-5 w-5 text-muted-foreground" />
-                <div>
-                  <p className="text-sm text-muted-foreground">Email</p>
-                  <p className="font-medium">{walletData.producer.user.email}</p>
-                </div>
+              <div className="flex items-center gap-2">
+                <Mail className="h-4 w-4 text-muted-foreground" />
+                <span>{walletData.producer.user.email}</span>
               </div>
-              
-              <div className="flex items-center gap-3">
-                <Phone className="h-5 w-5 text-muted-foreground" />
-                <div>
-                  <p className="text-sm text-muted-foreground">Téléphone</p>
-                  <p className="font-medium">{walletData.producer.user.phone || "Non renseigné"}</p>
+              {walletData.producer.user.phone && (
+                <div className="flex items-center gap-2">
+                  <Phone className="h-4 w-4 text-muted-foreground" />
+                  <span>{walletData.producer.user.phone}</span>
                 </div>
-              </div>
-              
-              <div className="flex items-start gap-3">
-                <Building className="h-5 w-5 text-muted-foreground mt-0.5" />
-                <div>
-                  <p className="text-sm text-muted-foreground">Adresse</p>
-                  <p className="font-medium">{walletData.producer.address || "Non renseignée"}</p>
-                </div>
-              </div>
+              )}
             </div>
           </div>
           
           <div>
-            <h3 className="text-sm font-medium text-muted-foreground mb-3">Informations bancaires</h3>
-            {walletData.producer.iban ? (
-              <div className="space-y-3">
-                <div className="flex items-center gap-3">
-                  <Landmark className="h-5 w-5 text-muted-foreground" />
-                  <div>
-                    <p className="text-sm text-muted-foreground">Banque</p>
-                    <p className="font-medium">{walletData.producer.bankName}</p>
-                  </div>
+            <h3 className="font-medium mb-3">Informations bancaires</h3>
+            <div className="space-y-2">
+              {walletData.producer.bankName && (
+                <div className="flex items-center gap-2">
+                  <Landmark className="h-4 w-4 text-muted-foreground" />
+                  <span>{walletData.producer.bankName}</span>
                 </div>
-                
-                <div className="flex items-center gap-3">
-                  <Building className="h-5 w-5 text-muted-foreground" />
-                  <div>
-                    <p className="text-sm text-muted-foreground">Titulaire</p>
-                    <p className="font-medium">{walletData.producer.bankAccountName}</p>
-                  </div>
+              )}
+              {walletData.producer.iban && (
+                <div className="flex items-center gap-2">
+                  <CreditCard className="h-4 w-4 text-muted-foreground" />
+                  <span>{walletData.producer.iban}</span>
                 </div>
-                
-                <div className="flex items-center gap-3">
-                  <Wallet className="h-5 w-5 text-muted-foreground" />
-                  <div>
-                    <p className="text-sm text-muted-foreground">IBAN</p>
-                    <p className="font-medium">{walletData.producer.iban}</p>
-                  </div>
+              )}
+              {walletData.producer.bic && (
+                <div className="text-sm text-muted-foreground">
+                  BIC: {walletData.producer.bic}
                 </div>
-                
-                {walletData.producer.bic && (
-                  <div className="flex items-center gap-3">
-                    <Wallet className="h-5 w-5 text-muted-foreground" />
-                    <div>
-                      <p className="text-sm text-muted-foreground">BIC/SWIFT</p>
-                      <p className="font-medium">{walletData.producer.bic}</p>
-                    </div>
-                  </div>
-                )}
-              </div>
-            ) : (
-              <div className="p-4 bg-yellow-50 dark:bg-yellow-900/20 rounded-lg flex items-start gap-2">
-                <AlertCircle className="h-5 w-5 text-yellow-600 dark:text-yellow-400 mt-0.5 flex-shrink-0" />
-                <div>
-                  <p className="text-sm font-medium text-yellow-800 dark:text-yellow-300">
-                    Informations bancaires non configurées
-                  </p>
-                  <p className="text-xs text-yellow-700 dark:text-yellow-400 mt-1">
-                    Le producteur n'a pas encore configuré ses informations bancaires.
-                  </p>
-                </div>
-              </div>
-            )}
+              )}
+            </div>
           </div>
         </div>
       </div>
-      
+
       {/* Demandes de retrait en attente */}
-      <h2 className="text-xl font-semibold mb-4">Demandes de retrait en attente</h2>
-      
-      {pendingWithdrawals.length === 0 ? (
-        <div className="bg-background border border-foreground/10 rounded-lg p-8 text-center mb-8">
-          <Clock className="h-12 w-12 mx-auto text-muted-foreground mb-4 opacity-20" />
-          <h3 className="text-lg font-medium mb-2">Aucune demande en attente</h3>
-          <p className="text-muted-foreground">
-            Ce producteur n'a pas de demandes de retrait en attente.
-          </p>
-        </div>
-      ) : (
-        <div className="bg-background border border-foreground/10 rounded-lg overflow-hidden mb-8">
-          <table className="w-full">
-            <thead className="bg-muted/50 border-b border-foreground/10">
-              <tr>
-                <th className="px-4 py-3 text-left text-sm font-medium">Date de demande</th>
-                <th className="px-4 py-3 text-right text-sm font-medium">Montant</th>
-                <th className="px-4 py-3 text-left text-sm font-medium">IBAN</th>
-                <th className="px-4 py-3 text-center text-sm font-medium">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-foreground/10">
-              {pendingWithdrawals.map(withdrawal => {
-                // Formatter la date
-                const requestDate = new Date(withdrawal.requestedAt)
-                const formattedDate = format(requestDate, 'PPP', { locale: fr })
-                
-                // Extraire les détails bancaires
-                const bankDetails = JSON.parse(withdrawal.bankDetails)
-                
-                return (
-                  <tr key={withdrawal.id} className="hover:bg-muted/50">
-                    <td className="px-4 py-4">
-                      <div className="flex items-center">
-                        <Calendar className="h-4 w-4 text-muted-foreground mr-2" />
-                        <span>{formattedDate}</span>
-                      </div>
-                    </td>
-                    <td className="px-4 py-4 text-right font-medium">
-                      {formatPrice(withdrawal.amount)}
-                    </td>
-                    <td className="px-4 py-4">
-                      {bankDetails.iban}
-                    </td>
-                    <td className="px-4 py-4">
-                      <div className="flex items-center justify-center gap-2">
-                        <button
-                          onClick={() => openModal(withdrawal.id, 'approve')}
-                          className="px-3 py-1 text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-300 rounded-full hover:bg-green-200 dark:hover:bg-green-900/30 transition-colors"
-                        >
-                          <CheckCircle className="h-3 w-3 inline-block mr-1" />
-                          Approuver
-                        </button>
-                        <button
-                          onClick={() => openModal(withdrawal.id, 'reject')}
-                          className="px-3 py-1 text-xs font-medium bg-red-100 text-red-800 dark:bg-red-900/20 dark:text-red-300 rounded-full hover:bg-red-200 dark:hover:bg-red-900/30 transition-colors"
-                        >
-                          <XCircle className="h-3 w-3 inline-block mr-1" />
-                          Rejeter
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                )
-              })}
-            </tbody>
-          </table>
+      {walletData.withdrawals.some(w => w.status === 'PENDING') && (
+        <div className="bg-background border border-foreground/10 rounded-lg p-6 shadow-sm mb-8">
+          <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
+            <Clock className="h-5 w-5 text-orange-500" />
+            Demandes de retrait en attente
+          </h2>
+          
+          <div className="space-y-4">
+            {walletData.withdrawals.filter(w => w.status === 'PENDING').map((withdrawal) => (
+              <div key={withdrawal.id} className="border border-orange-200 dark:border-orange-800 rounded-lg p-4 bg-orange-50 dark:bg-orange-900/20">
+                <div className="flex justify-between items-start">
+                  <div>
+                    <div className="flex items-center gap-2 mb-2">
+                      <span className="font-medium text-lg">{formatPrice(withdrawal.amount)}</span>
+                      {getStatusBadge(withdrawal.status, 'withdrawal')}
+                    </div>
+                    <div className="text-sm text-muted-foreground mb-2">
+                      Demandé le {format(new Date(withdrawal.requestedAt), 'PPP', { locale: fr })}
+                    </div>
+                    <div className="text-sm">
+                      <strong>Coordonnées bancaires:</strong> {withdrawal.bankDetails}
+                    </div>
+                  </div>
+                  
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => openWithdrawalModal(withdrawal.id, 'approve')}
+                      className="px-3 py-1 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors text-sm"
+                    >
+                      Approuver
+                    </button>
+                    <button
+                      onClick={() => openWithdrawalModal(withdrawal.id, 'reject')}
+                      className="px-3 py-1 bg-red-600 text-white rounded-md hover:bg-red-700 transition-colors text-sm"
+                    >
+                      Rejeter
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
       )}
-      
-      {/* Historique des retraits */}
-      <h2 className="text-xl font-semibold mb-4">Historique des retraits</h2>
-      
-      {walletData.withdrawals.length === 0 ? (
-        <div className="bg-background border border-foreground/10 rounded-lg p-8 text-center mb-8">
-          <ArrowDown className="h-12 w-12 mx-auto text-muted-foreground mb-4 opacity-20" />
-          <h3 className="text-lg font-medium mb-2">Aucun historique de retrait</h3>
-          <p className="text-muted-foreground">
-            Ce producteur n'a pas encore effectué de retrait.
-          </p>
-        </div>
-      ) : (
-        <div className="bg-background border border-foreground/10 rounded-lg overflow-hidden mb-8">
-          <table className="w-full">
-            <thead className="bg-muted/50 border-b border-foreground/10">
-              <tr>
-                <th className="px-4 py-3 text-left text-sm font-medium">Date de demande</th>
-                <th className="px-4 py-3 text-right text-sm font-medium">Montant</th>
-                <th className="px-4 py-3 text-center text-sm font-medium">Statut</th>
-                <th className="px-4 py-3 text-left text-sm font-medium">Note</th>
-                <th className="px-4 py-3 text-left text-sm font-medium">Date de traitement</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-foreground/10">
-              {walletData.withdrawals.filter(w => w.status !== 'PENDING').map(withdrawal => {
-                // Formatter les dates
-                const requestDate = new Date(withdrawal.requestedAt)
-                const formattedRequestDate = format(requestDate, 'PPP', { locale: fr })
-                
-                const processedDate = withdrawal.processedAt ? new Date(withdrawal.processedAt) : null
-                const formattedProcessedDate = processedDate ? format(processedDate, 'PPP', { locale: fr }) : '-'
-                
-                // Déterminer le style du statut
-                let statusStyle = ""
-                let statusText = ""
-                let statusIcon = null
-                
-                switch (withdrawal.status) {
-                  case 'COMPLETED':
-                    statusStyle = "bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-300"
-                    statusText = "Traité"
-                    statusIcon = <CheckCircle className="h-3 w-3 inline mr-1" />
-                    break
-                  case 'PROCESSING':
-                    statusStyle = "bg-blue-100 text-blue-800 dark:bg-blue-900/20 dark:text-blue-300"
-                    statusText = "En cours"
-                    statusIcon = <Clock className="h-3 w-3 inline mr-1" />
-                    break
-                  case 'REJECTED':
-                    statusStyle = "bg-red-100 text-red-800 dark:bg-red-900/20 dark:text-red-300"
-                    statusText = "Rejeté"
-                    statusIcon = <XCircle className="h-3 w-3 inline mr-1" />
-                    break
-                  default:
-                    statusStyle = "bg-gray-100 text-gray-800 dark:bg-gray-900/20 dark:text-gray-300"
-                    statusText = withdrawal.status
-                }
-                
-                return (
-                  <tr key={withdrawal.id} className="hover:bg-muted/50">
-                    <td className="px-4 py-4">
-                      <div className="flex items-center">
-                        <Calendar className="h-4 w-4 text-muted-foreground mr-2" />
-                        <span>{formattedRequestDate}</span>
-                      </div>
-                    </td>
-                    <td className="px-4 py-4 text-right font-medium">
-                      {formatPrice(withdrawal.amount)}
-                    </td>
-                    <td className="px-4 py-4 text-center">
-                      <span className={`px-2 py-1 text-xs font-medium rounded-full ${statusStyle}`}>
-                        {statusIcon}{statusText}
-                      </span>
-                    </td>
-                    <td className="px-4 py-4 text-sm">
-                      {withdrawal.processorNote || '-'}
-                    </td>
-                    <td className="px-4 py-4 text-sm">
-                      {formattedProcessedDate}
-                    </td>
+
+      {/* ✅ NOUVEAU: Historique des retraits avec pagination */}
+      <div className="bg-background border border-foreground/10 rounded-lg p-6 shadow-sm mb-8">
+        <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
+          <ArrowDown className="h-5 w-5" />
+          Historique des retraits ({walletData.withdrawals.length})
+        </h2>
+        
+        {walletData.withdrawals.length === 0 ? (
+          <p className="text-muted-foreground text-center py-8">Aucun retrait effectué</p>
+        ) : (
+          <>
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead>
+                  <tr className="border-b border-foreground/10">
+                    <th className="text-left py-3 font-medium">Montant</th>
+                    <th className="text-left py-3 font-medium">Statut</th>
+                    <th className="text-left py-3 font-medium">Date demande</th>
+                    <th className="text-left py-3 font-medium">Date traitement</th>
+                    <th className="text-left py-3 font-medium">Référence</th>
                   </tr>
-                )
-              })}
-            </tbody>
-          </table>
-        </div>
-      )}
-      
-      {/* Historique des transactions */}
-      <h2 className="text-xl font-semibold mb-4">Historique des transactions</h2>
-      
-      {walletData.transactions.length === 0 ? (
-        <div className="bg-background border border-foreground/10 rounded-lg p-8 text-center">
-          <Wallet className="h-12 w-12 mx-auto text-muted-foreground mb-4 opacity-20" />
-          <h3 className="text-lg font-medium mb-2">Aucune transaction</h3>
-          <p className="text-muted-foreground">
-            Ce producteur n'a pas encore effectué de transactions.
-          </p>
-        </div>
-      ) : (
-        <div className="bg-background border border-foreground/10 rounded-lg overflow-hidden">
-          <table className="w-full">
-            <thead className="bg-muted/50 border-b border-foreground/10">
-              <tr>
-                <th className="px-4 py-3 text-left text-sm font-medium">Date</th>
-                <th className="px-4 py-3 text-left text-sm font-medium">Description</th>
-                <th className="px-4 py-3 text-center text-sm font-medium">Type</th>
-                <th className="px-4 py-3 text-right text-sm font-medium">Montant</th>
-                <th className="px-4 py-3 text-center text-sm font-medium">Statut</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-foreground/10">
-              {walletData.transactions.map(transaction => {
-                // Formatter la date
-                const transactionDate = new Date(transaction.createdAt)
-                const formattedDate = format(transactionDate, 'PPP', { locale: fr })
-                
-                // Déterminer le style du type
-                let typeStyle = ""
-                let typeText = ""
-                
-                switch (transaction.type) {
-                  case 'SALE':
-                    typeStyle = "bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-300"
-                    typeText = "Vente"
-                    break
-                  case 'WITHDRAWAL':
-                    typeStyle = "bg-amber-100 text-amber-800 dark:bg-amber-900/20 dark:text-amber-300"
-                    typeText = "Retrait"
-                    break
-                  case 'REFUND':
-                    typeStyle = "bg-red-100 text-red-800 dark:bg-red-900/20 dark:text-red-300"
-                    typeText = "Remboursement"
-                    break
-                  case 'ADJUSTMENT':
-                    typeStyle = "bg-blue-100 text-blue-800 dark:bg-blue-900/20 dark:text-blue-300"
-                    typeText = "Ajustement"
-                    break
-                  case 'FEE':
-                    typeStyle = "bg-purple-100 text-purple-800 dark:bg-purple-900/20 dark:text-purple-300"
-                    typeText = "Frais"
-                    break
-                  default:
-                    typeStyle = "bg-gray-100 text-gray-800 dark:bg-gray-900/20 dark:text-gray-300"
-                    typeText = transaction.type
-                }
-                
-                // Déterminer le style du statut
-                let statusStyle = ""
-                let statusText = ""
-                
-                switch (transaction.status) {
-                  case 'COMPLETED':
-                    statusStyle = "bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-300"
-                    statusText = "Complété"
-                    break
-                  case 'PENDING':
-                    statusStyle = "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/20 dark:text-yellow-300"
-                    statusText = "En attente"
-                    break
-                  case 'FAILED':
-                    statusStyle = "bg-red-100 text-red-800 dark:bg-red-900/20 dark:text-red-300"
-                    statusText = "Échoué"
-                    break
-                  case 'CANCELLED':
-                    statusStyle = "bg-gray-100 text-gray-800 dark:bg-gray-900/20 dark:text-gray-300"
-                    statusText = "Annulé"
-                    break
-                  default:
-                    statusStyle = "bg-gray-100 text-gray-800 dark:bg-gray-900/20 dark:text-gray-300"
-                    statusText = transaction.status
-                }
-                
-                return (
-                  <tr key={transaction.id} className="hover:bg-muted/50">
-                    <td className="px-4 py-4">
-                      <div className="flex items-center">
-                        <Calendar className="h-4 w-4 text-muted-foreground mr-2" />
-                        <span>{formattedDate}</span>
-                      </div>
-                    </td>
-                    <td className="px-4 py-4">
-                      {transaction.description || `Transaction #${transaction.id.substring(0, 8)}`}
-                    </td>
-                    <td className="px-4 py-4 text-center">
-                      <span className={`px-2 py-1 text-xs font-medium rounded-full ${typeStyle}`}>
-                        {typeText}
-                      </span>
-                    </td>
-                    <td className="px-4 py-4 text-right font-medium">
-                      {formatPrice(transaction.amount)}
-                    </td>
-                    <td className="px-4 py-4 text-center">
-                      <span className={`px-2 py-1 text-xs font-medium rounded-full ${statusStyle}`}>
-                        {statusText}
-                      </span>
-                    </td>
+                </thead>
+                <tbody>
+                  {getPaginatedWithdrawals().map((withdrawal) => (
+                    <tr key={withdrawal.id} className="border-b border-foreground/10">
+                      <td className="py-3 font-medium">{formatPrice(withdrawal.amount)}</td>
+                      <td className="py-3">{getStatusBadge(withdrawal.status, 'withdrawal')}</td>
+                      <td className="py-3 text-sm text-muted-foreground">
+                        {format(new Date(withdrawal.requestedAt), 'PPP', { locale: fr })}
+                      </td>
+                      <td className="py-3 text-sm text-muted-foreground">
+                        {withdrawal.processedAt 
+                          ? format(new Date(withdrawal.processedAt), 'PPP', { locale: fr })
+                          : '-'
+                        }
+                      </td>
+                      <td className="py-3 text-sm text-muted-foreground">
+                        {withdrawal.reference || '-'}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            
+            {/* Pagination des retraits */}
+            <PaginationControls
+              currentPage={withdrawalsPage}
+              totalPages={getTotalWithdrawalPages()}
+              onPageChange={goToWithdrawalPage}
+              itemName="retraits"
+            />
+          </>
+        )}
+      </div>
+
+      {/* ✅ NOUVEAU: Historique des transactions avec pagination */}
+      <div className="bg-background border border-foreground/10 rounded-lg p-6 shadow-sm">
+        <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
+          <Activity className="h-5 w-5" />
+          Historique des transactions ({walletData.transactions.length})
+        </h2>
+        
+        {walletData.transactions.length === 0 ? (
+          <p className="text-muted-foreground text-center py-8">Aucune transaction</p>
+        ) : (
+          <>
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead>
+                  <tr className="border-b border-foreground/10">
+                    <th className="text-left py-3 font-medium">Type</th>
+                    <th className="text-left py-3 font-medium">Montant</th>
+                    <th className="text-left py-3 font-medium">Statut</th>
+                    <th className="text-left py-3 font-medium">Description</th>
+                    <th className="text-left py-3 font-medium">Date</th>
                   </tr>
-                )
-              })}
-            </tbody>
-          </table>
-        </div>
-      )}
-      
-      {/* Modal de confirmation pour les actions sur les retraits */}
-      {isModalOpen && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
-          <div className="bg-background rounded-lg max-w-md w-full p-6 shadow-lg">
-           <h3 className="text-lg font-semibold mb-4">
-             {modalAction === 'approve' ? 'Approuver le retrait' : 'Rejeter le retrait'}
-           </h3>
-           
-           <p className="mb-4">
-             {modalAction === 'approve' 
-               ? 'Êtes-vous sûr de vouloir approuver cette demande de retrait ? Cette action confirmera que le virement a été effectué.'
-               : 'Êtes-vous sûr de vouloir rejeter cette demande de retrait ? Veuillez indiquer la raison du rejet.'}
-           </p>
-           
-           <div className="mb-4">
-             <label htmlFor="note" className="block text-sm font-medium mb-1">
-               {modalAction === 'approve' ? 'Référence du virement (optionnel)' : 'Raison du rejet'}
-             </label>
-             <textarea
-               id="note"
-               value={withdrawalNote}
-               onChange={(e) => setWithdrawalNote(e.target.value)}
-               rows={3}
-               className="w-full border border-input rounded-md p-2"
-               placeholder={modalAction === 'approve' 
-                 ? 'Ex: Référence bancaire, numéro de transaction...'
-                 : 'Ex: Informations bancaires incorrectes...'}
-               required={modalAction === 'reject'}
-             />
-           </div>
-           
-           <div className="flex gap-4 justify-end">
-             <button
-               onClick={() => setIsModalOpen(false)}
-               className="px-4 py-2 border border-input rounded-md hover:bg-accent hover:text-accent-foreground"
-             >
-               Annuler
-             </button>
-             
-             <LoadingButton
-               onClick={() => handleWithdrawalAction(modalAction)}
-               isLoading={isProcessingWithdrawal}
-               disabled={modalAction === 'reject' && !withdrawalNote.trim()}
-               className={
-                 modalAction === 'approve'
-                   ? 'bg-green-600 hover:bg-green-700 text-white'
-                   : 'bg-red-600 hover:bg-red-700 text-white'
-               }
-             >
-               {modalAction === 'approve' ? 'Confirmer le paiement' : 'Rejeter la demande'}
-             </LoadingButton>
-           </div>
-         </div>
-       </div>
-     )}
-   </div>
- )
+                </thead>
+                <tbody>
+                  {getPaginatedTransactions().map((transaction) => (
+                    <tr key={transaction.id} className="border-b border-foreground/10">
+                      <td className="py-3">
+                        <div className="flex items-center gap-2">
+                          {/* ✅ CORRECTION: Logique basée sur le montant ET le type */}
+                          {transaction.amount > 0 || transaction.type === 'SALE' ? (
+                            <ArrowUp className="h-4 w-4 text-green-500" />
+                          ) : (
+                            <ArrowDown className="h-4 w-4 text-red-500" />
+                          )}
+                          <span className="text-sm">
+                            {/* ✅ CORRECTION: Affichage basé sur le type de transaction */}
+                            {transaction.type === 'SALE' ? 'Vente' : 
+                             transaction.type === 'WITHDRAWAL' ? 'Retrait' :
+                             transaction.amount > 0 ? 'Crédit' : 'Débit'}
+                          </span>
+                        </div>
+                      </td>
+                      <td className="py-3 font-medium">
+                        {/* ✅ CORRECTION: Affichage du montant selon le type */}
+                        <span className={
+                          transaction.type === 'SALE' || transaction.amount > 0 
+                            ? 'text-green-600' 
+                            : 'text-red-600'
+                        }>
+                          {transaction.type === 'SALE' || transaction.amount > 0 
+                            ? '+' : ''}
+                          {formatPrice(Math.abs(transaction.amount))}
+                        </span>
+                      </td>
+                      <td className="py-3">{getStatusBadge(transaction.status, 'transaction')}</td>
+                      <td className="py-3 text-sm text-muted-foreground">
+                        {transaction.description || '-'}
+                      </td>
+                      <td className="py-3 text-sm text-muted-foreground">
+                        {format(new Date(transaction.createdAt), 'PPP', { locale: fr })}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            
+            {/* Pagination des transactions */}
+            <PaginationControls
+              currentPage={transactionsPage}
+              totalPages={getTotalTransactionPages()}
+              onPageChange={goToTransactionPage}
+              itemName="transactions"
+            />
+          </>
+        )}
+      </div>
+
+      {/* Modal de traitement des retraits */}
+      <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>
+              {modalAction === 'approve' ? 'Approuver' : 'Rejeter'} la demande de retrait
+            </DialogTitle>
+          </DialogHeader>
+          
+          <div className="space-y-4">
+            <div className="bg-foreground/5 p-4 rounded-lg">
+              <p className="text-sm text-muted-foreground">
+                {modalAction === 'approve' 
+                  ? 'Vous êtes sur le point d\'approuver cette demande de retrait.'
+                  : 'Vous êtes sur le point de rejeter cette demande de retrait.'
+                }
+              </p>
+            </div>
+            
+            <div>
+              <label className="block text-sm font-medium mb-2">
+                Note (optionnel)
+              </label>
+              <textarea
+                value={withdrawalNote}
+                onChange={(e) => setWithdrawalNote(e.target.value)}
+                placeholder={modalAction === 'approve' 
+                  ? 'Note interne pour l\'approbation...'
+                  : 'Raison du rejet...'
+                }
+                className="w-full p-3 border border-foreground/10 rounded-md resize-none h-20"
+              />
+            </div>
+            
+            <div className="flex gap-3 pt-4">
+              <button
+                onClick={() => setIsModalOpen(false)}
+                className="flex-1 px-4 py-2 border border-foreground/10 rounded-md hover:bg-foreground/5 transition-colors"
+              >
+                Annuler
+              </button>
+              
+              <LoadingButton
+                onClick={() => handleWithdrawalAction(modalAction)}
+                isLoading={isProcessingWithdrawal}
+                className={`flex-1 ${modalAction === 'approve' 
+                  ? 'bg-green-600 hover:bg-green-700' 
+                  : 'bg-red-600 hover:bg-red-700'
+                } text-white`}
+              >
+                {modalAction === 'approve' ? (
+                  <>
+                    <CheckCircle className="h-4 w-4 mr-2" />
+                    Approuver
+                  </>
+                ) : (
+                  <>
+                    <XCircle className="h-4 w-4 mr-2" />
+                    Rejeter
+                  </>
+                )}
+              </LoadingButton>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+    </div>
+  )
 }

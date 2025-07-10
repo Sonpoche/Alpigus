@@ -1,4 +1,4 @@
-// app/(protected)/dashboard/page.tsx - VERSION COMPLÈTE CORRIGÉE
+// app/(protected)/dashboard/page.tsx - VERSION COMPLÈTE CORRIGÉE POUR ÉVITER LES ERREURS 403 ADMIN
 'use client'
 
 import { useSession } from "next-auth/react"
@@ -140,21 +140,32 @@ export default function DashboardPage() {
  const [lowStockProducts, setLowStockProducts] = useState<any[]>([])
  const [upcomingDeliveries, setUpcomingDeliveries] = useState<any[]>([])
 
+ // ✅ FONCTION UTILITAIRE pour vérifier le rôle admin
+ const isAdmin = (role: string | null | undefined): boolean => {
+   return role === 'ADMIN'
+ }
+
  useEffect(() => {
-   // Redirection pour les administrateurs
-   if (session?.user?.role === UserRole.ADMIN) {
+   // ✅ CORRECTION : Redirection immédiate pour les administrateurs SANS appel API
+   if (isAdmin(session?.user?.role)) {
      router.push('/admin')
+     return // ✅ IMPORTANT : Arrêter l'exécution ici
    }
    
-   // Récupération des données de tableau de bord selon le rôle
+   // ✅ CORRECTION : Ne récupérer les données que pour les non-admins
    const fetchDashboardData = async () => {
+     // Double vérification pour éviter les appels API pour les admins
+     if (isAdmin(session?.user?.role)) {
+       return
+     }
+     
      setIsLoading(true)
      
      try {
        // Récupérer les statistiques selon le rôle
-       if (session?.user?.role === UserRole.PRODUCER) {
+       if (session?.user?.role === 'PRODUCER') {
          await fetchProducerData()
-       } else {
+       } else if (session?.user?.role === 'CLIENT') {
          await fetchClientData()
        }
        
@@ -170,7 +181,8 @@ export default function DashboardPage() {
      }
    }
    
-   if (session?.user) {
+   // ✅ CORRECTION : Vérifier le rôle avant d'exécuter les appels API
+   if (session?.user && !isAdmin(session.user.role)) {
      fetchDashboardData()
    }
  }, [session, router, toast])
@@ -642,7 +654,7 @@ export default function DashboardPage() {
 
  // Fonction pour obtenir les éléments du dashboard selon le rôle
  const getDashboardItems = () => {
-   if (session?.user?.role === UserRole.PRODUCER) {
+   if (session?.user?.role === 'PRODUCER') {
      return [
        {
          title: "Commandes en attente",
@@ -718,7 +730,7 @@ export default function DashboardPage() {
  
  // Obtenir les liens rapides selon le rôle
  const getQuickLinks = () => {
-   if (session?.user?.role === UserRole.PRODUCER) {
+   if (session?.user?.role === 'PRODUCER') {
      return [
        {
          title: "Ajouter un produit",
@@ -772,7 +784,7 @@ export default function DashboardPage() {
 
  // Rendu conditionnel des widgets supplémentaires selon le rôle
  const renderRoleSpecificWidgets = () => {
-   if (session?.user?.role === UserRole.PRODUCER) {
+   if (session?.user?.role === 'PRODUCER') {
      return (
        <>
          {/* Alertes de stock bas */}
@@ -812,6 +824,18 @@ export default function DashboardPage() {
    }
    
    return null
+ }
+
+ // ✅ CORRECTION : Affichage de chargement pour les admins pendant la redirection
+ if (isAdmin(session?.user?.role)) {
+   return (
+     <div className="flex justify-center items-center min-h-[400px]">
+       <div className="text-center">
+         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-custom-accent mx-auto mb-4" />
+         <p className="text-muted-foreground">Redirection vers l'administration...</p>
+       </div>
+     </div>
+   )
  }
 
  if (isLoading) {
@@ -874,7 +898,7 @@ export default function DashboardPage() {
          <div className={cardClasses("shadow-sm overflow-hidden")}>
            <div className="px-4 sm:px-6 py-3 sm:py-4 border-b border-foreground/10 flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2">
              <h2 className="font-semibold text-base sm:text-lg">Activités récentes</h2>
-             <Link href={session?.user?.role === UserRole.PRODUCER ? "/producer/orders" : "/orders"} className="text-xs sm:text-sm text-custom-accent hover:underline">
+             <Link href={session?.user?.role === 'PRODUCER' ? "/producer/orders" : "/orders"} className="text-xs sm:text-sm text-custom-accent hover:underline">
                Voir tout
              </Link>
            </div>
@@ -946,7 +970,7 @@ export default function DashboardPage() {
                    <Badge variant="success" className="text-xs self-start sm:self-auto">Confirmée</Badge>
                  </div>
                  <p className="text-xs text-muted-foreground line-clamp-2">
-                   {session?.user?.role === UserRole.PRODUCER
+                   {session?.user?.role === 'PRODUCER'
                      ? `Produit frais: ${(upcomingDeliveries[0].maxCapacity || 0) - (upcomingDeliveries[0].reserved || 0)} ${upcomingDeliveries[0].product?.unit || ''} disponible de ${upcomingDeliveries[0].product?.name || ''}`
                      : `Produit frais réservé: ${upcomingDeliveries[0].booking?.quantity || ''} ${upcomingDeliveries[0].product?.unit || ''} de ${upcomingDeliveries[0].product?.name || ''}`
                    }
