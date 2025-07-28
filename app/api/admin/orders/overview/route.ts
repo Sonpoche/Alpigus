@@ -1,48 +1,68 @@
-// app/api/admin/orders/overview/route.ts - CORRECTION pour exclure les DRAFT
+// app/api/admin/orders/overview/route.ts - Version sécurisée
 import { NextRequest, NextResponse } from "next/server"
+import { withAdminSecurity, validateData } from "@/lib/api-security"
 import { prisma } from "@/lib/prisma"
-import { apiAuthMiddleware } from "@/lib/api-middleware"
-import { Session } from "next-auth"
 import { Prisma, OrderStatus } from "@prisma/client"
+import { z } from "zod"
 
-export const GET = apiAuthMiddleware(
-  async (
-    req: NextRequest,
-    session: Session
-  ) => {
-    try {
-      // Vérifier que l'utilisateur est admin
-      if (session.user.role !== 'ADMIN') {
-        return new NextResponse("Non autorisé", { status: 403 })
-      }
-      
-      // Période à analyser (30 derniers jours par défaut)
-      const searchParams = new URL(req.url).searchParams
-      const days = parseInt(searchParams.get('days') || '30')
-      const page = parseInt(searchParams.get('page') || '1')
-      const limit = parseInt(searchParams.get('limit') || '10')
-      const search = searchParams.get('search') || ''
-      
-      const dateLimit = new Date()
-      dateLimit.setDate(dateLimit.getDate() - days)
-      
-      console.log("Début du traitement de l'API orders/overview");
-      
-      // ✅ CORRECTION: ÉTAPE 1 - Statistiques de base SANS les DRAFT
-      console.log("Récupération des statistiques de base des commandes (sans DRAFT)");
-      
+// Schéma de validation pour les paramètres de requête
+const overviewQuerySchema = z.object({
+  days: z.coerce.number().min(1).max(365),
+  page: z.coerce.number().min(1),
+  limit: z.coerce.number().min(1).max(100),
+  search: z.string().max(100).optional()
+})
+
+// Valeurs par défaut
+const defaultParams = {
+  days: 30,
+  page: 1,
+  limit: 10,
+  search: ''
+}
+
+export const GET = withAdminSecurity(async (
+  request: NextRequest,
+  session
+) => {
+  try {
+    console.log(`📊 Admin ${session.user.id} consulte l'aperçu des commandes`)
+    
+    // Validation des paramètres de requête
+    const { searchParams } = new URL(request.url)
+    const queryParams = Object.fromEntries(searchParams.entries())
+    
+    // Appliquer les valeurs par défaut
+    const parsedParams = {
+      days: queryParams.days || defaultParams.days.toString(),
+      page: queryParams.page || defaultParams.page.toString(),
+      limit: queryParams.limit || defaultParams.limit.toString(),
+      search: queryParams.search || defaultParams.search
+    }
+    
+    const { days, page, limit, search } = validateData(overviewQuerySchema, parsedParams)
+    
+    // Calculer la date limite
+    const dateLimit = new Date()
+    dateLimit.setDate(dateLimit.getDate() - days)
+    
+    console.log(`📅 Récupération des commandes des ${days} derniers jours`)
+    
+    // ÉTAPE 1 - Statistiques de base SANS les DRAFT
+    console.log("📈 Calcul des statistiques de base...")
+    
+    const [totalOrders, ordersByStatus] = await Promise.all([
       // Total des commandes (SANS les DRAFT)
-      const totalOrders = await prisma.order.count({
+      prisma.order.count({
         where: {
           status: {
             not: OrderStatus.DRAFT
           }
         }
-      });
-      console.log(`Total des commandes (sans DRAFT): ${totalOrders}`);
+      }),
       
-      // ✅ CORRECTION: Commandes par statut (SANS les DRAFT)
-      const ordersByStatus = await prisma.order.groupBy({
+      // Commandes par statut (SANS les DRAFT)
+      prisma.order.groupBy({
         by: ['status'],
         where: {
           status: {
@@ -52,158 +72,178 @@ export const GET = apiAuthMiddleware(
         _count: {
           id: true
         }
-      });
-      console.log("Commandes par statut récupérées (sans DRAFT):", ordersByStatus);
-      
-      // ✅ CORRECTION: Préparation de la recherche avec exclusion des DRAFT
-      let whereClause: Prisma.OrderWhereInput = {
-        createdAt: {
-          gte: dateLimit
-        },
-        // Exclure explicitement les DRAFT
-        status: {
-          not: OrderStatus.DRAFT
-        }
-      };
-      
-      // Ajouter un filtre de recherche si un terme est fourni
-      if (search) {
-        whereClause = {
-          ...whereClause,
-          OR: [
-            { 
-              id: {
-                contains: search
-              }
-            },
-            {
-              user: {
-                OR: [
-                  { name: { contains: search } },
-                  { email: { contains: search } }
-                ]
-              }
-            }
-          ]
-        };
+      })
+    ])
+    
+    console.log(`📊 Total commandes (sans DRAFT): ${totalOrders}`)
+    
+    // ÉTAPE 2 - Préparation de la recherche avec exclusion des DRAFT
+    let whereClause: Prisma.OrderWhereInput = {
+      createdAt: {
+        gte: dateLimit
+      },
+      // Exclure explicitement les DRAFT
+      status: {
+        not: OrderStatus.DRAFT
       }
-      
-      // ✅ CORRECTION: Commandes récentes avec pagination (SANS les DRAFT)
-      console.log("Récupération des commandes avec pagination et recherche (sans DRAFT)");
-      const skip = (page - 1) * limit;
-      
-      const orders = await prisma.order.findMany({
+    }
+    
+    // Ajouter un filtre de recherche sécurisé si un terme est fourni
+    if (search && search.trim()) {
+      const searchTerm = search.trim()
+      whereClause = {
+        ...whereClause,
+        OR: [
+          { 
+            id: {
+              contains: searchTerm,
+              mode: 'insensitive'
+            }
+          },
+          {
+            user: {
+              OR: [
+                { name: { contains: searchTerm, mode: 'insensitive' } },
+                { email: { contains: searchTerm, mode: 'insensitive' } }
+              ]
+            }
+          }
+        ]
+      }
+    }
+    
+    // ÉTAPE 3 - Commandes récentes avec pagination sécurisée
+    console.log("📝 Récupération des commandes avec pagination...")
+    const skip = (page - 1) * limit
+    
+    const [orders, totalFilteredOrders] = await Promise.all([
+      prisma.order.findMany({
         where: whereClause,
-        orderBy: {
-          createdAt: 'desc'
-        },
-        skip,
-        take: limit,
-        include: {
+        select: {
+          id: true,
+          createdAt: true,
+          status: true,
+          total: true,
           user: {
             select: {
               name: true,
               email: true
             }
           },
-          items: true
-        }
-      });
-      
-      // Nombre total de commandes correspondant à la recherche (SANS les DRAFT)
-      const totalFilteredOrders = await prisma.order.count({
-        where: whereClause
-      });
-      
-      // Nombre total de pages
-      const totalPages = Math.ceil(totalFilteredOrders / limit);
-      
-      console.log(`${orders.length} commandes récupérées sur ${totalFilteredOrders} au total (sans DRAFT)`);
-      
-      // ✅ CORRECTION: ÉTAPE 2 - Commandes nécessitant attention (SANS les DRAFT)
-      console.log("Récupération des commandes nécessitant attention (sans DRAFT)");
-      const ordersNeedingAttention = await prisma.order.findMany({
-        where: {
-          AND: [
-            // Exclure les DRAFT
-            {
-              status: {
-                not: OrderStatus.DRAFT
-              }
-            },
-            // Conditions d'attention
-            {
-              OR: [
-                { 
-                  status: OrderStatus.PENDING, 
-                  createdAt: { 
-                    lte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) 
-                  } 
-                }
-              ]
-            }
-          ]
-        },
-        include: {
-          user: {
+          items: {
             select: {
-              name: true,
-              email: true
+              id: true
             }
           }
         },
         orderBy: {
-          createdAt: 'asc'
+          createdAt: 'desc'
         },
-        take: 10
-      });
-      console.log(`${ordersNeedingAttention.length} commandes nécessitant attention récupérées (sans DRAFT)`);
+        skip,
+        take: limit
+      }),
       
-      // Préparation de la réponse
-      console.log("Préparation de la réponse");
-      return NextResponse.json({
-        overview: {
-          totalOrders,
-          ordersByStatus
-        },
-        orders: orders.map(order => ({
-          id: order.id,
-          createdAt: order.createdAt,
-          status: order.status,
-          total: order.total,
-          customer: order.user ? {
-            name: order.user.name,
-            email: order.user.email
-          } : null,
-          items: order.items.length
-        })),
-        pagination: {
-          page,
-          limit,
-          total: totalFilteredOrders,
-          pages: totalPages
-        },
-        ordersNeedingAttention: ordersNeedingAttention.map(order => ({
-          id: order.id,
-          createdAt: order.createdAt,
-          status: order.status,
-          total: order.total,
-          customer: order.user ? {
-            name: order.user.name,
-            email: order.user.email
-          } : null,
-          issueType: 'Commande en attente depuis longtemps'
+      prisma.order.count({
+        where: whereClause
+      })
+    ])
+    
+    const totalPages = Math.ceil(totalFilteredOrders / limit)
+    console.log(`📄 ${orders.length} commandes récupérées (page ${page}/${totalPages})`)
+    
+    // ÉTAPE 4 - Commandes nécessitant attention (SANS les DRAFT)
+    console.log("⚠️ Identification des commandes nécessitant attention...")
+    const ordersNeedingAttention = await prisma.order.findMany({
+      where: {
+        AND: [
+          // Exclure les DRAFT
+          {
+            status: {
+              not: OrderStatus.DRAFT
+            }
+          },
+          // Conditions d'attention
+          {
+            OR: [
+              { 
+                status: OrderStatus.PENDING, 
+                createdAt: { 
+                  lte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) 
+                } 
+              }
+              // Ajouter d'autres conditions d'attention ici si nécessaire
+            ]
+          }
+        ]
+      },
+      select: {
+        id: true,
+        createdAt: true,
+        status: true,
+        total: true,
+        user: {
+          select: {
+            name: true,
+            email: true
+          }
+        }
+      },
+      orderBy: {
+        createdAt: 'asc'
+      },
+      take: 10
+    })
+    
+    console.log(`⚠️ ${ordersNeedingAttention.length} commandes nécessitent attention`)
+    
+    // ÉTAPE 5 - Préparation de la réponse sécurisée
+    const response = {
+      overview: {
+        totalOrders,
+        ordersByStatus: ordersByStatus.map(item => ({
+          status: item.status,
+          count: item._count.id
         }))
-      });
-    } catch (error) {
-      // Log détaillé de l'erreur
-      console.error("Erreur détaillée lors de la récupération de l'aperçu des commandes:", error);
-      console.error("Stack trace:", error instanceof Error ? error.stack : "No stack trace available");
-      
-      return new NextResponse("Erreur lors de la récupération de l'aperçu des commandes", { 
-        status: 500 
-      });
+      },
+      orders: orders.map(order => ({
+        id: order.id,
+        createdAt: order.createdAt,
+        status: order.status,
+        total: order.total,
+        customer: order.user ? {
+          name: order.user.name,
+          email: order.user.email
+        } : null,
+        items: order.items.length
+      })),
+      pagination: {
+        page,
+        limit,
+        total: totalFilteredOrders,
+        pages: totalPages
+      },
+      ordersNeedingAttention: ordersNeedingAttention.map(order => ({
+        id: order.id,
+        createdAt: order.createdAt,
+        status: order.status,
+        total: order.total,
+        customer: order.user ? {
+          name: order.user.name,
+          email: order.user.email
+        } : null,
+        issueType: 'Commande en attente depuis longtemps'
+      })),
+      filters: {
+        days,
+        search: search || null
+      }
     }
-  },
-  ["ADMIN"] // Seuls les admins peuvent accéder à cet endpoint
-);
+    
+    console.log(`✅ Aperçu des commandes généré avec succès`)
+    return NextResponse.json(response)
+    
+  } catch (error) {
+    console.error("❌ Erreur lors de la récupération de l'aperçu des commandes:", error)
+    throw error
+  }
+})

@@ -1,166 +1,245 @@
-// app/api/admin/users/route.ts
+// app/api/admin/users/route.ts - Version sécurisée
 import { NextRequest, NextResponse } from "next/server"
+import { withAdminSecurity, validateData } from "@/lib/api-security"
 import { prisma } from "@/lib/prisma"
-import { apiAuthMiddleware } from "@/lib/api-middleware"
-import { Session } from "next-auth"
+import { EmailService } from "@/lib/email-service"
+import { createError } from "@/lib/error-handler"
 import { hash } from "bcrypt"
 import { isValidPhoneNumber } from 'libphonenumber-js'
 import { UserRole } from "@prisma/client"
-import { EmailService } from "@/lib/email-service"
+import { z } from "zod"
+import crypto from "crypto"
 
-// GET: Récupérer tous les utilisateurs
-export const GET = apiAuthMiddleware(async (
-  req: NextRequest,
-  session: Session
+// Schémas de validation
+const createUserSchema = z.object({
+  name: z.string().min(2, 'Nom trop court').max(100, 'Nom trop long').optional(),
+  email: z.string().email('Email invalide').max(255, 'Email trop long'),
+  phone: z.string().min(6, 'Téléphone trop court').max(20, 'Téléphone trop long'),
+  role: z.nativeEnum(UserRole, {
+    errorMap: () => ({ message: 'Rôle invalide' })
+  })
+}).strict()
+
+const getUsersQuerySchema = z.object({
+  page: z.coerce.number().min(1),
+  limit: z.coerce.number().min(1).max(100),
+  role: z.nativeEnum(UserRole).optional(),
+  search: z.string().max(100).optional()
+})
+
+// Valeurs par défaut
+const defaultPagination = {
+  page: 1,
+  limit: 20
+}
+
+// GET: Récupérer tous les utilisateurs avec pagination et filtres
+export const GET = withAdminSecurity(async (
+  request: NextRequest,
+  session
 ) => {
   try {
-    // Vérifier que l'utilisateur est admin
-    if (session.user.role !== 'ADMIN') {
-      return new NextResponse("Non autorisé", { status: 403 })
+    console.log(`👥 Admin ${session.user.id} consulte la liste des utilisateurs`)
+    
+    // Validation et extraction des paramètres de requête
+    const { searchParams } = new URL(request.url)
+    const queryParams = Object.fromEntries(searchParams.entries())
+    
+    // Appliquer les valeurs par défaut manuellement
+    const parsedParams = {
+      page: queryParams.page || defaultPagination.page.toString(),
+      limit: queryParams.limit || defaultPagination.limit.toString(),
+      role: queryParams.role,
+      search: queryParams.search
     }
+    
+    const { page, limit, role, search } = validateData(getUsersQuerySchema, parsedParams)
+    
+    // Construction de la requête avec filtres sécurisés
+    const where: any = {}
+    
+    if (role) {
+      where.role = role
+    }
+    
+    if (search && search.trim()) {
+      const searchTerm = search.trim()
+      where.OR = [
+        { name: { contains: searchTerm, mode: 'insensitive' } },
+        { email: { contains: searchTerm, mode: 'insensitive' } }
+      ]
+    }
+    
+    // Exécution des requêtes en parallèle pour optimiser les performances
+    const [users, totalCount] = await Promise.all([
+      prisma.user.findMany({
+        where,
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          phone: true,
+          role: true,
+          profileCompleted: true,
+          createdAt: true,
+          updatedAt: true,
+          producer: {
+            select: {
+              id: true,
+              companyName: true
+            }
+          },
+          // Statistiques utiles pour l'admin
+          _count: {
+            select: {
+              orders: true,
+              notifications: true
+            }
+          }
+        },
+        orderBy: {
+          createdAt: 'desc'
+        },
+        skip: (page - 1) * limit,
+        take: limit
+      }),
+      prisma.user.count({ where })
+    ])
+    
+    console.log(`✅ ${users.length} utilisateurs récupérés (page ${page}/${Math.ceil(totalCount / limit)})`)
+    
+    return NextResponse.json({
+      users,
+      pagination: {
+        page,
+        limit,
+        total: totalCount,
+        pages: Math.ceil(totalCount / limit)
+      },
+      filters: {
+        role: role || null,
+        search: search || null
+      }
+    })
+    
+  } catch (error) {
+    console.error("❌ Erreur récupération utilisateurs:", error)
+    throw error
+  }
+})
 
-    const users = await prisma.user.findMany({
-      include: {
-        producer: {
+// POST: Créer un nouvel utilisateur
+export const POST = withAdminSecurity(async (
+  request: NextRequest,
+  session
+) => {
+  try {
+    // Validation stricte des données d'entrée
+    const rawData = await request.json()
+    const { name, email, phone, role } = validateData(createUserSchema, rawData)
+    
+    console.log(`👤 Admin ${session.user.id} crée un utilisateur ${role}: ${email}`)
+    
+    // Vérification unicité email
+    const existingUser = await prisma.user.findUnique({
+      where: { email },
+      select: { id: true, email: true }
+    })
+    
+    if (existingUser) {
+      throw createError.conflict("Cet email est déjà utilisé")
+    }
+    
+    // Validation et normalisation du téléphone
+    let normalizedPhone = phone.trim()
+    
+    if (!normalizedPhone.startsWith('+')) {
+      // Validation basique pour numéros locaux
+      const localPhoneRegex = /^[0-9\s\-\(\)]{6,15}$/
+      if (!localPhoneRegex.test(normalizedPhone)) {
+        throw createError.validation(
+          "Format de téléphone invalide. Utilisez l'indicatif pays (+41) pour les numéros internationaux"
+        )
+      }
+    } else {
+      // Validation stricte avec indicatif pays
+      try {
+        const cleanPhone = normalizedPhone.replace(/\s+/g, '').replace(/[-()]/g, '')
+        if (!isValidPhoneNumber(cleanPhone)) {
+          throw createError.validation("Numéro de téléphone invalide")
+        }
+        normalizedPhone = cleanPhone
+      } catch (e) {
+        throw createError.validation("Format de téléphone invalide")
+      }
+    }
+    
+    // Génération mot de passe temporaire sécurisé
+    const tempPassword = crypto.randomBytes(12).toString('base64').slice(0, 12)
+    const hashedPassword = await hash(tempPassword, 12)
+    
+    // Transaction atomique pour créer l'utilisateur et ses dépendances
+    const user = await prisma.$transaction(async (tx) => {
+      // Créer l'utilisateur
+      const newUser = await tx.user.create({
+        data: {
+          email: email.trim().toLowerCase(),
+          name: name?.trim() || null,
+          password: hashedPassword,
+          role: role,
+          phone: normalizedPhone,
+          profileCompleted: false // Forcer l'onboarding
+        },
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          phone: true,
+          role: true,
+          profileCompleted: true,
+          createdAt: true
+        }
+      })
+      
+      // Si c'est un producteur, créer le profil producteur
+      let producerProfile = null
+      if (role === UserRole.PRODUCER) {
+        producerProfile = await tx.producer.create({
+          data: {
+            userId: newUser.id,
+            companyName: '',
+            description: '',
+            address: ''
+          },
           select: {
             id: true,
             companyName: true
           }
-        }
-      },
-      orderBy: {
-        createdAt: 'desc'
-      }
-    })
-
-    return NextResponse.json(users)
-  } catch (error) {
-    console.error("Erreur lors de la récupération des utilisateurs:", error)
-    return new NextResponse(
-      "Erreur lors de la récupération des utilisateurs", 
-      { status: 500 }
-    )
-  }
-}, ["ADMIN"])
-
-// POST: Créer un nouvel utilisateur
-export const POST = apiAuthMiddleware(async (
-  req: NextRequest,
-  session: Session
-) => {
-  try {
-    // Vérifier que l'utilisateur est admin
-    if (session.user.role !== 'ADMIN') {
-      return new NextResponse("Non autorisé", { status: 403 })
-    }
-
-    const { name, email, phone, role } = await req.json()
-
-    // Validation - Email ET téléphone obligatoires
-    if (!email || !role || !phone) {
-      return new NextResponse("Email, téléphone et rôle sont requis", { status: 400 })
-    }
-
-    // Validation format téléphone
-    if (!phone.trim()) {
-      return new NextResponse("Le téléphone ne peut pas être vide", { status: 400 })
-    }
-
-    // Vérifier si l'email est déjà utilisé
-    const existingUser = await prisma.user.findUnique({
-      where: { email }
-    })
-
-    if (existingUser) {
-      return new NextResponse("Cet email est déjà utilisé", { status: 400 })
-    }
-
-    // Validation téléphone flexible pour tous les pays
-    let normalizedPhone = phone.trim()
-
-    // Si le numéro ne commence pas par +, validation basique
-    if (!normalizedPhone.startsWith('+')) {
-      // Pour les numéros sans indicatif, validation simple
-      const localPhoneRegex = /^[0-9\s\-\(\)]{6,15}$/
-      if (!localPhoneRegex.test(normalizedPhone)) {
-        return new NextResponse(
-          "Format de téléphone invalide. Utilisez l'indicatif pays pour les numéros internationaux (ex: +41791234567)", 
-          { status: 400 }
-        )
-      }
-    } else {
-      // Si l'indicatif est présent, valider avec libphonenumber-js
-      try {
-        const cleanPhone = normalizedPhone.replace(/\s+/g, '').replace(/[-()]/g, '')
-        
-        if (!isValidPhoneNumber(cleanPhone)) {
-          return new NextResponse(
-            "Numéro de téléphone invalide pour l'indicatif pays spécifié", 
-            { status: 400 }
-          )
-        }
-        
-        // Utiliser le numéro validé
-        normalizedPhone = cleanPhone
-      } catch (e) {
-        return new NextResponse(
-          "Format de téléphone invalide", 
-          { status: 400 }
-        )
-      }
-    }
-
-    // Vérifier si le rôle est valide
-    if (!Object.values(UserRole).includes(role as UserRole)) {
-      return new NextResponse("Rôle invalide", { status: 400 })
-    }
-
-    // Générer un mot de passe temporaire
-    const tempPassword = Math.random().toString(36).slice(-8)
-    const hashedPassword = await hash(tempPassword, 12)
-
-    // Créer l'utilisateur avec téléphone flexible
-    const user = await prisma.user.create({
-      data: {
-        email: email.trim(),
-        name: name?.trim() || null,
-        password: hashedPassword,
-        role: role as UserRole,
-        phone: normalizedPhone,
-        profileCompleted: false, // ✅ NOUVEAU - Forcer l'onboarding pour les utilisateurs invités
-        // Si c'est un producteur, créer aussi l'entrée Producer
-        ...(role === UserRole.PRODUCER && {
-          producer: {
-            create: {
-              companyName: '',
-              description: '',
-              address: ''
-            }
-          }
         })
-      },
-      include: {
-        producer: true
+      }
+      
+      return {
+        ...newUser,
+        producer: producerProfile
       }
     })
-
-    // Envoyer email d'invitation avec mot de passe temporaire
+    
+    // Envoi email d'invitation (non bloquant)
     let emailSent = false
     try {
       await EmailService.sendInvitationEmail(
-        email, 
-        name || 'Utilisateur', 
+        email,
+        name || 'Utilisateur',
         tempPassword,
-        role as UserRole
-      );
-      console.log(`Email d'invitation envoyé avec succès à ${email}`);
+        role
+      )
       emailSent = true
+      console.log(`📧 Email d'invitation envoyé à ${email}`)
     } catch (emailError) {
-      console.error('Erreur lors de l\'envoi de l\'email d\'invitation:', emailError);
-      // On continue malgré l'erreur d'email
+      console.error('⚠️ Erreur envoi email (non critique):', emailError)
     }
-
-    // Créer une entrée dans les logs admin
+    
+    // Log d'audit détaillé
     try {
       await prisma.adminLog.create({
         data: {
@@ -169,33 +248,31 @@ export const POST = apiAuthMiddleware(async (
           entityType: 'User',
           entityId: user.id,
           details: JSON.stringify({
-            action: `Création d'un utilisateur ${role}: ${email}`,
             userEmail: email,
             userName: name,
             userRole: role,
-            emailSent: emailSent
+            emailSent,
+            hasPhone: !!phone,
+            timestamp: new Date().toISOString()
           })
         }
       })
     } catch (logError) {
-      console.error('Erreur lors de la création du log admin:', logError)
-      // Ne pas faire échouer la création pour un problème de log
+      console.error('⚠️ Erreur log admin (non critique):', logError)
     }
-
-    // Retirer le mot de passe de la réponse
-    const { password, ...userWithoutPassword } = user
-
+    
+    console.log(`✅ Utilisateur créé avec succès: ${user.id}`)
+    
     return NextResponse.json({
-      ...userWithoutPassword,
+      ...user,
       message: emailSent 
         ? "Utilisateur créé avec succès. Email d'invitation envoyé."
-        : "Utilisateur créé avec succès. Erreur lors de l'envoi de l'email."
+        : "Utilisateur créé avec succès. Erreur lors de l'envoi de l'email.",
+      emailSent
     })
+    
   } catch (error) {
-    console.error("Erreur lors de la création de l'utilisateur:", error)
-    return new NextResponse(
-      "Erreur lors de la création de l'utilisateur: " + (error instanceof Error ? error.message : 'Erreur inconnue'), 
-      { status: 500 }
-    )
+    console.error("❌ Erreur création utilisateur:", error)
+    throw error
   }
-}, ["ADMIN"])
+})

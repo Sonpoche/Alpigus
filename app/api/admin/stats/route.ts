@@ -1,52 +1,56 @@
-// app/api/admin/stats/route.ts - CODE COMPLET CORRIGÉ
+// app/api/admin/stats/route.ts - Version sécurisée
 import { NextRequest, NextResponse } from "next/server"
+import { withAdminSecurity } from "@/lib/api-security"
 import { prisma } from "@/lib/prisma"
-import { apiAuthMiddleware } from "@/lib/api-middleware"
-import { Session } from "next-auth"
 import { ProductType, Prisma, OrderStatus } from "@prisma/client"
 
-export const GET = apiAuthMiddleware(
-  async (
-    req: NextRequest,
-    session: Session
-  ) => {
-    try {
-      // Vérifier que l'utilisateur est admin
-      if (session.user.role !== 'ADMIN') {
-        return new NextResponse("Non autorisé", { status: 403 })
-      }
-
-      // --- Statistiques des utilisateurs ---
-      const totalUsers = await prisma.user.count();
+export const GET = withAdminSecurity(async (
+  request: NextRequest,
+  session
+) => {
+  try {
+    console.log(`📊 Admin ${session.user.id} consulte les statistiques générales`)
+    
+    // --- ÉTAPE 1: Statistiques des utilisateurs ---
+    console.log("👥 Calcul des statistiques utilisateurs...")
+    
+    const thirtyDaysAgo = new Date()
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30)
+    
+    const [totalUsers, usersByRole, newUsers] = await Promise.all([
+      prisma.user.count(),
       
-      const usersByRole = await prisma.user.groupBy({
+      prisma.user.groupBy({
         by: ['role'],
         _count: {
           id: true
         }
-      });
+      }),
       
-      const thirtyDaysAgo = new Date();
-      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-      
-      const newUsers = await prisma.user.count({
+      prisma.user.count({
         where: {
           createdAt: {
             gte: thirtyDaysAgo
           }
         }
-      });
-      
-      // --- Statistiques des commandes (SANS les DRAFT) ---
-      const totalOrders = await prisma.order.count({
+      })
+    ])
+    
+    console.log(`👥 ${totalUsers} utilisateurs au total, ${newUsers} nouveaux ce mois`)
+    
+    // --- ÉTAPE 2: Statistiques des commandes (SANS les DRAFT) ---
+    console.log("🛒 Calcul des statistiques commandes...")
+    
+    const [totalOrders, ordersByStatus, newOrders, totalOrdersValue] = await Promise.all([
+      prisma.order.count({
         where: {
           status: {
             not: OrderStatus.DRAFT
           }
         }
-      });
+      }),
       
-      const ordersByStatus = await prisma.order.groupBy({
+      prisma.order.groupBy({
         by: ['status'],
         where: {
           status: {
@@ -56,9 +60,9 @@ export const GET = apiAuthMiddleware(
         _count: {
           id: true
         }
-      });
+      }),
       
-      const newOrders = await prisma.order.count({
+      prisma.order.count({
         where: {
           AND: [
             {
@@ -73,9 +77,9 @@ export const GET = apiAuthMiddleware(
             }
           ]
         }
-      });
+      }),
       
-      const totalOrdersValue = await prisma.order.aggregate({
+      prisma.order.aggregate({
         where: {
           status: {
             not: OrderStatus.DRAFT
@@ -84,209 +88,244 @@ export const GET = apiAuthMiddleware(
         _sum: {
           total: true
         }
-      });
+      })
+    ])
+    
+    console.log(`🛒 ${totalOrders} commandes (sans DRAFT), valeur totale: ${totalOrdersValue._sum?.total || 0} CHF`)
+    
+    // --- ÉTAPE 3: Statistiques des produits ---
+    console.log("📦 Calcul des statistiques produits...")
+    
+    const [totalProducts, productsByType] = await Promise.all([
+      prisma.product.count(),
       
-      // --- Statistiques des produits ---
-      const totalProducts = await prisma.product.count();
-      
-      const productsByType = await prisma.product.groupBy({
+      prisma.product.groupBy({
         by: ['type'],
         _count: {
           id: true
         }
-      });
-      
-      // ✅ Top produits avec calcul correct et simple
-      const topProductsRaw = await prisma.orderItem.groupBy({
-        by: ['productId'],
-        where: {
-          order: {
-            status: {
-              not: OrderStatus.DRAFT
-            }
+      })
+    ])
+    
+    console.log(`📦 ${totalProducts} produits au total`)
+    
+    // --- ÉTAPE 4: Top produits avec calcul optimisé ---
+    console.log("🏆 Calcul du top des produits...")
+    
+    const topProductsRaw = await prisma.orderItem.groupBy({
+      by: ['productId'],
+      where: {
+        order: {
+          status: {
+            not: OrderStatus.DRAFT
           }
-        },
-        _count: {
-          id: true
-        },
+        }
+      },
+      _count: {
+        id: true
+      },
+      _sum: {
+        quantity: true
+      },
+      orderBy: {
         _sum: {
-          quantity: true
-        },
-        orderBy: {
-          _sum: {
-            quantity: 'desc'
-          }
-        },
-        take: 10
-      });
-
-      // ✅ Mapping simplifié et direct
-      const topProductsWithDetails = [];
-
-      for (const item of topProductsRaw) {
-        if (!item._sum.quantity || item._sum.quantity <= 0) continue;
-        
-        const product = await prisma.product.findUnique({
-          where: { id: item.productId },
-          select: { 
-            id: true,
-            name: true, 
-            type: true,
-            unit: true 
-          }
-        });
-        
-        if (!product) continue;
-        
-        // Compter le nombre de commandes uniques pour ce produit
-        const uniqueOrders = await prisma.order.count({
-          where: {
-            AND: [
-              {
-                status: {
-                  not: OrderStatus.DRAFT
-                }
-              },
-              {
-                items: {
-                  some: {
-                    productId: item.productId
+          quantity: 'desc'
+        }
+      },
+      take: 10
+    })
+    
+    // Enrichir les données des produits de manière optimisée
+    const topProductsWithDetails = await Promise.all(
+      topProductsRaw
+        .filter(item => item._sum.quantity && item._sum.quantity > 0)
+        .map(async (item) => {
+          // Récupérer les détails du produit
+          const product = await prisma.product.findUnique({
+            where: { id: item.productId },
+            select: { 
+              id: true,
+              name: true, 
+              type: true,
+              unit: true 
+            }
+          })
+          
+          if (!product) return null
+          
+          // Compter le nombre de commandes uniques pour ce produit
+          const uniqueOrders = await prisma.order.count({
+            where: {
+              AND: [
+                {
+                  status: {
+                    not: OrderStatus.DRAFT
+                  }
+                },
+                {
+                  items: {
+                    some: {
+                      productId: item.productId
+                    }
                   }
                 }
-              }
-            ]
+              ]
+            }
+          })
+          
+          return {
+            id: item.productId,
+            name: product.name,
+            type: product.type,
+            unit: product.unit,
+            totalQuantity: item._sum.quantity!,
+            totalOrders: uniqueOrders,
+            orderItems: item._count.id
           }
-        });
-        
-        // ✅ Structure finale correcte
-        const productData = {
-          id: item.productId,
-          name: product.name,
-          type: product.type,
-          unit: product.unit,
-          totalQuantity: item._sum.quantity, // ✅ Quantité totale commandée
-          totalOrders: uniqueOrders, // ✅ Nombre de commandes uniques
-          orderItems: item._count.id // ✅ Nombre de lignes de commande
-        };
-        
-        topProductsWithDetails.push(productData);
+        })
+    )
+    
+    const topProducts = topProductsWithDetails
+      .filter(Boolean)
+      .slice(0, 5)
+    
+    console.log(`🏆 Top 5 produits calculé`)
+    
+    // --- ÉTAPE 5: Commandes par type de produit ---
+    console.log("📊 Calcul des commandes par type de produit...")
+    
+    const ordersByProductTypeRaw = await prisma.orderItem.groupBy({
+      by: ['productId'],
+      where: {
+        order: {
+          status: {
+            not: OrderStatus.DRAFT
+          }
+        }
+      },
+      _count: {
+        id: true
       }
-
-      const topProducts = topProductsWithDetails.slice(0, 5);
+    })
+    
+    // Regrouper par type de produit de manière optimisée
+    const productTypes = await prisma.product.findMany({
+      where: {
+        id: {
+          in: ordersByProductTypeRaw.map(item => item.productId)
+        }
+      },
+      select: {
+        id: true,
+        type: true
+      }
+    })
+    
+    const ordersByProductTypeMap: Record<string, number> = {}
+    
+    ordersByProductTypeRaw.forEach(item => {
+      const product = productTypes.find(p => p.id === item.productId)
+      const productType = product?.type || 'Inconnu'
       
-      // ✅ Commandes par type de produit avec meilleure logique
-      const ordersByProductTypeRaw = await prisma.orderItem.groupBy({
-        by: ['productId'],
-        where: {
-          order: {
+      if (!ordersByProductTypeMap[productType]) {
+        ordersByProductTypeMap[productType] = 0
+      }
+      
+      ordersByProductTypeMap[productType] += item._count.id
+    })
+    
+    const ordersByProductTypeArray = Object.entries(ordersByProductTypeMap).map(([type, count]) => ({
+      type,
+      count
+    }))
+    
+    // --- ÉTAPE 6: Ventes mensuelles (SANS les DRAFT) ---
+    console.log("📈 Calcul des ventes mensuelles...")
+    
+    const sixMonthsAgo = new Date()
+    sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6)
+    
+    const orders = await prisma.order.findMany({
+      where: {
+        AND: [
+          {
+            createdAt: {
+              gte: sixMonthsAgo
+            }
+          },
+          {
             status: {
               not: OrderStatus.DRAFT
             }
           }
-        },
-        _count: {
-          id: true
-        },
-        _sum: {
-          quantity: true
-        }
-      });
+        ]
+      },
+      select: {
+        createdAt: true,
+        total: true
+      },
+      orderBy: {
+        createdAt: 'asc'
+      }
+    })
+    
+    const salesByMonthMap: Record<string, number> = {}
+    
+    orders.forEach(order => {
+      const date = new Date(order.createdAt)
+      const month = date.toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' })
       
-      // Regrouper par type de produit
-      const ordersByProductTypeMap: Record<string, number> = {};
-      
-      for (const item of ordersByProductTypeRaw) {
-        const product = await prisma.product.findUnique({
-          where: { id: item.productId },
-          select: { type: true }
-        });
-        
-        const productType = product?.type || 'Inconnu';
-        
-        if (!ordersByProductTypeMap[productType]) {
-          ordersByProductTypeMap[productType] = 0;
-        }
-        
-        ordersByProductTypeMap[productType] += item._count.id;
+      if (!salesByMonthMap[month]) {
+        salesByMonthMap[month] = 0
       }
       
-      const ordersByProductTypeArray = Object.entries(ordersByProductTypeMap).map(([type, count]) => ({
-        type,
-        count
-      }));
-      
-      // ✅ Ventes mensuelles (SANS les DRAFT)
-      const sixMonthsAgo = new Date();
-      sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
-      
-      const orders = await prisma.order.findMany({
-        where: {
-          AND: [
-            {
-              createdAt: {
-                gte: sixMonthsAgo
-              }
-            },
-            {
-              status: {
-                not: OrderStatus.DRAFT
-              }
-            }
-          ]
-        },
-        select: {
-          createdAt: true,
-          total: true
-        },
-        orderBy: {
-          createdAt: 'asc'
-        }
-      });
-      
-      const salesByMonthMap: Record<string, number> = {};
-      
-      orders.forEach(order => {
-        const date = new Date(order.createdAt);
-        const month = date.toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' });
-        
-        if (!salesByMonthMap[month]) {
-          salesByMonthMap[month] = 0;
-        }
-        
-        salesByMonthMap[month] += order.total;
-      });
-      
-      const salesByMonth = Object.entries(salesByMonthMap).map(([month, value]) => ({
-        month,
-        value
-      }));
-      
-      // ✅ Réponse finale avec structure correcte
-      return NextResponse.json({
-        users: {
-          total: totalUsers,
-          byRole: usersByRole,
-          newUsers
-        },
-        orders: {
-          total: totalOrders,
-          byStatus: ordersByStatus,
-          newOrders,
-          totalValue: totalOrdersValue._sum?.total || 0
-        },
-        products: {
-          total: totalProducts,
-          byType: productsByType,
-          topProducts: topProducts // ✅ Données correctement formatées
-        },
-        ordersByProductType: ordersByProductTypeArray,
-        salesByMonth
-      });
-      
-    } catch (error) {
-      console.error("Erreur lors de la récupération des statistiques:", error);
-      return new NextResponse("Erreur lors de la récupération des statistiques", { status: 500 });
+      salesByMonthMap[month] += order.total
+    })
+    
+    const salesByMonth = Object.entries(salesByMonthMap).map(([month, value]) => ({
+      month,
+      value
+    }))
+    
+    console.log(`📈 Ventes calculées pour ${Object.keys(salesByMonthMap).length} mois`)
+    
+    // --- ÉTAPE 7: Réponse finale sécurisée ---
+    const response = {
+      users: {
+        total: totalUsers,
+        byRole: usersByRole.map(item => ({
+          role: item.role,
+          count: item._count.id
+        })),
+        newUsers
+      },
+      orders: {
+        total: totalOrders,
+        byStatus: ordersByStatus.map(item => ({
+          status: item.status,
+          count: item._count.id
+        })),
+        newOrders,
+        totalValue: totalOrdersValue._sum?.total || 0
+      },
+      products: {
+        total: totalProducts,
+        byType: productsByType.map(item => ({
+          type: item.type,
+          count: item._count.id
+        })),
+        topProducts: topProducts
+      },
+      ordersByProductType: ordersByProductTypeArray,
+      salesByMonth,
+      generatedAt: new Date().toISOString()
     }
-  },
-  ["ADMIN"] // Seuls les admins peuvent accéder à cet endpoint
-);
+    
+    console.log(`✅ Statistiques générées avec succès`)
+    return NextResponse.json(response)
+    
+  } catch (error) {
+    console.error("❌ Erreur lors de la récupération des statistiques:", error)
+    throw error
+  }
+})

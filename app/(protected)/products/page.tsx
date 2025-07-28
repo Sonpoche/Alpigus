@@ -1,9 +1,10 @@
-import ProductCatalog from '@/components/products/product-catalog'
+// app/(protected)/products/page.tsx
+import ModernProductCatalog from '@/components/products/modern-product-catalog'
 
 export default function CatalogPage() {
   return (
-    <div className="p-8">
-      <ProductCatalog />
+    <div>
+      <ModernProductCatalog />
     </div>
   )
 }
