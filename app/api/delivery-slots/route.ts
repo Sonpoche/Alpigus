@@ -1,81 +1,165 @@
 // app/api/delivery-slots/route.ts
+// app/api/delivery-slots/route.ts - Version sécurisée
 import { NextRequest, NextResponse } from "next/server"
+import { withAuthSecurity, validateData } from "@/lib/api-security"
 import { prisma } from "@/lib/prisma"
-import { apiAuthMiddleware } from "@/lib/api-middleware"
-import { Session } from "next-auth"
-import { UserRole } from "@prisma/client"
+import { createError } from "@/lib/error-handler"
+import { z } from "zod"
 
-export const GET = apiAuthMiddleware(async (
-  req: NextRequest,
-  session: Session
+// Schémas de validation
+const getSlotsQuerySchema = z.object({
+  page: z.number().min(1),
+  limit: z.number().min(1).max(50),
+  date: z.string().datetime().optional(),
+  productId: z.string().cuid().optional(),
+  available: z.boolean().optional()
+})
+
+const createSlotSchema = z.object({
+  productId: z.string().cuid('ID produit invalide'),
+  date: z.string().datetime('Date invalide'),
+  maxCapacity: z.number().min(0.1, 'Capacité minimale 0.1').max(10000, 'Capacité maximale 10000')
+}).strict()
+
+export const GET = withAuthSecurity(async (
+  request: NextRequest,
+  session
 ) => {
   try {
-    const { searchParams } = new URL(req.url)
-    const page = parseInt(searchParams.get('page') ?? '1')
-    const limit = parseInt(searchParams.get('limit') ?? '10')
-    const date = searchParams.get('date')
-    const productId = searchParams.get('productId')
-
-    let where: any = {}
+    console.log(`Utilisateur ${session.user.id} consulte les créneaux de livraison`)
     
-    if (date) {
-      where.date = new Date(date)
+    // Extraction et validation des paramètres
+    const { searchParams } = new URL(request.url)
+    const rawParams = {
+      page: parseInt(searchParams.get('page') || '1'),
+      limit: parseInt(searchParams.get('limit') || '10'),
+      date: searchParams.get('date') || undefined,
+      productId: searchParams.get('productId') || undefined,
+      available: searchParams.get('available') === 'true' ? true : undefined
     }
     
+    const { page, limit, date, productId, available } = validateData(getSlotsQuerySchema, rawParams)
+    
+    // Construction de la requête WHERE selon le rôle
+    let where: any = {}
+    
+    // Filtre par date si spécifié
+    if (date) {
+      const targetDate = new Date(date)
+      const nextDay = new Date(targetDate)
+      nextDay.setDate(nextDay.getDate() + 1)
+      
+      where.date = {
+        gte: targetDate,
+        lt: nextDay
+      }
+    }
+    
+    // Filtre par disponibilité
+    if (available !== undefined) {
+      where.isAvailable = available
+      // Seulement les créneaux avec de la capacité disponible
+      if (available) {
+        where.reserved = {
+          lt: prisma.deliverySlot.fields.maxCapacity
+        }
+      }
+    }
+    
+    // Filtre par produit spécifique
     if (productId) {
       where.productId = productId
     }
-
-    // Vérifier les autorisations avec une approche différente
-    if (typeof session.user.role === 'string' && session.user.role.includes('PRODUCER')) {
+    
+    // Restrictions selon le rôle
+    if (session.user.role === 'PRODUCER') {
+      // Les producteurs ne voient que leurs créneaux
       const producer = await prisma.producer.findUnique({
-        where: { userId: session.user.id }
+        where: { userId: session.user.id },
+        select: { id: true }
       })
-
+      
       if (!producer) {
-        return new NextResponse("Producteur non trouvé", { status: 404 })
+        throw createError.notFound("Profil producteur non trouvé")
       }
-
-      if (!productId) {
-        where.product = {
-          producer: {
-            userId: session.user.id
-          }
-        }
-      } else {
-        // Si un productId est spécifié, vérifier qu'il appartient au producteur
+      
+      if (productId) {
+        // Vérifier que le produit appartient au producteur
         const product = await prisma.product.findFirst({
           where: { 
             id: productId,
-            producer: {
-              userId: session.user.id
-            }
+            producerId: producer.id
           }
         })
         
-        // Utiliser une méthode différente pour vérifier les autorisations
-        const isAdmin = typeof session.user.role === 'string' && session.user.role.includes('ADMIN');
-        if (!product && !isAdmin) {
-          return new NextResponse("Non autorisé", { status: 403 })
+        if (!product) {
+          throw createError.forbidden("Accès non autorisé à ce produit")
+        }
+      } else {
+        // Filtrer par tous les produits du producteur
+        where.product = {
+          producerId: producer.id
         }
       }
     }
-
+    
+    // Pour les clients, seulement les créneaux disponibles et futurs
+    if (session.user.role === 'CLIENT') {
+      where.isAvailable = true
+      where.date = {
+        gte: new Date()
+      }
+      where.reserved = {
+        lt: prisma.deliverySlot.fields.maxCapacity
+      }
+    }
+    
+    // Récupération des créneaux avec pagination
     const [slots, total] = await Promise.all([
       prisma.deliverySlot.findMany({
         where,
         include: {
           product: {
             include: {
-              stock: true,
+              stock: {
+                select: {
+                  quantity: true
+                }
+              },
               producer: {
-                include: {
-                  user: true
+                select: {
+                  id: true,
+                  companyName: true,
+                  user: {
+                    select: {
+                      name: true
+                    }
+                  }
                 }
               }
             }
           },
-          bookings: true
+          bookings: session.user.role === 'ADMIN' ? {
+            include: {
+              order: {
+                select: {
+                  id: true,
+                  user: {
+                    select: {
+                      name: true,
+                      email: true
+                    }
+                  }
+                }
+              }
+            }
+          } : {
+            select: {
+              id: true,
+              quantity: true,
+              status: true
+            }
+          }
         },
         skip: (page - 1) * limit,
         take: limit,
@@ -83,119 +167,164 @@ export const GET = apiAuthMiddleware(async (
       }),
       prisma.deliverySlot.count({ where })
     ])
-
+    
+    // Enrichir les données avec des informations calculées
+    const enrichedSlots = slots.map(slot => ({
+      ...slot,
+      availableCapacity: slot.maxCapacity - slot.reserved,
+      capacityPercentage: Math.round((slot.reserved / slot.maxCapacity) * 100),
+      isFullyBooked: slot.reserved >= slot.maxCapacity,
+      isPast: slot.date < new Date(),
+      canBook: slot.isAvailable && slot.reserved < slot.maxCapacity && slot.date > new Date(),
+      daysFromNow: Math.ceil((slot.date.getTime() - Date.now()) / (1000 * 60 * 60 * 24))
+    }))
+    
+    console.log(`${slots.length} créneaux récupérés pour ${session.user.role}`)
+    
     return NextResponse.json({
-      slots,
+      slots: enrichedSlots,
       pagination: {
         page,
         limit,
         total,
-        pages: Math.ceil(total / limit)
+        pages: Math.ceil(total / limit),
+        hasMore: page * limit < total
+      },
+      filters: {
+        date,
+        productId,
+        available
       }
     })
+    
   } catch (error) {
     console.error("Erreur lors de la récupération des créneaux:", error)
-    return new NextResponse(
-      "Erreur lors de la récupération des créneaux", 
-      { status: 500 }
-    )
+    throw error
   }
 })
 
-export const POST = apiAuthMiddleware(
-  async (req: NextRequest, session: Session) => {
-    try {
-      // Vérifier que c'est bien un producteur avec une approche différente
-      const isProducer = typeof session.user.role === 'string' && session.user.role.includes('PRODUCER');
-      if (!isProducer) {
-        return new NextResponse("Non autorisé", { status: 403 })
-      }
-
-      // Récupérer le producteur
-      const producer = await prisma.producer.findUnique({
-        where: { userId: session.user.id }
-      })
-
-      if (!producer) {
-        return new NextResponse("Producteur non trouvé", { status: 404 })
-      }
-
-      const body = await req.json()
-      const { productId, date, maxCapacity } = body
-
-      // Validation des données
-      if (!productId || !date || !maxCapacity) {
-        return new NextResponse("Tous les champs sont requis", { status: 400 })
-      }
-
-      if (maxCapacity <= 0) {
-        return new NextResponse("La capacité doit être positive", { status: 400 })
-      }
-
-      // Vérifier que le produit appartient bien au producteur ET récupérer le stock
-      const product = await prisma.product.findUnique({
-        where: { id: productId },
-        include: {
-          stock: true
+export const POST = withAuthSecurity(async (
+  request: NextRequest,
+  session
+) => {
+  try {
+    // Validation des données d'entrée
+    const rawData = await request.json()
+    const { productId, date, maxCapacity } = validateData(createSlotSchema, rawData)
+    
+    console.log(`Producteur ${session.user.id} crée un créneau pour le produit ${productId}`)
+    
+    // Récupérer et vérifier le producteur
+    const producer = await prisma.producer.findUnique({
+      where: { userId: session.user.id },
+      select: { id: true }
+    })
+    
+    if (!producer) {
+      throw createError.notFound("Profil producteur non trouvé")
+    }
+    
+    // Vérifier et récupérer le produit avec son stock
+    const product = await prisma.product.findUnique({
+      where: { id: productId },
+      include: {
+        stock: {
+          select: {
+            quantity: true
+          }
         }
-      })
-
-      if (!product) {
-        return new NextResponse("Produit non trouvé", { status: 404 })
       }
-
-      if (product.producerId !== producer.id) {
-        return new NextResponse("Non autorisé", { status: 403 })
+    })
+    
+    if (!product) {
+      throw createError.notFound("Produit non trouvé")
+    }
+    
+    if (product.producerId !== producer.id) {
+      throw createError.forbidden("Ce produit ne vous appartient pas")
+    }
+    
+    if (!product.stock) {
+      throw createError.validation("Stock non configuré pour ce produit")
+    }
+    
+    if (maxCapacity > product.stock.quantity) {
+      throw createError.validation(
+        `La capacité ne peut pas dépasser le stock disponible (${product.stock.quantity} ${product.unit})`
+      )
+    }
+    
+    // Vérifier que la date n'est pas dans le passé
+    const slotDate = new Date(date)
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
+    
+    if (slotDate < today) {
+      throw createError.validation("Impossible de créer un créneau dans le passé")
+    }
+    
+    // Vérifier qu'il n'existe pas déjà un créneau pour ce produit à cette date
+    const existingSlot = await prisma.deliverySlot.findFirst({
+      where: {
+        productId,
+        date: {
+          gte: slotDate,
+          lt: new Date(slotDate.getTime() + 24 * 60 * 60 * 1000) // Même jour
+        }
       }
-
-      // 🔧 VALIDATION MANQUANTE AJOUTÉE :
-      // Vérifier que la capacité ne dépasse pas le stock
-      if (!product.stock) {
-        return new NextResponse("Stock non configuré pour ce produit", { status: 400 })
-      }
-
-      if (maxCapacity > product.stock.quantity) {
-        return new NextResponse(
-          `La capacité ne peut pas dépasser le stock disponible (${product.stock.quantity} ${product.unit})`, 
-          { status: 400 }
-        )
-      }
-
-      // Vérifier que la date n'est pas dans le passé
-      const slotDate = new Date(date)
-      const today = new Date()
-      today.setHours(0, 0, 0, 0)
-      
-      if (slotDate < today) {
-        return new NextResponse("Impossible de créer un créneau dans le passé", { status: 400 })
-      }
-
-      // Créer le créneau
-      const slot = await prisma.deliverySlot.create({
-        data: {
-          productId,
-          date: slotDate,
-          maxCapacity,
-          reserved: 0,
-          isAvailable: true
-        },
-        include: {
-          product: {
-            include: {
-              producer: true
+    })
+    
+    if (existingSlot) {
+      throw createError.validation("Un créneau existe déjà pour ce produit à cette date")
+    }
+    
+    // Créer le créneau
+    const slot = await prisma.deliverySlot.create({
+      data: {
+        productId,
+        date: slotDate,
+        maxCapacity,
+        reserved: 0,
+        isAvailable: true
+      },
+      include: {
+        product: {
+          include: {
+            producer: {
+              select: {
+                id: true,
+                companyName: true
+              }
+            },
+            stock: {
+              select: {
+                quantity: true
+              }
             }
           }
         }
-      })
-
-      return NextResponse.json(slot)
-    } catch (error) {
-      console.error("Erreur lors de la création du créneau:", error)
-      return new NextResponse(
-        "Erreur lors de la création du créneau", 
-        { status: 500 }
-      )
-    }
-  },
-  ["PRODUCER"]  // Seuls les producteurs peuvent créer des créneaux
-)
+      }
+    })
+    
+    console.log(`Créneau créé avec succès: ${slot.id} pour ${maxCapacity}${product.unit}`)
+    
+    return NextResponse.json({
+      success: true,
+      slot: {
+        ...slot,
+        availableCapacity: slot.maxCapacity - slot.reserved,
+        canBook: true,
+        daysFromNow: Math.ceil((slot.date.getTime() - Date.now()) / (1000 * 60 * 60 * 24))
+      },
+      message: "Créneau de livraison créé avec succès"
+    }, { status: 201 })
+    
+  } catch (error) {
+    console.error("Erreur lors de la création du créneau:", error)
+    throw error
+  }
+}, {
+  requireAuth: true,
+  allowedRoles: ['PRODUCER'],
+  allowedMethods: ['POST']
+})

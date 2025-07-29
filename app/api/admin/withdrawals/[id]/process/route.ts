@@ -33,7 +33,7 @@ export const POST = withAdminSecurity(async (
     const rawData = await request.json()
     const { status, note, paymentReference } = validateData(processWithdrawalSchema, rawData)
     
-    console.log(`💰 Admin ${session.user.id} traite le retrait ${withdrawalId}: ${status}`)
+    console.log(`Admin ${session.user.id} traite le retrait ${withdrawalId}: ${status}`)
     
     // Récupérer la demande de retrait avec toutes les informations nécessaires
     const withdrawal = await prisma.withdrawal.findUnique({
@@ -85,7 +85,7 @@ export const POST = withAdminSecurity(async (
         )
       }
       
-      console.log(`💰 Traitement du retrait approuvé: ${withdrawal.amount}€ vers ${producer.iban?.slice(-4)}`)
+      console.log(`Traitement du retrait approuvé: ${withdrawal.amount}€ vers ${producer.iban?.slice(-4)}`)
       
     } else if (status === 'REJECTED') {
       // Le rejet nécessite une note explicative
@@ -93,14 +93,12 @@ export const POST = withAdminSecurity(async (
         throw createError.validation("Une raison de rejet est requise")
       }
       
-      console.log(`❌ Rejet du retrait: ${withdrawal.amount}€ (raison: ${note.substring(0, 50)}...)`)
+      console.log(`Rejet du retrait: ${withdrawal.amount}€ (raison: ${note.substring(0, 50)}...)`)
     }
-    
-    let processedWithdrawal
     
     try {
       // Traiter la demande via le service wallet
-      processedWithdrawal = await WalletService.processWithdrawal(
+      await WalletService.processWithdrawal(
         withdrawalId, 
         status as 'COMPLETED' | 'REJECTED', 
         note?.trim()
@@ -111,18 +109,14 @@ export const POST = withAdminSecurity(async (
         await prisma.withdrawal.update({
           where: { id: withdrawalId },
           data: {
-            metadata: JSON.stringify({ 
-              paymentReference: paymentReference.trim(),
-              processedBy: session.user.id,
-              processedAt: new Date().toISOString()
-            })
+            reference: paymentReference.trim(),
+            processorNote: note?.trim() || null
           }
         })
-        processedWithdrawal.paymentReference = paymentReference.trim()
       }
       
     } catch (serviceError) {
-      console.error(`❌ Erreur service wallet:`, serviceError)
+      console.error(`Erreur service wallet:`, serviceError)
       throw createError.internal(
         `Erreur lors du traitement: ${serviceError instanceof Error ? serviceError.message : 'Erreur inconnue'}`
       )
@@ -133,27 +127,27 @@ export const POST = withAdminSecurity(async (
       const notificationData = {
         userId: withdrawal.wallet.producer.userId,
         type: status === 'COMPLETED' ? 'WITHDRAWAL_COMPLETED' : 'WITHDRAWAL_REJECTED',
-        title: status === 'COMPLETED' ? '✅ Retrait effectué' : '❌ Retrait rejeté',
+        title: status === 'COMPLETED' ? 'Retrait effectué' : 'Retrait rejeté',
         message: status === 'COMPLETED' 
           ? `Votre demande de retrait de ${withdrawal.amount}€ a été traitée avec succès. ${paymentReference ? `Référence: ${paymentReference}` : ''}`
           : `Votre demande de retrait de ${withdrawal.amount}€ a été rejetée. ${note ? `Raison: ${note}` : ''}`,
         link: '/producer/wallet',
-        data: JSON.stringify({
+        data: {
           withdrawalId,
           amount: withdrawal.amount,
           status,
           paymentReference: paymentReference || null
-        })
+        }
       }
       
       await prisma.notification.create({
         data: notificationData
       })
       
-      console.log(`📧 Notification envoyée au producteur ${withdrawal.wallet.producer.user.email}`)
+      console.log(`Notification envoyée au producteur ${withdrawal.wallet.producer.user.email}`)
       
     } catch (notifError) {
-      console.error('⚠️ Erreur notification (non critique):', notifError)
+      console.error('Erreur notification (non critique):', notifError)
     }
     
     // Log d'audit détaillé
@@ -178,7 +172,7 @@ export const POST = withAdminSecurity(async (
         }
       })
     } catch (logError) {
-      console.error('⚠️ Erreur log admin (non critique):', logError)
+      console.error('Erreur log admin (non critique):', logError)
     }
     
     // Récupérer la demande mise à jour avec toutes les informations
@@ -203,7 +197,7 @@ export const POST = withAdminSecurity(async (
       }
     })
     
-    console.log(`✅ Retrait ${withdrawalId} traité avec succès: ${status}`)
+    console.log(`Retrait ${withdrawalId} traité avec succès: ${status}`)
     
     return NextResponse.json({
       success: true,
@@ -219,7 +213,7 @@ export const POST = withAdminSecurity(async (
     })
     
   } catch (error) {
-    console.error("❌ Erreur traitement retrait:", error)
+    console.error("Erreur traitement retrait:", error)
     throw error
   }
 })

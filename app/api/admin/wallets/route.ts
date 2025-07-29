@@ -8,7 +8,7 @@ export const GET = withAdminSecurity(async (
   session
 ) => {
   try {
-    console.log(`💼 Admin ${session.user.id} consulte les portefeuilles`)
+    console.log(`Admin ${session.user.id} consulte les portefeuilles`)
     
     // D'abord, récupérer tous les producteurs avec leurs informations
     const producers = await prisma.producer.findMany({
@@ -30,7 +30,9 @@ export const GET = withAdminSecurity(async (
         }
       },
       orderBy: {
-        createdAt: 'desc'
+        user: {
+          createdAt: 'desc'
+        }
       }
     })
     
@@ -85,6 +87,12 @@ export const GET = withAdminSecurity(async (
           } as any
         }
         
+        // Vérifier que le wallet existe avant d'accéder à ses propriétés
+        if (!wallet) {
+          console.error(`Erreur: portefeuille manquant pour le producteur ${producer.id}`)
+          return null
+        }
+        
         // Calculer les statistiques supplémentaires
         const pendingWithdrawals = wallet.id.startsWith('temp-')
           ? 0
@@ -134,7 +142,7 @@ export const GET = withAdminSecurity(async (
             companyName: producer.companyName,
             address: producer.address,
             description: producer.description,
-            productsCount: producer._count.products,
+            productsCount: producer._count?.products || 0,
             
             // Informations bancaires (masquées pour sécurité)
             bankInfo: {
@@ -146,19 +154,19 @@ export const GET = withAdminSecurity(async (
             
             // Utilisateur associé
             user: {
-              id: producer.user.id,
-              name: producer.user.name,
-              email: producer.user.email,
-              phone: producer.user.phone,
-              memberSince: producer.user.createdAt
+              id: producer.user?.id || '',
+              name: producer.user?.name || '',
+              email: producer.user?.email || '',
+              phone: producer.user?.phone || '',
+              memberSince: producer.user?.createdAt || new Date()
             }
           },
           
           // Activité récente
           recentActivity: {
-            transactionsCount: wallet._count.transactions,
-            withdrawalsCount: wallet._count.withdrawals,
-            lastWithdrawals: wallet.withdrawals.map(w => ({
+            transactionsCount: wallet._count?.transactions || 0,
+            withdrawalsCount: wallet._count?.withdrawals || 0,
+            lastWithdrawals: (wallet.withdrawals || []).map((w: any) => ({
               id: w.id,
               amount: w.amount,
               status: w.status,
@@ -169,36 +177,39 @@ export const GET = withAdminSecurity(async (
       })
     )
     
+    // Filtrer les wallets null (au cas où)
+    const validWallets = wallets.filter(w => w !== null)
+    
     // Calculer des statistiques globales
-    const totalBalance = wallets.reduce((sum, w) => sum + w.balance, 0)
-    const totalEarned = wallets.reduce((sum, w) => sum + w.totalEarned, 0)
-    const totalWithdrawn = wallets.reduce((sum, w) => sum + w.totalWithdrawn, 0)
-    const activeWallets = wallets.filter(w => w.status === 'active').length
-    const walletsWithPendingWithdrawals = wallets.filter(w => w.pendingWithdrawals > 0).length
+    const totalBalance = validWallets.reduce((sum, w) => sum + w.balance, 0)
+    const totalEarned = validWallets.reduce((sum, w) => sum + w.totalEarned, 0)
+    const totalWithdrawn = validWallets.reduce((sum, w) => sum + w.totalWithdrawn, 0)
+    const activeWallets = validWallets.filter(w => w.status === 'active').length
+    const walletsWithPendingWithdrawals = validWallets.filter(w => w.pendingWithdrawals > 0).length
     
     // Trier les portefeuilles par solde décroissant
-    wallets.sort((a, b) => b.balance - a.balance)
+    validWallets.sort((a, b) => b.balance - a.balance)
     
-    console.log(`💼 ${wallets.length} portefeuilles traités (${Math.round(totalBalance)}€ total)`)
+    console.log(`${validWallets.length} portefeuilles traités (${Math.round(totalBalance)}€ total)`)
     
     const response = {
-      wallets,
+      wallets: validWallets,
       summary: {
-        totalWallets: wallets.length,
+        totalWallets: validWallets.length,
         activeWallets,
         totalBalance: Math.round(totalBalance * 100) / 100,
         totalEarned: Math.round(totalEarned * 100) / 100,
         totalWithdrawn: Math.round(totalWithdrawn * 100) / 100,
-        pendingBalance: wallets.reduce((sum, w) => sum + w.pendingBalance, 0),
+        pendingBalance: validWallets.reduce((sum, w) => sum + w.pendingBalance, 0),
         walletsWithPendingWithdrawals,
-        averageBalance: wallets.length > 0 ? totalBalance / wallets.length : 0
+        averageBalance: validWallets.length > 0 ? totalBalance / validWallets.length : 0
       },
       breakdown: {
         byStatus: {
-          active: wallets.filter(w => w.status === 'active').length,
-          inactive: wallets.filter(w => w.status === 'inactive').length,
-          pending_withdrawal: wallets.filter(w => w.status === 'pending_withdrawal').length,
-          low_balance: wallets.filter(w => w.status === 'low_balance').length
+          active: validWallets.filter(w => w.status === 'active').length,
+          inactive: validWallets.filter(w => w.status === 'inactive').length,
+          pending_withdrawal: validWallets.filter(w => w.status === 'pending_withdrawal').length,
+          low_balance: validWallets.filter(w => w.status === 'low_balance').length
         }
       }
     }
@@ -206,7 +217,7 @@ export const GET = withAdminSecurity(async (
     return NextResponse.json(response)
     
   } catch (error) {
-    console.error("❌ Erreur récupération portefeuilles:", error)
+    console.error("Erreur récupération portefeuilles:", error)
     throw error
   }
 })

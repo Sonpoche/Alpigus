@@ -20,7 +20,7 @@ export const POST = withAdminSecurity(async (
       throw createError.validation("ID utilisateur invalide")
     }
     
-    console.log(`💌 Admin ${session.user.id} envoie une invitation à l'utilisateur ${userId}`)
+    console.log(`Admin ${session.user.id} envoie une invitation à l'utilisateur ${userId}`)
     
     // Vérifier si l'utilisateur existe
     const user = await prisma.user.findUnique({
@@ -47,14 +47,14 @@ export const POST = withAdminSecurity(async (
                          new Date(user.resetTokenExpiry) > new Date()
     
     if (hasValidToken) {
-      console.log(`⚠️ Token valide existant pour ${user.email}, régénération...`)
+      console.log(`Token valide existant pour ${user.email}, régénération...`)
     }
 
     // Générer un nouveau token d'invitation sécurisé
     const inviteToken = crypto.randomBytes(32).toString('hex')
     const inviteTokenExpiry = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000) // 7 jours pour invitation
 
-    console.log(`🔐 Token d'invitation généré pour ${user.email} (expire: ${inviteTokenExpiry.toISOString()})`)
+    console.log(`Token d'invitation généré pour ${user.email} (expire: ${inviteTokenExpiry.toISOString()})`)
 
     // Sauvegarder le token dans la base de données
     await prisma.user.update({
@@ -72,7 +72,7 @@ export const POST = withAdminSecurity(async (
     const isNewUser = !user.profileCompleted
     const invitationType = isNewUser ? 'welcome' : 'reinvite'
     
-    console.log(`📧 Envoi invitation ${invitationType} à ${user.email}`)
+    console.log(`Envoi invitation ${invitationType} à ${user.email}`)
 
     // Envoyer l'email d'invitation approprié
     let emailSent = false
@@ -98,10 +98,10 @@ export const POST = withAdminSecurity(async (
       }
       
       emailSent = true
-      console.log(`📧 Email ${emailType} envoyé avec succès à ${user.email}`)
+      console.log(`Email ${emailType} envoyé avec succès à ${user.email}`)
       
     } catch (emailError) {
-      console.error("❌ Erreur lors de l'envoi de l'email:", emailError)
+      console.error("Erreur lors de l'envoi de l'email:", emailError)
       
       // En cas d'échec d'email, nettoyer le token pour éviter les fuites
       await prisma.user.update({
@@ -145,10 +145,10 @@ export const POST = withAdminSecurity(async (
         }
       })
     } catch (logError) {
-      console.error('⚠️ Erreur log admin (non critique):', logError)
+      console.error('Erreur log admin (non critique):', logError)
     }
     
-    console.log(`✅ Invitation envoyée avec succès à ${user.email}`)
+    console.log(`Invitation envoyée avec succès à ${user.email}`)
     
     return NextResponse.json({ 
       success: true,
@@ -162,3 +162,13 @@ export const POST = withAdminSecurity(async (
           name: user.name,
           role: user.role
         },
+        sentAt: new Date().toISOString(),
+        expiresAt: inviteTokenExpiry.toISOString()
+      }
+    })
+    
+  } catch (error) {
+    console.error("Erreur lors de l'envoi de l'invitation:", error)
+    throw error
+  }
+})
