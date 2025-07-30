@@ -1,12 +1,13 @@
 // app/api/invoices/[id]/mark-paid/route.ts
 import { NextRequest, NextResponse } from "next/server"
-import { withAuthSecurity } from "@/lib/api-security"
+import { withAuthSecurity, validateData, commonSchemas } from "@/lib/api-security"
+import { handleError, createError } from "@/lib/error-handler"
 import { prisma } from "@/lib/prisma"
 import { z } from "zod"
 
-// Schéma de validation pour les paramètres
+// Schéma de validation pour les paramètres d'URL
 const paramsSchema = z.object({
-  id: z.string().cuid('ID de facture invalide')
+  id: commonSchemas.id
 })
 
 // Schéma de validation pour le body (optionnel)
@@ -19,19 +20,19 @@ const bodySchema = z.object({
 
 export const POST = withAuthSecurity(async (request: NextRequest, session) => {
   try {
-    // 1. Extraction et validation de l'ID de facture depuis l'URL
+    // 1. Extraction et validation sécurisée de l'ID depuis l'URL
     const url = new URL(request.url)
     const pathSegments = url.pathname.split('/')
     const invoiceId = pathSegments[pathSegments.indexOf('invoices') + 1]
     
-    const validatedParams = paramsSchema.parse({ id: invoiceId })
+    const { id } = validateData(paramsSchema, { id: invoiceId })
     
     // 2. Validation du body de la requête (optionnel)
     let bodyData: { paymentMethod?: string; notes?: string } = { paymentMethod: 'manual' }
     try {
       const rawBody = await request.text()
       if (rawBody.trim()) {
-        const parsedBody = bodySchema.parse(JSON.parse(rawBody))
+        const parsedBody = validateData(bodySchema, JSON.parse(rawBody))
         bodyData = parsedBody || { paymentMethod: 'manual' }
       }
     } catch (bodyError) {
@@ -41,9 +42,11 @@ export const POST = withAuthSecurity(async (request: NextRequest, session) => {
     
     const { paymentMethod = 'manual', notes } = bodyData
     
+    console.log(`✅ Marquage facture ${id} comme payée par ${session.user.role} ${session.user.id} via ${paymentMethod}`)
+    
     // 3. Récupération de la facture avec toutes les relations nécessaires
     const invoice = await prisma.invoice.findUnique({
-      where: { id: validatedParams.id },
+      where: { id },
       include: {
         order: {
           include: {
@@ -94,24 +97,12 @@ export const POST = withAuthSecurity(async (request: NextRequest, session) => {
     })
     
     if (!invoice) {
-      return NextResponse.json(
-        { 
-          error: 'Facture non trouvée', 
-          code: 'INVOICE_NOT_FOUND' 
-        },
-        { status: 404 }
-      )
+      throw createError.notFound("Facture non trouvée")
     }
     
-    // 4. Vérification du statut de la facture
+    // 4. Validation du statut de la facture
     if (invoice.status === 'PAID') {
-      return NextResponse.json(
-        { 
-          error: 'Facture déjà payée', 
-          code: 'ALREADY_PAID' 
-        },
-        { status: 400 }
-      )
+      throw createError.validation("Facture déjà payée")
     }
     
     // 5. Vérifications d'autorisation spécifiques selon le rôle
@@ -123,13 +114,7 @@ export const POST = withAuthSecurity(async (request: NextRequest, session) => {
       })
       
       if (!producer) {
-        return NextResponse.json(
-          { 
-            error: 'Profil producteur non trouvé', 
-            code: 'PRODUCER_NOT_FOUND' 
-          },
-          { status: 404 }
-        )
+        throw createError.notFound("Profil producteur non trouvé")
       }
       
       // Vérifier si ce producteur a des produits dans la commande
@@ -142,22 +127,17 @@ export const POST = withAuthSecurity(async (request: NextRequest, session) => {
       )
       
       if (!hasProducerProducts && !hasProducerBookings) {
-        return NextResponse.json(
-          { 
-            error: 'Non autorisé - cette facture ne concerne pas vos produits', 
-            code: 'FORBIDDEN_PRODUCER' 
-          },
-          { status: 403 }
-        )
+        console.warn(`⚠️ Producteur ${session.user.id} tentative marquage facture non autorisée ${id}`)
+        throw createError.forbidden("Non autorisé - cette facture ne concerne pas vos produits")
       }
       
-      console.log(`🏭 Producteur ${producer.companyName || 'Inconnu'} marque la facture ${invoiceId} comme payée`)
+      console.log(`🏭 Producteur ${producer.companyName || 'Inconnu'} marque la facture ${id} comme payée`)
     }
     // Les ADMIN peuvent marquer toutes les factures (pas de vérification supplémentaire)
     
-    // 6. Mise à jour de la facture
+    // 6. Mise à jour sécurisée de la facture
     const updatedInvoice = await prisma.invoice.update({
-      where: { id: validatedParams.id },
+      where: { id },
       data: {
         status: 'PAID',
         paidAt: new Date(),
@@ -166,6 +146,7 @@ export const POST = withAuthSecurity(async (request: NextRequest, session) => {
         ...(notes && {
           metadata: JSON.stringify({
             markedPaidBy: session.user.id,
+            markedPaidByRole: session.user.role,
             markedPaidAt: new Date().toISOString(),
             notes: notes,
             method: paymentMethod
@@ -188,13 +169,14 @@ export const POST = withAuthSecurity(async (request: NextRequest, session) => {
           paymentStatus: 'PAID',
           paidAt: new Date().toISOString(),
           markedPaidBy: session.user.id,
+          markedPaidByRole: session.user.role,
           paymentMethod: paymentMethod,
           ...(notes && { paymentNotes: notes })
         })
       }
     })
     
-    // 8. Notifications sécurisées (utiliser la facture originale avec include)
+    // 8. Notifications sécurisées (non bloquantes)
     try {
       // Notification au client
       if (invoice.order.user) {
@@ -202,19 +184,20 @@ export const POST = withAuthSecurity(async (request: NextRequest, session) => {
           data: {
             userId: invoice.order.user.id,
             type: "INVOICE_PAID",
-            title: "Paiement confirmé",
-            message: `Votre paiement pour la commande #${invoice.order.id.substring(0, 8)} a été confirmé.`,
+            title: "💰 Paiement confirmé",
+            message: `Votre paiement pour la commande #${invoice.order.id.substring(0, 8)} a été confirmé par ${session.user.role === 'PRODUCER' ? 'le producteur' : 'l\'administrateur'}.`,
             link: `/orders?view=${invoice.order.id}`,
             data: JSON.stringify({ 
-              invoiceId: validatedParams.id,
+              invoiceId: id,
               orderId: invoice.order.id,
-              paymentMethod
+              paymentMethod,
+              confirmedBy: session.user.role
             })
           }
         })
       }
       
-      // Notifications aux producteurs concernés
+      // Notifications aux producteurs concernés (sauf celui qui a confirmé)
       const producerIds = new Set<string>()
       
       // Collecter les producteurs des articles
@@ -238,26 +221,29 @@ export const POST = withAuthSecurity(async (request: NextRequest, session) => {
             data: {
               userId: producerId,
               type: "INVOICE_PAID",
-              title: "Paiement client reçu",
-              message: `Le paiement pour la commande #${invoice.order.id.substring(0, 8)} a été confirmé.`,
+              title: "💰 Paiement client confirmé",
+              message: `Le paiement pour la commande #${invoice.order.id.substring(0, 8)} a été confirmé${session.user.role === 'PRODUCER' ? ' par un autre producteur' : ' par l\'administrateur'}.`,
               link: `/producer/orders?modal=${invoice.order.id}`,
               data: JSON.stringify({ 
-                invoiceId: validatedParams.id,
+                invoiceId: id,
                 orderId: invoice.order.id,
-                paymentMethod
+                paymentMethod,
+                confirmedBy: session.user.role
               })
             }
           })
         }
       }
       
+      console.log(`📧 Notifications envoyées pour confirmation paiement facture ${id}`)
+      
     } catch (notificationError) {
       // Ne pas faire échouer l'opération si les notifications échouent
-      console.warn("Erreur lors de l'envoi des notifications:", notificationError)
+      console.warn("⚠️ Erreur lors de l'envoi des notifications:", notificationError)
     }
     
     // 9. Log d'audit sécurisé
-    console.log(`✅ Facture ${validatedParams.id} marquée comme payée par ${session.user.role} ${session.user.id} via ${paymentMethod}`)
+    console.log(`✅ Facture ${id} marquée comme payée par ${session.user.role} ${session.user.id} via ${paymentMethod}`)
     
     // 10. Réponse sécurisée
     return NextResponse.json({
@@ -274,57 +260,11 @@ export const POST = withAuthSecurity(async (request: NextRequest, session) => {
     
   } catch (error) {
     console.error("❌ Erreur lors du marquage de la facture comme payée:", error)
-    
-    // Gestion d'erreur avec validation Zod
-    if (error instanceof z.ZodError) {
-      return NextResponse.json(
-        { 
-          error: 'Données invalides', 
-          code: 'VALIDATION_ERROR',
-          details: error.errors
-        },
-        { status: 400 }
-      )
-    }
-    
-    // Gestion d'erreur Prisma
-    if (error instanceof Error) {
-      if (error.message.includes('Unique constraint')) {
-        return NextResponse.json(
-          { 
-            error: 'Conflit de données', 
-            code: 'CONFLICT_ERROR' 
-          },
-          { status: 409 }
-        )
-      }
-      
-      if (error.message.includes('Record to update not found')) {
-        return NextResponse.json(
-          { 
-            error: 'Facture non trouvée pour mise à jour', 
-            code: 'UPDATE_NOT_FOUND' 
-          },
-          { status: 404 }
-        )
-      }
-    }
-    
-    // Erreur générique
-    return NextResponse.json(
-      { 
-        error: 'Erreur lors du traitement', 
-        code: 'INTERNAL_ERROR',
-        ...(process.env.NODE_ENV === 'development' && { 
-          details: error instanceof Error ? error.message : 'Erreur inconnue' 
-        })
-      },
-      { status: 500 }
-    )
+    return handleError(error, request.url)
   }
 }, {
   requireAuth: true,
-  allowedRoles: ['PRODUCER', 'ADMIN'],
+  allowedRoles: ['PRODUCER', 'ADMIN'], // Seuls les producteurs et admins peuvent marquer comme payé
   allowedMethods: ['POST'],
   rateLimit: {
     requests: 5,     // 5 tentatives max (action critique)

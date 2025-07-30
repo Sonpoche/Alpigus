@@ -1,12 +1,16 @@
-// app/api/invoices/[id]/pay/route.ts - Version sécurisée
+// app/api/invoices/[id]/pay/route.ts
 import { NextRequest, NextResponse } from "next/server"
-import { withClientSecurity } from "@/lib/api-security"
-import { validateInput } from "@/lib/validation-schemas"
+import { withClientSecurity, validateData, commonSchemas } from "@/lib/api-security"
 import { handleError, createError } from "@/lib/error-handler"
 import { prisma } from "@/lib/prisma"
 import { NotificationService } from '@/lib/notification-service'
 import { stripe } from '@/lib/stripe'
 import { z } from 'zod'
+
+// Schéma de validation pour les paramètres d'URL
+const paramsSchema = z.object({
+  id: commonSchemas.id
+})
 
 // Schéma de validation pour le paiement de facture
 const invoicePaymentSchema = z.object({
@@ -25,32 +29,26 @@ const invoicePaymentSchema = z.object({
   path: ['stripePaymentIntentId']
 })
 
-export const POST = withClientSecurity(async (
-  request: NextRequest,
-  session
-) => {
+export const POST = withClientSecurity(async (request: NextRequest, session) => {
   try {
-    // Récupérer les paramètres depuis l'URL
+    // 1. Extraction et validation sécurisée de l'ID depuis l'URL
     const url = new URL(request.url)
-    const pathParts = url.pathname.split('/')
-    const invoiceId = pathParts[pathParts.indexOf('invoices') + 1]
+    const pathSegments = url.pathname.split('/')
+    const invoiceId = pathSegments[pathSegments.indexOf('invoices') + 1]
     
-    // Validation des paramètres d'URL
-    if (!invoiceId || typeof invoiceId !== 'string') {
-      throw createError.validation("ID de facture invalide")
-    }
+    const { id } = validateData(paramsSchema, { id: invoiceId })
     
-    // Validation des données d'entrée
+    // 2. Validation des données de paiement
     const rawData = await request.json()
-    const { paymentMethod, stripePaymentIntentId } = validateInput(invoicePaymentSchema, rawData)
+    const { paymentMethod, stripePaymentIntentId } = validateData(invoicePaymentSchema, rawData)
     
-    console.log(`🧾 Tentative de paiement facture ${invoiceId} via ${paymentMethod} par user ${session.user.id}`)
+    console.log(`💳 Tentative de paiement facture ${id} via ${paymentMethod} par user ${session.user.id}`)
     
-    // Récupération sécurisée de la facture avec vérification d'ownership
+    // 3. Récupération sécurisée de la facture avec vérification d'ownership
     const invoice = await prisma.invoice.findFirst({
       where: {
-        id: invoiceId,
-        userId: session.user.id // SÉCURITÉ: Vérification que la facture appartient à l'utilisateur
+        id,
+        userId: session.user.id // SÉCURITÉ CRITIQUE: Vérifier que la facture appartient à l'utilisateur
       },
       include: {
         order: {
@@ -108,10 +106,11 @@ export const POST = withClientSecurity(async (
     })
     
     if (!invoice) {
+      console.warn(`⚠️ Tentative de paiement non autorisé facture ${id} par user ${session.user.id}`)
       throw createError.notFound("Facture non trouvée ou non autorisée")
     }
     
-    // Validation du statut de la facture
+    // 4. Validation du statut de la facture
     const validStatuses = ['PENDING', 'OVERDUE']
     if (!validStatuses.includes(invoice.status)) {
       throw createError.validation(
@@ -119,7 +118,7 @@ export const POST = withClientSecurity(async (
       )
     }
     
-    // Validation des montants pour éviter la fraude
+    // 5. Validation des montants pour éviter la fraude
     if (invoice.amount <= 0) {
       throw createError.validation("Montant de facture invalide")
     }
@@ -130,7 +129,7 @@ export const POST = withClientSecurity(async (
     let paidAt = new Date()
     let paymentVerified = false
     
-    // Traitement sécurisé selon la méthode de paiement
+    // 6. Traitement sécurisé selon la méthode de paiement
     if (paymentMethod === 'card') {
       if (!stripePaymentIntentId) {
         throw createError.validation("ID du paiement Stripe manquant pour le paiement par carte")
@@ -152,6 +151,7 @@ export const POST = withClientSecurity(async (
         // SÉCURITÉ CRITIQUE: Vérification du montant
         const expectedAmount = Math.round(invoice.amount * 100) // Convertir en centimes
         if (paymentIntent.amount !== expectedAmount) {
+          console.error(`💥 Fraude détectée: montant attendu ${expectedAmount}, reçu ${paymentIntent.amount}`)
           throw createError.validation(
             `Montant invalide. Attendu: ${expectedAmount} centimes, reçu: ${paymentIntent.amount} centimes`
           )
@@ -159,17 +159,19 @@ export const POST = withClientSecurity(async (
         
         // SÉCURITÉ: Vérifier que le paiement correspond à cette facture
         const intentMetadata = paymentIntent.metadata
-        if (intentMetadata.invoiceId && intentMetadata.invoiceId !== invoiceId) {
+        if (intentMetadata.invoiceId && intentMetadata.invoiceId !== id) {
+          console.error(`💥 Fraude détectée: PaymentIntent pour autre facture`)
           throw createError.validation("Le paiement ne correspond pas à cette facture")
         }
         
         // SÉCURITÉ: Vérifier que le paiement appartient au bon utilisateur
         if (intentMetadata.userId && intentMetadata.userId !== session.user.id) {
+          console.error(`💥 Fraude détectée: PaymentIntent pour autre utilisateur`)
           throw createError.validation("Paiement non autorisé pour cet utilisateur")
         }
         
         paymentVerified = true
-        console.log(`✅ Paiement Stripe vérifié: ${stripePaymentIntentId} pour facture ${invoiceId}`)
+        console.log(`✅ Paiement Stripe vérifié: ${stripePaymentIntentId} pour facture ${id}`)
         
       } catch (stripeError) {
         console.error("❌ Erreur Stripe:", stripeError)
@@ -188,23 +190,23 @@ export const POST = withClientSecurity(async (
       
     } else if (paymentMethod === 'bank_transfer') {
       // Pour les virements, confirmation utilisateur (à vérifier manuellement par admin)
-      console.log(`🏦 Virement bancaire déclaré par l'utilisateur pour facture ${invoiceId}`)
+      console.log(`🏦 Virement bancaire déclaré par l'utilisateur pour facture ${id}`)
       paymentVerified = true
       
     } else {
       throw createError.validation(`Méthode de paiement non supportée: ${paymentMethod}`)
     }
     
-    // SÉCURITÉ: Double vérification avant la mise à jour
+    // 7. SÉCURITÉ: Double vérification avant la mise à jour
     if (!paymentVerified) {
       throw createError.internal("Paiement non vérifié, transaction annulée")
     }
     
-    // Transaction atomique pour la mise à jour
+    // 8. Transaction atomique pour la mise à jour
     const updatedInvoice = await prisma.$transaction(async (tx) => {
       // Mettre à jour la facture
       const invoice = await tx.invoice.update({
-        where: { id: invoiceId },
+        where: { id },
         data: {
           status: finalPaymentStatus,
           paidAt,
@@ -238,9 +240,9 @@ export const POST = withClientSecurity(async (
       return invoice
     })
     
-    console.log(`✅ Facture ${invoiceId} mise à jour avec succès`)
+    console.log(`✅ Facture ${id} mise à jour avec succès`)
     
-    // Envoi sécurisé des notifications
+    // 9. Envoi sécurisé des notifications (non bloquant)
     try {
       // Notification au client
       if (invoice.order?.user) {
@@ -299,7 +301,7 @@ export const POST = withClientSecurity(async (
                 message: `Le paiement pour la commande #${invoice.order.id.substring(0, 8)} a été confirmé (${paymentMethod === 'card' ? 'Carte bancaire' : 'Virement bancaire'}).`,
                 link: `/producer/orders?modal=${invoice.order.id}`,
                 data: JSON.stringify({ 
-                  invoiceId,
+                  invoiceId: id,
                   orderId: invoice.order.id,
                   paymentMethod,
                   amount: invoice.amount
@@ -317,16 +319,16 @@ export const POST = withClientSecurity(async (
       // Ne pas bloquer le processus si les notifications échouent
     }
     
-    // Log d'audit final
+    // 10. Log d'audit final
     console.log(`🎉 Paiement facture terminé avec succès:`, {
-      invoiceId,
+      invoiceId: id,
       userId: session.user.id,
       paymentMethod,
       amount: invoice.amount,
       stripePaymentIntentId: paymentMethod === 'card' ? stripePaymentIntentId : undefined
     })
     
-    // Réponse sécurisée (ne pas exposer trop d'informations)
+    // 11. Réponse sécurisée (ne pas exposer trop d'informations)
     return NextResponse.json({
       success: true,
       invoice: {
@@ -342,8 +344,8 @@ export const POST = withClientSecurity(async (
     
   } catch (error) {
     const url = new URL(request.url)
-    const pathParts = url.pathname.split('/')
-    const invoiceIdForError = pathParts[pathParts.indexOf('invoices') + 1]
+    const pathSegments = url.pathname.split('/')
+    const invoiceIdForError = pathSegments[pathSegments.indexOf('invoices') + 1]
     
     console.error("❌ Erreur paiement facture:", {
       invoiceId: invoiceIdForError,

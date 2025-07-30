@@ -1,139 +1,261 @@
 // app/api/onboarding/complete/route.ts
-
 import { NextRequest, NextResponse } from "next/server"
-import { getServerSession } from "next-auth"
-import { authOptions } from "@/app/api/auth/[...nextauth]/route"
+import { withAuthSecurity, validateData } from "@/lib/api-security"
+import { handleError, createError } from "@/lib/error-handler"
 import { prisma } from "@/lib/prisma"
 import { hash, compare } from "bcrypt"
+import { z } from "zod"
 
-interface OnboardingData {
-  currentPassword: string
-  newPassword: string
-  confirmPassword: string
-  name: string
-  phone: string
-  companyName?: string
-  description?: string
-  address?: string
-  siretNumber?: string
-  bankAccountNumber?: string
-  bankAccountName?: string
-}
+// Schémas de validation stricts
+const baseOnboardingSchema = z.object({
+  currentPassword: z.string().min(1, 'Mot de passe actuel requis'),
+  newPassword: z.string()
+    .min(8, 'Le mot de passe doit contenir au moins 8 caractères')
+    .max(128, 'Mot de passe trop long')
+    .regex(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/, 'Le mot de passe doit contenir au moins une majuscule, une minuscule et un chiffre'),
+  confirmPassword: z.string().min(1, 'Confirmation du mot de passe requise'),
+  name: z.string()
+    .min(2, 'Le nom doit contenir au moins 2 caractères')
+    .max(100, 'Nom trop long')
+    .regex(/^[a-zA-ZÀ-ÿ\s\-']+$/, 'Le nom ne peut contenir que des lettres, espaces, tirets et apostrophes'),
+  phone: z.string()
+    .min(10, 'Numéro de téléphone invalide')
+    .max(20, 'Numéro de téléphone trop long')
+    .regex(/^(?:\+33|0)[1-9](?:[0-9]{8})$|^[0-9]{10}$/, 'Format de téléphone invalide')
+}).refine((data) => data.newPassword === data.confirmPassword, {
+  message: "Les mots de passe ne correspondent pas",
+  path: ["confirmPassword"]
+})
 
-export async function POST(req: NextRequest) {
+const producerOnboardingSchema = z.object({
+  currentPassword: z.string().min(1, 'Mot de passe actuel requis'),
+  newPassword: z.string()
+    .min(8, 'Le mot de passe doit contenir au moins 8 caractères')
+    .max(128, 'Mot de passe trop long')
+    .regex(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/, 'Le mot de passe doit contenir au moins une majuscule, une minuscule et un chiffre'),
+  confirmPassword: z.string().min(1, 'Confirmation du mot de passe requise'),
+  name: z.string()
+    .min(2, 'Le nom doit contenir au moins 2 caractères')
+    .max(100, 'Nom trop long')
+    .regex(/^[a-zA-ZÀ-ÿ\s\-']+$/, 'Le nom ne peut contenir que des lettres, espaces, tirets et apostrophes'),
+  phone: z.string()
+    .min(10, 'Numéro de téléphone invalide')
+    .max(20, 'Numéro de téléphone trop long')
+    .regex(/^(?:\+33|0)[1-9](?:[0-9]{8})$|^[0-9]{10}$/, 'Format de téléphone invalide'),
+  companyName: z.string()
+    .min(2, 'Nom de l\'entreprise requis')
+    .max(200, 'Nom d\'entreprise trop long')
+    .regex(/^[a-zA-ZÀ-ÿ0-9\s\-'&.()]+$/, 'Nom d\'entreprise invalide'),
+  description: z.string().max(1000, 'Description trop longue').optional(),
+  address: z.string()
+    .min(10, 'Adresse complète requise')
+    .max(500, 'Adresse trop longue'),
+  siretNumber: z.string()
+    .regex(/^[0-9]{14}$/, 'Le numéro SIRET doit contenir 14 chiffres')
+    .optional(),
+  bankAccountNumber: z.string()
+    .min(15, 'IBAN invalide')
+    .max(34, 'IBAN trop long')
+    .regex(/^[A-Z]{2}[0-9]{2}[A-Z0-9]+$/, 'Format IBAN invalide'),
+  bankAccountName: z.string()
+    .min(2, 'Nom du titulaire du compte requis')
+    .max(100, 'Nom du titulaire trop long')
+}).refine((data) => data.newPassword === data.confirmPassword, {
+  message: "Les mots de passe ne correspondent pas",
+  path: ["confirmPassword"]
+})
+
+export const POST = withAuthSecurity(async (request: NextRequest, session) => {
   try {
-    const session = await getServerSession(authOptions)
+    console.log(`🔧 Début onboarding pour user ${session.user.id} (${session.user.role})`)
+
+    // 1. Vérification que le profil n'est pas déjà complété
+    if ((session.user as any).profileCompleted) {
+      console.warn(`⚠️ Tentative onboarding sur profil déjà complété par user ${session.user.id}`)
+      throw createError.validation("Profil déjà complété - modification non autorisée")
+    }
+
+    // 2. Validation des données selon le rôle
+    const rawData = await request.json()
     
-    if (!session?.user?.id) {
-      return new NextResponse("Non authentifié", { status: 401 })
+    let validatedData: any
+    if (session.user.role === 'PRODUCER') {
+      validatedData = validateData(producerOnboardingSchema, rawData)
+    } else {
+      validatedData = validateData(baseOnboardingSchema, rawData)
     }
 
-    // Si le profil est déjà complété, ne pas permettre la modification
-    if (session.user.profileCompleted) {
-      return new NextResponse("Profil déjà complété", { status: 400 })
-    }
+    const { currentPassword, newPassword, name, phone } = validatedData
 
-    const data: OnboardingData = await req.json()
-
-    // Validation des données
-    if (!data.currentPassword || !data.newPassword || !data.name || !data.phone) {
-      return new NextResponse("Données manquantes", { status: 400 })
-    }
-
-    if (data.newPassword !== data.confirmPassword) {
-      return new NextResponse("Les mots de passe ne correspondent pas", { status: 400 })
-    }
-
-    if (data.newPassword.length < 8) {
-      return new NextResponse("Le mot de passe doit contenir au moins 8 caractères", { status: 400 })
-    }
-
-    // Récupérer l'utilisateur actuel
+    // 3. Récupération sécurisée de l'utilisateur avec vérification d'ownership
     const user = await prisma.user.findUnique({
-      where: { id: session.user.id },
-      include: { producer: true }
+      where: { 
+        id: session.user.id // SÉCURITÉ: Vérifier que c'est bien l'utilisateur de la session
+      },
+      select: {
+        id: true,
+        email: true,
+        password: true,
+        role: true,
+        profileCompleted: true,
+        producer: true
+      }
     })
 
     if (!user) {
-      return new NextResponse("Utilisateur non trouvé", { status: 404 })
+      console.error(`❌ Utilisateur non trouvé lors de l'onboarding: ${session.user.id}`)
+      throw createError.notFound("Utilisateur non trouvé")
     }
 
-    // Vérifier le mot de passe actuel
-    const isPasswordValid = await compare(data.currentPassword, user.password!)
+    // 4. Double vérification du statut de complétion (sécurité)
+    if (user.profileCompleted) {
+      console.warn(`⚠️ Double tentative onboarding profil complété: ${session.user.id}`)
+      throw createError.validation("Profil déjà complété")
+    }
+
+    // 5. Vérification sécurisée du mot de passe actuel
+    if (!user.password) {
+      throw createError.internal("Compte en état incohérent - contactez le support")
+    }
+
+    const isPasswordValid = await compare(currentPassword, user.password)
     if (!isPasswordValid) {
-      return new NextResponse("Mot de passe actuel incorrect", { status: 400 })
+      console.warn(`⚠️ Tentative onboarding avec mauvais mot de passe: ${session.user.id}`)
+      throw createError.validation("Mot de passe actuel incorrect")
     }
 
-    // Hasher le nouveau mot de passe
-    const hashedNewPassword = await hash(data.newPassword, 12)
-
-    // Validation téléphone (format plus flexible)
-    const phoneRegex = /^(?:\+33|0)[1-9](?:[0-9]{8})$|^[0-9]{10}$/
-    if (!phoneRegex.test(data.phone.replace(/[\s\-\.]/g, ''))) {
-      return new NextResponse("Format de téléphone invalide (ex: 0612345678 ou +33612345678)", { status: 400 })
+    // 6. Vérification que le nouveau mot de passe est différent
+    const isSamePassword = await compare(newPassword, user.password)
+    if (isSamePassword) {
+      throw createError.validation("Le nouveau mot de passe doit être différent de l'actuel")
     }
 
-    // Préparer les données de mise à jour
+    // 7. Hashage sécurisé du nouveau mot de passe
+    const hashedNewPassword = await hash(newPassword, 12)
+
+    // 8. Nettoyage et validation des données
+    const cleanPhone = phone.replace(/[\s\-\.]/g, '')
+    const cleanName = name.trim()
+
+    // 9. Préparation des données de mise à jour
     const updateData: any = {
       password: hashedNewPassword,
-      name: data.name.trim(),
-      phone: data.phone.trim(),
-      profileCompleted: true // ✅ Marquer le profil comme complété
+      name: cleanName,
+      phone: cleanPhone,
+      profileCompleted: true // Marquer comme complété
     }
 
-    // Si c'est un producteur, mettre à jour aussi les données producteur
+    // 10. Gestion spécifique des producteurs
     if (session.user.role === 'PRODUCER') {
-      if (!data.companyName || !data.address) {
-        return new NextResponse("Informations d'entreprise manquantes", { status: 400 })
+      const { companyName, description, address, siretNumber, bankAccountNumber, bankAccountName } = validatedData
+
+      // Validation métier supplémentaire pour les producteurs
+      if (!companyName || !address || !bankAccountNumber || !bankAccountName) {
+        throw createError.validation("Informations d'entreprise et bancaires requises pour les producteurs")
       }
 
-      if (!data.bankAccountNumber || !data.bankAccountName) {
-        return new NextResponse("Informations bancaires manquantes", { status: 400 })
+      // Nettoyage des données producteur
+      const cleanCompanyName = companyName.trim()
+      const cleanAddress = address.trim()
+      const cleanBankAccountName = bankAccountName.trim()
+      const cleanIban = bankAccountNumber.trim().toUpperCase()
+
+      // Validation IBAN simple (peut être renforcée)
+      if (!cleanIban.startsWith('FR') && !cleanIban.startsWith('CH')) {
+        console.warn(`⚠️ IBAN suspect lors de l'onboarding: ${cleanIban.substring(0, 4)}...`)
       }
 
-      // Mettre à jour les informations producteur
       updateData.producer = {
         upsert: {
           create: {
-            companyName: data.companyName.trim(),
-            description: data.description?.trim() || '',
-            address: data.address.trim(),
-            bankAccountName: data.bankAccountName.trim(),
-            iban: data.bankAccountNumber.trim(),
+            companyName: cleanCompanyName,
+            description: description?.trim() || '',
+            address: cleanAddress,
+            bankAccountName: cleanBankAccountName,
+            iban: cleanIban,
+            siretNumber: siretNumber?.trim() || null
           },
           update: {
-            companyName: data.companyName.trim(),
-            description: data.description?.trim() || '',
-            address: data.address.trim(),
-            bankAccountName: data.bankAccountName.trim(),
-            iban: data.bankAccountNumber.trim(),
+            companyName: cleanCompanyName,
+            description: description?.trim() || '',
+            address: cleanAddress,
+            bankAccountName: cleanBankAccountName,
+            iban: cleanIban,
+            siretNumber: siretNumber?.trim() || null
           }
         }
       }
+
+      console.log(`🏭 Données producteur préparées pour user ${session.user.id}`)
     }
 
-    // Mettre à jour l'utilisateur
-    const updatedUser = await prisma.user.update({
-      where: { id: session.user.id },
-      data: updateData,
-      include: { producer: true }
+    // 11. Mise à jour atomique en transaction
+    const updatedUser = await prisma.$transaction(async (tx) => {
+      // Mettre à jour l'utilisateur
+      const user = await tx.user.update({
+        where: { id: session.user.id },
+        data: updateData,
+        select: {
+          id: true,
+          email: true,
+          name: true,
+          phone: true,
+          role: true,
+          profileCompleted: true,
+          createdAt: true,
+          updatedAt: true,
+          producer: {
+            select: {
+              id: true,
+              companyName: true,
+              description: true,
+              address: true,
+              bankAccountName: true,
+              // Ne pas exposer l'IBAN complet dans la réponse
+            }
+          }
+        }
+      })
+
+      return user
     })
 
-    console.log('Profil complété avec succès pour:', updatedUser.email)
+    // 12. Log d'audit sécurisé (sans données sensibles)
+    console.log(`✅ Onboarding complété avec succès:`, {
+      userId: session.user.id,
+      email: updatedUser.email,
+      role: session.user.role,
+      isProducer: session.user.role === 'PRODUCER',
+      timestamp: new Date().toISOString()
+    })
 
-    // Retirer le mot de passe de la réponse
-    const { password, ...userWithoutPassword } = updatedUser
-
+    // 13. Réponse sécurisée (sans mot de passe ni IBAN complet)
     return NextResponse.json({
-      ...userWithoutPassword,
-      message: "Profil complété avec succès"
+      success: true,
+      message: "Profil complété avec succès",
+      user: {
+        ...updatedUser,
+        // Masquer l'IBAN dans la réponse (garder seulement les 4 premiers caractères)
+        ...(updatedUser.producer && {
+          producer: {
+            ...updatedUser.producer,
+            ibanPreview: validatedData.bankAccountNumber ? 
+              `${validatedData.bankAccountNumber.substring(0, 4)}****` : undefined
+          }
+        })
+      }
     })
 
   } catch (error) {
-    console.error('Erreur lors de la complétion de l\'onboarding:', error)
-    return new NextResponse(
-      error instanceof Error ? error.message : "Erreur lors de la complétion du profil", 
-      { status: 500 }
-    )
+    console.error(`❌ Erreur onboarding pour user ${session.user.id}:`, error)
+    return handleError(error, request.url)
   }
-}
+}, {
+  requireAuth: true,
+  allowedRoles: ['CLIENT', 'PRODUCER'], // Les admins n'ont pas d'onboarding
+  allowedMethods: ['POST'],
+  rateLimit: {
+    requests: 5,  // 5 tentatives par heure (au cas où)
+    window: 3600  // 1 heure
+  }
+})

@@ -1,91 +1,116 @@
 // app/api/orders/items/route.ts
 import { NextRequest, NextResponse } from "next/server"
+import { withClientSecurity, validateData, commonSchemas } from "@/lib/api-security"
+import { handleError, createError } from "@/lib/error-handler"
 import { prisma } from "@/lib/prisma"
-import { apiAuthMiddleware } from "@/lib/api-middleware"
-import { Session } from "next-auth"
-import { OrderStatus } from "@prisma/client"  // Importer OrderStatus
+import { OrderStatus } from "@prisma/client"
+import { z } from "zod"
 
-export const POST = apiAuthMiddleware(async (
-  req: NextRequest,
-  session: Session
-) => {
+// Schéma de validation pour l'ajout d'un item
+const addItemSchema = z.object({
+  orderId: commonSchemas.id,
+  productId: commonSchemas.id,
+  quantity: z.number()
+    .positive('La quantité doit être positive')
+    .max(10000, 'Quantité trop élevée')
+    .refine(val => val % 0.01 === 0, 'Quantité invalide (2 décimales max)')
+})
+
+export const POST = withClientSecurity(async (request: NextRequest, session) => {
   try {
-    const { orderId, productId, quantity } = await req.json()
+    // 1. Validation des données d'entrée
+    const rawData = await request.json()
+    const { orderId, productId, quantity } = validateData(addItemSchema, rawData)
 
-    if (!orderId || !productId || !quantity) {
-      return new NextResponse(
-        "Tous les champs sont requis", 
-        { status: 400 }
-      )
-    }
+    console.log(`🛒 Ajout item au panier: orderId=${orderId}, productId=${productId}, qty=${quantity} par user ${session.user.id}`)
 
-    // Effectuer l'ajout dans une transaction
+    // 2. Transaction atomique pour l'ajout sécurisé
     const orderItem = await prisma.$transaction(async (tx) => {
-      // 1. Vérifier le produit et le stock
+      // 2.1. Vérification sécurisée du produit et du stock
       const product = await tx.product.findUnique({
         where: { id: productId },
         include: {
-          stock: true
+          stock: true,
+          producer: {
+            select: {
+              id: true,
+              companyName: true,
+              userId: true
+            }
+          }
         }
       })
 
       if (!product) {
-        throw new Error("Produit non trouvé")
+        throw createError.notFound("Produit non trouvé")
       }
 
       if (!product.available) {
-        throw new Error("Produit non disponible")
+        throw createError.validation("Produit non disponible")
       }
       
-      // Vérifier le stock
+      // 2.2. Gestion sécurisée du stock
       if (!product.stock) {
-        // Créer un stock s'il n'existe pas
+        // Créer un stock à zéro s'il n'existe pas
         await tx.stock.create({
           data: {
             productId: product.id,
             quantity: 0
           }
-        });
-        throw new Error("Stock insuffisant")
+        })
+        throw createError.validation("Stock insuffisant (stock créé)")
       }
       
       if (product.stock.quantity < quantity) {
-        throw new Error("Stock insuffisant")
+        throw createError.validation(
+          `Stock insuffisant. Disponible: ${product.stock.quantity} ${product.unit}, demandé: ${quantity} ${product.unit}`
+        )
       }
 
-      // Vérifier la quantité minimale de commande
+      // 2.3. Validation de la quantité minimale
       if (product.minOrderQuantity && quantity < product.minOrderQuantity) {
-        throw new Error(`La quantité minimale pour ce produit est de ${product.minOrderQuantity} ${product.unit}`)
+        throw createError.validation(
+          `Quantité minimale requise: ${product.minOrderQuantity} ${product.unit}`
+        )
       }
 
-      // 2. Vérifier que la commande existe et appartient à l'utilisateur
+      // 2.4. Vérification sécurisée de la commande
       const order = await tx.order.findUnique({
-        where: { id: orderId }
+        where: { id: orderId },
+        select: {
+          id: true,
+          userId: true,
+          status: true,
+          total: true
+        }
       })
 
       if (!order) {
-        throw new Error("Commande non trouvée")
+        throw createError.notFound("Commande non trouvée")
       }
       
+      // SÉCURITÉ CRITIQUE: Vérifier ownership de la commande
       if (order.userId !== session.user.id) {
-        throw new Error("Non autorisé")
+        console.error(`🚨 Tentative ajout item commande non autorisée: user ${session.user.id} -> commande ${orderId}`)
+        throw createError.forbidden("Non autorisé - Cette commande ne vous appartient pas")
       }
 
-      // Vérifier que la commande est bien un panier (DRAFT) ou en attente (PENDING) ou avec paiement différé (INVOICE_PENDING)
-      // Correction pour l'erreur de type
-      const orderStatus = order.status as string; // Convertir en string pour la comparaison
-      const validStatuses = ["DRAFT", "PENDING", "INVOICE_PENDING"];
-      
-      if (!validStatuses.includes(orderStatus)) {
-        throw new Error(`Impossible de modifier cette commande car son statut est ${orderStatus}`)
+      // 2.5. Validation du statut de commande modifiable
+      const editableStatuses: OrderStatus[] = [OrderStatus.DRAFT, OrderStatus.PENDING, OrderStatus.INVOICE_PENDING]
+      if (!editableStatuses.includes(order.status as OrderStatus)) {
+        throw createError.validation(
+          `Impossible de modifier cette commande (statut: ${order.status})`
+        )
       }
 
-      // Vérifier si le produit accepte le paiement différé pour les commandes de type INVOICE_PENDING
-      if (orderStatus === "INVOICE_PENDING" && !product.acceptDeferred) {
-        throw new Error("Ce produit n'accepte pas le paiement différé")
+      // 2.6. Vérification paiement différé si nécessaire
+      if (order.status === OrderStatus.INVOICE_PENDING && !product.acceptDeferred) {
+        throw createError.validation(
+          "Ce produit n'accepte pas le paiement différé"
+        )
       }
 
-      // 3. Vérifier si l'article existe déjà dans la commande
+      // 2.7. Gestion de l'item existant ou création
       const existingItem = await tx.orderItem.findFirst({
         where: {
           orderId,
@@ -93,13 +118,24 @@ export const POST = apiAuthMiddleware(async (
         }
       })
 
-      let orderItem;
+      let orderItem
+      let actualQuantityAdded = quantity
+
       if (existingItem) {
-        // Mise à jour de la quantité
+        // Vérifier que le stock peut supporter la quantité totale
+        const newTotalQuantity = existingItem.quantity + quantity
+        if (product.stock.quantity < quantity) { // On vérifie juste la quantité à ajouter
+          throw createError.validation(
+            `Stock insuffisant pour cette quantité supplémentaire`
+          )
+        }
+
         orderItem = await tx.orderItem.update({
           where: { id: existingItem.id },
           data: {
-            quantity: existingItem.quantity + quantity
+            quantity: newTotalQuantity,
+            // Utiliser le prix actuel du produit pour cohérence
+            price: product.price
           }
         })
       } else {
@@ -109,47 +145,73 @@ export const POST = apiAuthMiddleware(async (
             orderId,
             productId,
             quantity,
-            price: product.price
+            price: product.price // SÉCURITÉ: Toujours utiliser le prix de la DB
           }
         })
       }
 
-      // 4. Mettre à jour le stock
+      // 2.8. Mise à jour sécurisée du stock
       await tx.stock.update({
         where: { productId },
         data: {
           quantity: {
-            decrement: quantity
+            decrement: actualQuantityAdded
           }
         }
       })
 
-      // 5. Mettre à jour le total de la commande
-      const orderItems = await tx.orderItem.findMany({
+      // 2.9. Recalcul sécurisé du total de la commande
+      const allOrderItems = await tx.orderItem.findMany({
         where: { orderId },
         include: {
-          product: true
+          product: {
+            select: {
+              price: true // Utiliser le prix actuel pour recalcul
+            }
+          }
         }
       })
 
-      const total = orderItems.reduce((sum, item) => 
-        sum + (item.price * item.quantity), 0
+      const newTotal = allOrderItems.reduce((sum, item) => 
+        sum + (item.product.price * item.quantity), 0
       )
 
       await tx.order.update({
         where: { id: orderId },
-        data: { total }
+        data: { total: newTotal }
       })
 
-      return orderItem
+      console.log(`✅ Item ajouté: ${quantity} ${product.unit} de ${product.name} (nouveau total: ${newTotal} CHF)`)
+
+      return {
+        ...orderItem,
+        product: {
+          id: product.id,
+          name: product.name,
+          unit: product.unit,
+          price: product.price,
+          producer: product.producer
+        }
+      }
     })
 
-    return NextResponse.json(orderItem)
+    // 3. Log d'audit sécurisé
+    console.log(`📋 Audit - Item ajouté au panier:`, {
+      userId: session.user.id,
+      orderId,
+      productId,
+      quantity,
+      timestamp: new Date().toISOString()
+    })
+
+    return NextResponse.json({
+      success: true,
+      item: orderItem,
+      message: `${quantity} article(s) ajouté(s) au panier`
+    })
+
   } catch (error) {
-    console.error("Erreur lors de l'ajout au panier:", error)
-    return new NextResponse(
-      error instanceof Error ? error.message : "Erreur lors de l'ajout au panier",
-      { status: 400 }
-    )
+    console.error("❌ Erreur ajout item au panier:", error)
+    return handleError(error, request.url)
   }
 })

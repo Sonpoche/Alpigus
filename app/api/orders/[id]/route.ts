@@ -1,111 +1,60 @@
 // app/api/orders/[id]/route.ts
 import { NextRequest, NextResponse } from "next/server"
+import { withAuthSecurity, validateData, commonSchemas } from "@/lib/api-security"
+import { handleError, createError } from "@/lib/error-handler"
 import { prisma } from "@/lib/prisma"
-import { apiAuthMiddleware } from "@/lib/api-middleware"
-import { Session } from "next-auth"
-import { OrderStatus, ProductType, Prisma } from "@prisma/client"
+import { OrderStatus } from "@prisma/client"
 import { NotificationService } from '@/lib/notification-service'
-import fs from 'fs/promises';
-import path from 'path';
+import { z } from "zod"
 
-export const GET = apiAuthMiddleware(async (
-  req: NextRequest,
-  session: Session,
-  context: { params: { [key: string]: string } }
-) => {
+// Schéma de validation pour les paramètres d'URL
+const paramsSchema = z.object({
+  id: commonSchemas.id
+})
+
+// GET - Récupérer une commande par ID
+export const GET = withAuthSecurity(async (request: NextRequest, session) => {
   try {
-    const orderId = context.params.id;
+    // 1. Extraction et validation de l'ID depuis l'URL
+    const url = new URL(request.url)
+    const pathSegments = url.pathname.split('/')
+    const orderId = pathSegments[pathSegments.indexOf('orders') + 1]
 
-    // Vérifier que la commande existe
+    const { id } = validateData(paramsSchema, { id: orderId })
+
+    console.log(`🔍 Récupération commande ${id} par ${session.user.role} ${session.user.id}`)
+
+    // 2. Récupération sécurisée de la commande avec toutes les relations
     const order = await prisma.order.findUnique({
-      where: { id: orderId },
+      where: { id },
       include: {
         user: {
           select: {
+            id: true,
             name: true,
             email: true,
-            phone: true,
+            phone: true
           }
         },
-        items: {
-          include: {
-            product: true
-          }
-        },
-        bookings: {
-          include: {
-            deliverySlot: {
-              include: {
-                product: true
-              }
-            }
-          }
-        }
-      }
-    });
-
-    if (!order) {
-      return new NextResponse("Commande non trouvée", { status: 404 });
-    }
-
-    // Si c'est un client, vérifier que la commande lui appartient
-    if (session.user.role === 'CLIENT' && order.userId !== session.user.id) {
-      return new NextResponse("Non autorisé", { status: 403 });
-    }
-
-    // Si c'est un producteur, vérifier qu'il a des produits dans cette commande
-    if (session.user.role === 'PRODUCER') {
-      const producer = await prisma.producer.findUnique({
-        where: { userId: session.user.id }
-      });
-
-      if (!producer) {
-        return new NextResponse("Producteur non trouvé", { status: 404 });
-      }
-
-      const hasProducts = order.items.some(item => 
-        item.product.producerId === producer.id
-      );
-      
-      const hasBookings = order.bookings.some(booking => 
-        booking.deliverySlot.product.producerId === producer.id
-      );
-
-      if (!hasProducts && !hasBookings) {
-        return new NextResponse("Non autorisé", { status: 403 });
-      }
-    }
-
-    return NextResponse.json(order);
-  } catch (error) {
-    console.error("Erreur lors de la récupération de la commande:", error);
-    return new NextResponse("Erreur lors de la récupération de la commande", { status: 500 });
-  }
-});
-
-export const PATCH = apiAuthMiddleware(async (
-  req: NextRequest,
-  session: Session,
-  context: { params: { [key: string]: string } }
-) => {
-  try {
-    const orderId = context.params.id
-    const body = await req.json()
-    const { status } = body
-
-    if (!status || !Object.values(OrderStatus).includes(status)) {
-      return new NextResponse("Statut invalide", { status: 400 })
-    }
-
-    // Récupérer l'ordre pour vérifier les autorisations
-    const order = await prisma.order.findUnique({
-      where: { id: orderId },
-      include: {
         items: {
           include: {
             product: {
               include: {
-                producer: true
+                producer: {
+                  select: {
+                    id: true,
+                    companyName: true,
+                    userId: true,
+                    user: {
+                      select: {
+                        id: true,
+                        name: true,
+                        email: true,
+                        phone: true
+                      }
+                    }
+                  }
+                }
               }
             }
           }
@@ -116,86 +65,175 @@ export const PATCH = apiAuthMiddleware(async (
               include: {
                 product: {
                   include: {
-                    producer: true
+                    producer: {
+                      select: {
+                        id: true,
+                        companyName: true,
+                        userId: true,
+                        user: {
+                          select: {
+                            id: true,
+                            name: true,
+                            email: true,
+                            phone: true
+                          }
+                        }
+                      }
+                    }
                   }
                 }
               }
             }
           }
         },
-        user: {
+        invoice: {
           select: {
-            name: true,
-            email: true,
-            phone: true
+            id: true,
+            amount: true,
+            status: true,
+            dueDate: true,
+            paidAt: true,
+            paymentMethod: true
           }
         }
       }
     })
 
     if (!order) {
-      return new NextResponse("Commande non trouvée", { status: 404 })
+      console.warn(`⚠️ Tentative accès commande inexistante ${id} par user ${session.user.id}`)
+      throw createError.notFound("Commande non trouvée")
     }
 
-    // Vérifier si c'est un producteur qui a des produits dans cette commande
-    if (session.user.role === 'PRODUCER') {
-      // Récupérer l'ID du producteur
+    // 3. Vérifications d'autorisation selon le rôle
+    if (session.user.role === 'CLIENT') {
+      // Les clients ne peuvent voir que leurs propres commandes
+      if (order.userId !== session.user.id) {
+        console.warn(`⚠️ Client ${session.user.id} tentative accès commande non autorisée ${id}`)
+        throw createError.forbidden("Non autorisé - Cette commande ne vous appartient pas")
+      }
+    } 
+    else if (session.user.role === 'PRODUCER') {
+      // Les producteurs ne peuvent voir que les commandes contenant leurs produits
       const producer = await prisma.producer.findUnique({
-        where: { userId: session.user.id }
+        where: { userId: session.user.id },
+        select: { id: true, companyName: true }
       })
 
       if (!producer) {
-        return new NextResponse("Producteur non trouvé", { status: 404 })
+        throw createError.notFound("Profil producteur non trouvé")
       }
 
       // Vérifier si ce producteur a des produits dans cette commande
       const hasProducts = order.items.some(item => 
-        item.product.producer.userId === session.user.id
+        item.product.producer.id === producer.id
       )
-
+      
       const hasBookings = order.bookings.some(booking => 
-        booking.deliverySlot.product.producer.userId === session.user.id
+        booking.deliverySlot.product.producer.id === producer.id
       )
 
       if (!hasProducts && !hasBookings) {
-        return new NextResponse("Non autorisé - Vous n'avez pas de produits dans cette commande", { status: 403 })
+        console.warn(`⚠️ Producteur ${session.user.id} tentative accès commande non autorisée ${id}`)
+        throw createError.forbidden("Non autorisé - Vous n'avez pas de produits dans cette commande")
       }
 
-      // Vérifier les transitions d'état valides pour un producteur
-      const validTransitions: Record<OrderStatus, OrderStatus[]> = {
-        [OrderStatus.PENDING]: [OrderStatus.CONFIRMED, OrderStatus.CANCELLED],
-        [OrderStatus.CONFIRMED]: [OrderStatus.SHIPPED, OrderStatus.CANCELLED],
-        [OrderStatus.SHIPPED]: [OrderStatus.DELIVERED, OrderStatus.CANCELLED],
-        [OrderStatus.DELIVERED]: [],
-        [OrderStatus.CANCELLED]: [],
-        [OrderStatus.DRAFT]: [],
-        [OrderStatus.INVOICE_PENDING]: [],
-        [OrderStatus.INVOICE_PAID]: [],
-        [OrderStatus.INVOICE_OVERDUE]: []
-      }
+      console.log(`🏭 Producteur ${producer.companyName || 'Inconnu'} accède à commande ${id}`)
+    }
+    // Les ADMIN peuvent voir toutes les commandes (pas de vérification supplémentaire)
 
-      if (!validTransitions[order.status].includes(status as OrderStatus)) {
-        return new NextResponse(`Transition de statut invalide: ${order.status} → ${status}`, { status: 400 })
+    // 4. Filtrage des données selon le rôle pour la réponse
+    let responseOrder = order
+
+    if (session.user.role === 'PRODUCER') {
+      // Pour les producteurs, filtrer pour ne montrer que leurs produits
+      const producer = await prisma.producer.findUnique({
+        where: { userId: session.user.id },
+        select: { id: true }
+      })
+
+      if (producer) {
+        // Filtrer les items
+        const filteredItems = order.items.filter(item => 
+          item.product.producer.id === producer.id
+        )
+        
+        // Filtrer les bookings
+        const filteredBookings = order.bookings.filter(booking => 
+          booking.deliverySlot.product.producer.id === producer.id
+        )
+
+        // Recalculer le total pour ce producteur seulement
+        const producerItemsTotal = filteredItems.reduce(
+          (sum, item) => sum + (item.price * item.quantity), 0
+        )
+
+        const producerBookingsTotal = filteredBookings.reduce(
+          (sum, booking) => {
+            const price = booking.price || booking.deliverySlot.product.price
+            return sum + (price * booking.quantity)
+          }, 0
+        )
+
+        const producerTotal = producerItemsTotal + producerBookingsTotal
+
+        responseOrder = {
+          ...order,
+          items: filteredItems,
+          bookings: filteredBookings,
+          total: producerTotal // Total spécifique au producteur
+          // Note: le total original reste accessible via order.total si nécessaire
+        } as any // Cast temporaire pour éviter l'erreur TypeScript
       }
-    } 
-    // Si c'est un admin, il n'y a pas de restrictions
-    else if (session.user.role !== 'ADMIN') {
-      return new NextResponse("Non autorisé", { status: 403 })
     }
 
-    // Conserver l'ancien statut pour les notifications
-    const oldStatus = order.status;
+    // 5. Log d'audit sécurisé
+    console.log(`📋 Audit - Commande consultée:`, {
+      orderId: id,
+      consultedBy: session.user.id,
+      role: session.user.role,
+      timestamp: new Date().toISOString()
+    })
 
-    // Mettre à jour le statut de la commande
-    const updatedOrder = await prisma.order.update({
-      where: { id: orderId },
-      data: { status: status as OrderStatus },
+    console.log(`✅ Commande ${id} récupérée avec succès pour ${session.user.role} ${session.user.id}`)
+
+    return NextResponse.json(responseOrder)
+
+  } catch (error) {
+    console.error("❌ Erreur récupération commande:", error)
+    return handleError(error, request.url)
+  }
+}, {
+  requireAuth: true,
+  allowedRoles: ['CLIENT', 'PRODUCER', 'ADMIN'],
+  allowedMethods: ['GET'],
+  rateLimit: {
+    requests: 100, // 100 consultations par minute
+    window: 60
+  }
+})
+
+// DELETE - Supprimer une commande (CLIENT et ADMIN uniquement)
+export const DELETE = withAuthSecurity(async (request: NextRequest, session) => {
+  try {
+    // 1. Extraction et validation de l'ID
+    const url = new URL(request.url)
+    const pathSegments = url.pathname.split('/')
+    const orderId = pathSegments[pathSegments.indexOf('orders') + 1]
+
+    const { id } = validateData(paramsSchema, { id: orderId })
+
+    console.log(`🗑️ Suppression commande ${id} par ${session.user.role} ${session.user.id}`)
+
+    // 2. Récupération sécurisée de la commande
+    const order = await prisma.order.findUnique({
+      where: { id },
       include: {
         items: {
           include: {
             product: {
-              include: {
-                producer: true
+              select: {
+                id: true,
+                name: true
               }
             }
           }
@@ -203,137 +241,130 @@ export const PATCH = apiAuthMiddleware(async (
         bookings: {
           include: {
             deliverySlot: {
-              include: {
+              select: {
+                id: true,
                 product: {
-                  include: {
-                    producer: true
+                  select: {
+                    id: true,
+                    name: true
                   }
                 }
               }
             }
           }
         },
-        user: {
+        invoice: {
           select: {
-            name: true,
-            email: true,
-            phone: true
+            id: true,
+            status: true
           }
         }
       }
     })
 
-    // Convertir les dates en chaînes pour la notification
-    const orderWithStringDates = {
-      ...updatedOrder,
-      createdAt: updatedOrder.createdAt instanceof Date ? updatedOrder.createdAt.toISOString() : updatedOrder.createdAt,
-      updatedAt: updatedOrder.updatedAt instanceof Date ? updatedOrder.updatedAt.toISOString() : updatedOrder.updatedAt,
-      bookings: updatedOrder.bookings.map(booking => ({
-        ...booking,
-        price: booking.price === null ? undefined : booking.price, // Convertir null en undefined
-        deliverySlot: {
-          ...booking.deliverySlot,
-          date: booking.deliverySlot.date instanceof Date ? booking.deliverySlot.date.toISOString() : booking.deliverySlot.date
-        }
-      }))
+    if (!order) {
+      throw createError.notFound("Commande non trouvée")
     }
 
-    // Envoyer une notification de changement de statut
-    await NotificationService.sendOrderStatusChangeNotification(orderWithStringDates, oldStatus);
+    // 3. Vérifications d'autorisation pour la suppression
+    if (session.user.role === 'CLIENT') {
+      // CLIENT: Peut supprimer seulement ses propres commandes
+      if (order.userId !== session.user.id) {
+        console.warn(`⚠️ Client ${session.user.id} tentative suppression commande non autorisée ${id}`)
+        throw createError.forbidden("Non autorisé - Cette commande ne vous appartient pas")
+      }
+    }
+    // ADMIN: Peut supprimer toutes les commandes (pas de vérification supplémentaire)
 
-    // Si la commande est annulée, mettre à jour le stock
-    if (status === OrderStatus.CANCELLED && order.status !== OrderStatus.CANCELLED) {
-      await handleCancellation(order)
+    // 4. Validation des règles métier pour la suppression
+    const nonDeletableStatuses: OrderStatus[] = [
+      OrderStatus.CONFIRMED, 
+      OrderStatus.SHIPPED, 
+      OrderStatus.DELIVERED
+    ]
+
+    if (nonDeletableStatuses.includes(order.status as OrderStatus)) {
+      throw createError.validation(
+        `Impossible de supprimer une commande avec le statut: ${order.status}`
+      )
     }
 
-    return NextResponse.json(updatedOrder)
+    // 5. Vérifier qu'il n'y a pas de facture payée
+    if (order.invoice && order.invoice.status === 'PAID') {
+      throw createError.validation(
+        "Impossible de supprimer une commande avec une facture payée"
+      )
+    }
+
+    // 6. Suppression sécurisée avec remise en stock
+    await prisma.$transaction(async (tx) => {
+      // 6.1. Remettre les articles en stock
+      for (const item of order.items) {
+        await tx.stock.update({
+          where: { productId: item.product.id },
+          data: {
+            quantity: {
+              increment: item.quantity
+            }
+          }
+        })
+      }
+
+      // 6.2. Libérer les créneaux de réservation
+      for (const booking of order.bookings) {
+        await tx.deliverySlot.update({
+          where: { id: booking.slotId },
+          data: {
+            reserved: {
+              decrement: booking.quantity
+            }
+          }
+        })
+
+        // Remettre en stock aussi
+        await tx.stock.update({
+          where: { productId: booking.deliverySlot.product.id },
+          data: {
+            quantity: {
+              increment: booking.quantity
+            }
+          }
+        })
+      }
+
+      // 6.3. Supprimer la commande (cascade supprimera items, bookings, invoice)
+      await tx.order.delete({
+        where: { id }
+      })
+    })
+
+    // 7. Log d'audit sécurisé
+    console.log(`📋 Audit - Commande supprimée:`, {
+      orderId: id,
+      deletedBy: session.user.id,
+      role: session.user.role,
+      itemsCount: order.items.length,
+      bookingsCount: order.bookings.length,
+      timestamp: new Date().toISOString()
+    })
+
+    console.log(`✅ Commande ${id} supprimée avec succès et stock remis à jour`)
+
+    return NextResponse.json({
+      success: true,
+      message: 'Commande supprimée avec succès'
+    })
+
   } catch (error) {
-    console.error("Erreur lors de la mise à jour du statut de la commande:", error)
-    return new NextResponse("Erreur lors de la mise à jour du statut de la commande", { status: 500 })
+    console.error("❌ Erreur suppression commande:", error)
+    return handleError(error, request.url)
   }
-}, ["PRODUCER", "ADMIN"])
-
-// Fonction pour gérer la logique d'annulation
-async function handleCancellation(order: any) {
-  // 1. Retourner les articles au stock
-  for (const item of order.items) {
-    await prisma.stock.update({
-      where: { productId: item.product.id },
-      data: {
-        quantity: {
-          increment: item.quantity
-        }
-      }
-    })
+}, {
+  requireAuth: true,
+  allowedRoles: ['CLIENT', 'ADMIN'], // Seuls CLIENT et ADMIN peuvent supprimer
+  allowedMethods: ['DELETE'],
+  rateLimit: {
+    requests: 10, // 10 suppressions max par minute
+    window: 60
   }
-
-  // 2. Retourner les réservations au stock et libérer les créneaux
-  for (const booking of order.bookings) {
-    // Mettre à jour le statut de la réservation
-    await prisma.booking.update({
-      where: { id: booking.id },
-      data: { status: 'CANCELLED' }
-    })
-    
-    // Libérer le créneau
-    await prisma.deliverySlot.update({
-      where: { id: booking.slotId },
-      data: {
-        reserved: {
-          decrement: booking.quantity
-        }
-      }
-    })
-    
-    // Retourner au stock
-    await prisma.stock.update({
-      where: { productId: booking.deliverySlot.product.id },
-      data: {
-        quantity: {
-          increment: booking.quantity
-        }
-      }
-    })
-  }
-}
-
-export const DELETE = apiAuthMiddleware(
-  async (
-    req: NextRequest,
-    session: Session,
-    context: { params: { [key: string]: string } }
-  ) => {
-    try {
-      const orderId = context.params.id;
-
-      // Vérifier que la commande existe
-      const order = await prisma.order.findUnique({
-        where: { id: orderId },
-        include: {
-          items: true,
-          bookings: true
-        }
-      });
-
-      if (!order) {
-        return new NextResponse("Commande non trouvée", { status: 404 });
-      }
-
-      // Seul l'utilisateur qui a créé la commande ou un admin peut la supprimer
-      if (order.userId !== session.user.id && session.user.role !== 'ADMIN') {
-        return new NextResponse("Non autorisé", { status: 403 });
-      }
-
-      // Supprimer la commande et tous les éléments associés
-      await prisma.order.delete({
-        where: { id: orderId }
-      });
-
-      return new NextResponse(null, { status: 204 });
-    } catch (error) {
-      console.error("Erreur lors de la suppression de la commande:", error);
-      return new NextResponse("Erreur lors de la suppression de la commande", { status: 500 });
-    }
-  }, 
-  ["CLIENT", "ADMIN"]
-);
+})

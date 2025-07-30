@@ -1,31 +1,43 @@
 // app/api/orders/[id]/status/route.ts
 import { NextRequest, NextResponse } from "next/server"
+import { withAuthSecurity, validateData, commonSchemas } from "@/lib/api-security"
+import { handleError, createError } from "@/lib/error-handler"
 import { prisma } from "@/lib/prisma"
-import { apiAuthMiddleware } from "@/lib/api-middleware"
-import { Session } from "next-auth"
-import { OrderStatus, UserRole } from "@prisma/client"
+import { OrderStatus } from "@prisma/client"
 import { NotificationService } from '@/lib/notification-service'
 import { WalletService } from "@/lib/wallet-service"
+import { z } from "zod"
 
-export const PATCH = apiAuthMiddleware(async (
-  req: NextRequest,
-  session: Session,
-  context: { params: { [key: string]: string } }
-) => {
+// Schéma de validation pour les paramètres d'URL
+const paramsSchema = z.object({
+  id: commonSchemas.id
+})
+
+// Schéma de validation pour le changement de statut
+const statusUpdateSchema = z.object({
+  status: z.nativeEnum(OrderStatus, {
+    errorMap: () => ({ message: 'Statut de commande invalide' })
+  })
+})
+
+export const PATCH = withAuthSecurity(async (request: NextRequest, session) => {
   try {
-    const orderId = context.params.id
-    const body = await req.json()
-    const { status } = body
+    // 1. Extraction et validation de l'ID depuis l'URL
+    const url = new URL(request.url)
+    const pathSegments = url.pathname.split('/')
+    const orderId = pathSegments[pathSegments.indexOf('orders') + 1]
 
-    console.log(`Mise à jour du statut de la commande ${orderId} vers ${status}`);
+    const { id } = validateData(paramsSchema, { id: orderId })
 
-    if (!status || !Object.values(OrderStatus).includes(status)) {
-      return new NextResponse("Statut invalide", { status: 400 })
-    }
+    // 2. Validation des données de mise à jour
+    const rawData = await request.json()
+    const { status } = validateData(statusUpdateSchema, rawData)
 
-    // Récupérer l'ordre pour vérifier les autorisations
+    console.log(`🔄 Mise à jour statut commande ${id} vers ${status} par ${session.user.role} ${session.user.id}`)
+
+    // 3. Récupération sécurisée de la commande avec toutes les relations
     const order = await prisma.order.findUnique({
-      where: { id: orderId },
+      where: { id },
       include: {
         items: {
           include: {
@@ -51,6 +63,7 @@ export const PATCH = apiAuthMiddleware(async (
         },
         user: {
           select: {
+            id: true,
             name: true,
             email: true,
             phone: true
@@ -60,19 +73,20 @@ export const PATCH = apiAuthMiddleware(async (
     })
 
     if (!order) {
-      console.log(`Commande ${orderId} non trouvée`);
-      return new NextResponse("Commande non trouvée", { status: 404 })
+      console.warn(`⚠️ Tentative mise à jour commande inexistante ${id} par user ${session.user.id}`)
+      throw createError.notFound("Commande non trouvée")
     }
 
-    // Vérifier si c'est un producteur qui a des produits dans cette commande
-    if (session.user.role === UserRole.PRODUCER) {
+    // 4. Vérifications d'autorisation selon le rôle
+    if (session.user.role === 'PRODUCER') {
       // Récupérer l'ID du producteur
       const producer = await prisma.producer.findUnique({
-        where: { userId: session.user.id }
+        where: { userId: session.user.id },
+        select: { id: true, companyName: true }
       })
 
       if (!producer) {
-        return new NextResponse("Producteur non trouvé", { status: 404 })
+        throw createError.notFound("Profil producteur non trouvé")
       }
 
       // Vérifier si ce producteur a des produits dans cette commande
@@ -85,10 +99,11 @@ export const PATCH = apiAuthMiddleware(async (
       )
 
       if (!hasProducts && !hasBookings) {
-        return new NextResponse("Non autorisé - Vous n'avez pas de produits dans cette commande", { status: 403 })
+        console.warn(`⚠️ Producteur ${session.user.id} tentative modif commande non autorisée ${id}`)
+        throw createError.forbidden("Non autorisé - Vous n'avez pas de produits dans cette commande")
       }
 
-      // Vérifier les transitions d'état valides pour un producteur
+      // 5. Validation des transitions d'état pour les producteurs
       const validTransitions: Record<OrderStatus, OrderStatus[]> = {
         [OrderStatus.PENDING]: [OrderStatus.CONFIRMED, OrderStatus.CANCELLED],
         [OrderStatus.CONFIRMED]: [OrderStatus.SHIPPED, OrderStatus.CANCELLED],
@@ -101,22 +116,25 @@ export const PATCH = apiAuthMiddleware(async (
         [OrderStatus.INVOICE_OVERDUE]: []
       }
 
-      if (!validTransitions[order.status].includes(status as OrderStatus)) {
-        return new NextResponse(`Transition de statut invalide: ${order.status} → ${status}`, { status: 400 })
+      if (!validTransitions[order.status].includes(status)) {
+        throw createError.validation(
+          `Transition de statut invalide: ${order.status} → ${status}`
+        )
       }
+
+      console.log(`🏭 Producteur ${producer.companyName || 'Inconnu'} modifie commande ${id}`)
     } 
-    // Si c'est un admin, il n'y a pas de restrictions
-    else if (session.user.role !== UserRole.ADMIN) {
-      return new NextResponse("Non autorisé", { status: 403 })
+    else if (session.user.role !== 'ADMIN') {
+      throw createError.forbidden("Non autorisé - Seuls les producteurs et admins peuvent modifier le statut")
     }
 
-    // Conserver l'ancien statut pour les notifications
-    const oldStatus = order.status;
+    // 6. Sauvegarder l'ancien statut pour les notifications
+    const oldStatus = order.status
 
-    // Mettre à jour le statut de la commande
+    // 7. Mise à jour sécurisée du statut
     const updatedOrder = await prisma.order.update({
-      where: { id: orderId },
-      data: { status: status as OrderStatus },
+      where: { id },
+      data: { status },
       include: {
         items: {
           include: {
@@ -142,6 +160,7 @@ export const PATCH = apiAuthMiddleware(async (
         },
         user: {
           select: {
+            id: true,
             name: true,
             email: true,
             phone: true
@@ -150,95 +169,142 @@ export const PATCH = apiAuthMiddleware(async (
       }
     })
 
-    console.log(`Statut de la commande ${orderId} mis à jour de ${oldStatus} à ${status}`);
+    console.log(`✅ Statut commande ${id} mis à jour de ${oldStatus} à ${status}`)
 
-    // Envoyer une notification de changement de statut
-    await NotificationService.sendOrderStatusChangeNotification(updatedOrder, oldStatus);
-    
-    // Envoyer également une notification au client
-    await NotificationService.sendOrderStatusToClientNotification(updatedOrder);
+    // 8. Notifications sécurisées (non bloquantes)
+    try {
+      // Notification de changement de statut
+      await NotificationService.sendOrderStatusChangeNotification(updatedOrder, oldStatus)
+      
+      // Notification spécifique au client
+      await NotificationService.sendOrderStatusToClientNotification(updatedOrder)
+      
+      console.log(`📧 Notifications envoyées pour changement statut commande ${id}`)
+    } catch (notifError) {
+      console.error("⚠️ Erreur notifications (non critique):", notifError)
+    }
 
-    // Gestion des transactions selon le nouveau statut
+    // 9. Gestion des transactions wallet selon le nouveau statut
     if (status !== oldStatus) {
       try {
-        console.log(`Mise à jour des transactions pour la commande ${orderId} passant à ${status}`);
+        console.log(`💰 Mise à jour transactions pour commande ${id} passant à ${status}`)
         
-        // Si c'est une nouvelle commande, ajouter les transactions
+        // Si c'est une nouvelle commande confirmée, ajouter les transactions
         if (status === OrderStatus.CONFIRMED && oldStatus === OrderStatus.PENDING) {
           try {
-            await WalletService.addSaleTransaction(orderId);
-            console.log(`Transactions ajoutées avec succès pour la commande ${orderId}`);
+            await WalletService.addSaleTransaction(id)
+            console.log(`✅ Transactions ajoutées pour commande ${id}`)
           } catch (walletError) {
-            console.error(`Erreur lors de l'ajout des transactions pour la commande ${orderId}:`, walletError);
+            console.error(`❌ Erreur ajout transactions commande ${id}:`, walletError)
           }
         } 
-        // Si la commande est maintenant livrée, libérer les fonds
+        // Si la commande est livrée, libérer les fonds
         else if (status === OrderStatus.DELIVERED) {
           try {
-            await WalletService.updateTransactionsOnOrderStatus(orderId, status as OrderStatus);
-            console.log(`Transactions mises à jour pour la commande livrée ${orderId}`);
+            await WalletService.updateTransactionsOnOrderStatus(id, status)
+            console.log(`✅ Transactions mises à jour pour commande livrée ${id}`)
           } catch (walletError) {
-            console.error(`Erreur lors de la mise à jour du portefeuille pour la commande ${orderId}:`, walletError);
+            console.error(`❌ Erreur MAJ wallet commande ${id}:`, walletError)
           }
         }
       } catch (walletError) {
-        console.error("Erreur globale lors de la mise à jour du portefeuille:", walletError);
+        console.error("❌ Erreur globale wallet:", walletError)
         // Continuer le processus malgré l'erreur
       }
     }
 
-    // Si la commande est annulée, mettre à jour le stock
+    // 10. Gestion de l'annulation (remise en stock)
     if (status === OrderStatus.CANCELLED && order.status !== OrderStatus.CANCELLED) {
-      await handleCancellation(order)
+      try {
+        await handleCancellation(order)
+        console.log(`📦 Stock remis à jour pour annulation commande ${id}`)
+      } catch (stockError) {
+        console.error(`❌ Erreur remise en stock commande ${id}:`, stockError)
+      }
     }
 
-    return NextResponse.json(updatedOrder)
+    // 11. Log d'audit sécurisé
+    console.log(`📋 Audit - Changement statut commande:`, {
+      orderId: id,
+      oldStatus,
+      newStatus: status,
+      changedBy: session.user.id,
+      changedByRole: session.user.role,
+      timestamp: new Date().toISOString()
+    })
+
+    // 12. Réponse sécurisée
+    return NextResponse.json({
+      success: true,
+      order: {
+        id: updatedOrder.id,
+        status: updatedOrder.status,
+        updatedAt: updatedOrder.updatedAt
+      },
+      message: `Statut mis à jour de ${oldStatus} à ${status}`
+    })
+
   } catch (error) {
-    console.error("Erreur lors de la mise à jour du statut de la commande:", error)
-    return new NextResponse("Erreur lors de la mise à jour du statut de la commande", { status: 500 })
+    console.error("❌ Erreur mise à jour statut commande:", error)
+    return handleError(error, request.url)
   }
-}, ["PRODUCER", "ADMIN"])
+}, {
+  requireAuth: true,
+  allowedRoles: ['PRODUCER', 'ADMIN'],
+  allowedMethods: ['PATCH'],
+  rateLimit: {
+    requests: 30, // 30 mises à jour max par minute
+    window: 60
+  }
+})
 
-// Fonction pour gérer la logique d'annulation
+// Fonction utilitaire pour gérer l'annulation (remise en stock)
 async function handleCancellation(order: any) {
-  // 1. Retourner les articles au stock
-  for (const item of order.items) {
-    await prisma.stock.update({
-      where: { productId: item.product.id },
-      data: {
-        quantity: {
-          increment: item.quantity
+  try {
+    // 1. Retourner les articles au stock
+    for (const item of order.items) {
+      await prisma.stock.update({
+        where: { productId: item.product.id },
+        data: {
+          quantity: {
+            increment: item.quantity
+          }
         }
-      }
-    })
-  }
+      })
+    }
 
-  // 2. Retourner les réservations au stock et libérer les créneaux
-  for (const booking of order.bookings) {
-    // Mettre à jour le statut de la réservation
-    await prisma.booking.update({
-      where: { id: booking.id },
-      data: { status: 'CANCELLED' }
-    })
-    
-    // Libérer le créneau
-    await prisma.deliverySlot.update({
-      where: { id: booking.slotId },
-      data: {
-        reserved: {
-          decrement: booking.quantity
+    // 2. Retourner les réservations au stock et libérer les créneaux
+    for (const booking of order.bookings) {
+      // Mettre à jour le statut de la réservation
+      await prisma.booking.update({
+        where: { id: booking.id },
+        data: { status: 'CANCELLED' }
+      })
+      
+      // Libérer le créneau
+      await prisma.deliverySlot.update({
+        where: { id: booking.slotId },
+        data: {
+          reserved: {
+            decrement: booking.quantity
+          }
         }
-      }
-    })
-    
-    // Retourner au stock
-    await prisma.stock.update({
-      where: { productId: booking.deliverySlot.product.id },
-      data: {
-        quantity: {
-          increment: booking.quantity
+      })
+      
+      // Retourner au stock
+      await prisma.stock.update({
+        where: { productId: booking.deliverySlot.product.id },
+        data: {
+          quantity: {
+            increment: booking.quantity
+          }
         }
-      }
-    })
+      })
+    }
+
+    console.log(`📦 Remise en stock terminée pour commande annulée`)
+  } catch (error) {
+    console.error("❌ Erreur lors de la remise en stock:", error)
+    throw error
   }
 }

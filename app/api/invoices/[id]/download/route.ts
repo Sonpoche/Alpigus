@@ -1,26 +1,34 @@
 // app/api/invoices/[id]/download/route.ts
 import { NextRequest, NextResponse } from "next/server"
+import { withClientSecurity } from "@/lib/api-security"
 import { prisma } from "@/lib/prisma"
-import { apiAuthMiddleware } from "@/lib/api-middleware"
-import { Session } from "next-auth"
+import { z } from "zod"
+
+// Schéma de validation pour les paramètres
+const paramsSchema = z.object({
+  id: z.string().cuid('ID de facture invalide')
+})
 
 function formatNumber(num: number): string {
   return num.toFixed(2)
 }
 
-export const GET = apiAuthMiddleware(async (
-  req: NextRequest,
-  session: Session,
-  context: { params: { [key: string]: string } }
-) => {
+export const GET = withClientSecurity(async (request: NextRequest, session) => {
   try {
-    const invoiceId = context.params.id
+    // 1. Extraction et validation sécurisée de l'ID depuis l'URL
+    const url = new URL(request.url)
+    const pathSegments = url.pathname.split('/')
+    const invoiceId = pathSegments[pathSegments.indexOf('invoices') + 1]
+    
+    const { id } = paramsSchema.parse({ id: invoiceId })
 
-    // Récupérer la facture avec toutes les informations nécessaires
+    console.log(`📄 Téléchargement facture ${id} demandé par user ${session.user.id}`)
+
+    // 2. Récupération sécurisée de la facture avec vérification d'ownership
     const invoice = await prisma.invoice.findUnique({
       where: { 
-        id: invoiceId,
-        userId: session.user.id // Sécurité : seul le client peut télécharger sa facture
+        id,
+        userId: session.user.id // SÉCURITÉ CRITIQUE: seul le client peut télécharger sa facture
       },
       include: {
         order: {
@@ -62,12 +70,13 @@ export const GET = apiAuthMiddleware(async (
     })
 
     if (!invoice) {
-      return new NextResponse('Facture non trouvée', { status: 404 })
+      console.warn(`⚠️ Tentative téléchargement facture non autorisée ${id} par user ${session.user.id}`)
+      return new NextResponse('Facture non trouvée ou non autorisée', { status: 404 })
     }
 
     const order = invoice.order
     
-    // Extraire les informations de livraison du metadata
+    // 3. Extraction sécurisée des informations de livraison du metadata
     let deliveryInfo = null
     if (order.metadata) {
       try {
@@ -83,11 +92,11 @@ export const GET = apiAuthMiddleware(async (
           paymentMethod: metadata.paymentMethod
         }
       } catch (e) {
-        console.error('Erreur parsing metadata:', e)
+        console.error('Erreur parsing metadata pour facture:', id, e)
       }
     }
     
-    // Calculer les totaux
+    // 4. Calcul sécurisé des totaux
     const itemsTotal = order.items.reduce((sum, item) => {
       return sum + (item.price * item.quantity)
     }, 0)
@@ -101,21 +110,22 @@ export const GET = apiAuthMiddleware(async (
     const deliveryFee = deliveryInfo?.type === 'delivery' ? 15 : 0
     const totalWithDelivery = subtotal + deliveryFee
 
+    // 5. Génération sécurisée des informations de facture
     const invoiceNumber = `FACT-${invoice.id.substring(0, 8).toUpperCase()}`
     const invoiceDate = invoice.createdAt.toLocaleDateString('fr-FR')
     const dueDate = invoice.dueDate ? new Date(invoice.dueDate).toLocaleDateString('fr-FR') : null
     
-    // Vérifier si la facture/commande est payée (même logique que la modal)
+    // 6. Détermination sécurisée du statut de paiement
     let isPaid = false
     let paidAt = null
     let paymentMethod = null
     
-    // 1. Vérifier dans la facture
+    // Vérifier dans la facture
     isPaid = invoice.status === 'PAID'
     paidAt = invoice.paidAt ? new Date(invoice.paidAt).toLocaleDateString('fr-FR') : null
     paymentMethod = invoice.paymentMethod
     
-    // 2. Vérifier dans les métadonnées de la commande
+    // Vérifier dans les métadonnées de la commande comme fallback
     if (!isPaid && order.metadata) {
       try {
         const metadata = JSON.parse(order.metadata)
@@ -131,7 +141,7 @@ export const GET = apiAuthMiddleware(async (
       }
     }
     
-    // 3. Vérifier le statut de la commande (fallback)
+    // Vérifier le statut de la commande (fallback)
     if (!isPaid) {
       isPaid = order.status === 'INVOICE_PAID'
     }
@@ -141,7 +151,7 @@ export const GET = apiAuthMiddleware(async (
       paymentMethod = deliveryInfo.paymentMethod
     }
 
-    // Template HTML identique à celui de la modal
+    // 7. Génération du HTML sécurisé (template identique à celui de la modal)
     const html = `
 <!DOCTYPE html>
 <html lang="fr">
@@ -299,6 +309,7 @@ export const GET = apiAuthMiddleware(async (
     </style>
 </head>
 <body>
+    <!-- En-tête sécurisé -->
     <div class="header">
         <div>
             <h1 class="logo">Alpigus</h1>
@@ -312,6 +323,7 @@ export const GET = apiAuthMiddleware(async (
         </div>
     </div>
 
+    <!-- Statut de paiement sécurisé -->
     ${isPaid ? `
     <div class="payment-status">
         <h3 style="margin: 0 0 10px 0;">✅ Facture Payée</h3>
@@ -331,6 +343,7 @@ export const GET = apiAuthMiddleware(async (
     </div>
     ` : ''}
 
+    <!-- Informations sécurisées (données filtrées) -->
     <div class="info-section">
         <div class="info-box">
             <h3>Vos Informations</h3>
@@ -353,6 +366,7 @@ export const GET = apiAuthMiddleware(async (
         </div>
     </div>
 
+    <!-- Tableau des produits sécurisé -->
     <table>
         <thead>
             <tr>
@@ -397,6 +411,7 @@ export const GET = apiAuthMiddleware(async (
         </tbody>
     </table>
 
+    <!-- Section totaux sécurisée -->
     <div class="total-section">
         <div class="total-row">
             <span>Sous-total:</span>
@@ -414,6 +429,7 @@ export const GET = apiAuthMiddleware(async (
         </div>
     </div>
 
+    <!-- Footer sécurisé -->
     <div class="footer">
         <p><strong>alpigus - Marketplace B2B Champignons</strong></p>
         <p>Cette facture est générée automatiquement par la plateforme alpigus</p>
@@ -421,6 +437,7 @@ export const GET = apiAuthMiddleware(async (
         <p>TVA non applicable - Prestations de services numériques</p>
     </div>
 
+    <!-- Script sécurisé pour l'impression -->
     <script>
         document.addEventListener('DOMContentLoaded', function() {
             const printBtn = document.createElement('button');
@@ -434,15 +451,28 @@ export const GET = apiAuthMiddleware(async (
 </body>
 </html>`
 
+    console.log(`✅ Facture ${id} générée avec succès pour user ${session.user.id}`)
+
+    // 8. Réponse sécurisée avec headers appropriés
     return new NextResponse(html, {
       headers: {
         'Content-Type': 'text/html; charset=utf-8',
-        'Content-Disposition': `inline; filename="Facture_${invoiceNumber}.html"`
+        'Content-Disposition': `inline; filename="Facture_${invoiceNumber}.html"`,
+        // Headers de sécurité pour le téléchargement
+        'X-Content-Type-Options': 'nosniff',
+        'X-Frame-Options': 'SAMEORIGIN', // Permettre l'affichage dans le même domaine
+        'Cache-Control': 'private, no-cache, no-store, must-revalidate'
       }
     })
 
   } catch (error) {
-    console.error('Erreur génération facture client:', error)
+    console.error('❌ Erreur génération facture client:', error)
+    
+    // Gestion d'erreur avec validation Zod
+    if (error instanceof z.ZodError) {
+      return new NextResponse('ID de facture invalide', { status: 400 })
+    }
+    
     return new NextResponse('Erreur interne du serveur', { status: 500 })
   }
-}, ["CLIENT", "ADMIN"])
+})

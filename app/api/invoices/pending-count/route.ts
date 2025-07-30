@@ -1,24 +1,32 @@
 // app/api/invoices/pending-count/route.ts
-import { NextResponse } from "next/server"
+import { NextRequest, NextResponse } from "next/server"
+import { withClientSecurity } from "@/lib/api-security"
+import { handleError } from "@/lib/error-handler"
 import { prisma } from "@/lib/prisma"
-import { apiAuthMiddleware } from "@/lib/api-middleware"
 
-export const GET = apiAuthMiddleware(async (req, session) => {
+export const GET = withClientSecurity(async (request: NextRequest, session) => {
   try {
-    // Compter les factures en attente ou en retard pour l'utilisateur connecté
+    console.log(`📊 Comptage factures en attente pour user ${session.user.id}`)
+
+    // Compter les factures en attente ou en retard pour l'utilisateur connecté uniquement
     const count = await prisma.invoice.count({
       where: {
-        userId: session.user.id,
+        userId: session.user.id, // SÉCURITÉ: Limiter strictement à l'utilisateur connecté
         status: {
           in: ['PENDING', 'OVERDUE']
         }
       }
     })
+
+    console.log(`✅ ${count} factures en attente trouvées pour user ${session.user.id}`)
     
     return NextResponse.json({ count })
     
   } catch (error) {
-    console.error("Erreur lors du comptage des factures en attente:", error)
-    return NextResponse.json({ count: 0 }, { status: 500 })
+    console.error("❌ Erreur comptage factures en attente:", error)
+    
+    // En cas d'erreur, retourner 0 pour éviter de casser l'interface utilisateur
+    // Cette route est probablement utilisée pour des badges/notifications
+    return NextResponse.json({ count: 0 }, { status: 200 })
   }
-}, ["CLIENT"])
+})

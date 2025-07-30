@@ -1,165 +1,243 @@
 // app/api/orders/items/[id]/route.ts
 import { NextRequest, NextResponse } from "next/server"
+import { withClientSecurity, validateData, commonSchemas } from "@/lib/api-security"
+import { handleError, createError } from "@/lib/error-handler"
 import { prisma } from "@/lib/prisma"
-import { apiAuthMiddleware } from "@/lib/api-middleware"
-import { Session } from "next-auth"
+import { OrderStatus } from "@prisma/client"
+import { z } from "zod"
 
-// Mettre à jour un article du panier
-export const PATCH = apiAuthMiddleware(async (
-  req: NextRequest,
-  session: Session,
-  context: { params: { [key: string]: string } }
-) => {
+// Schéma de validation pour les paramètres d'URL
+const paramsSchema = z.object({
+  id: commonSchemas.id
+})
+
+// Schéma de validation pour la mise à jour de quantité
+const updateQuantitySchema = z.object({
+  quantity: z.number()
+    .positive('La quantité doit être positive')
+    .max(10000, 'Quantité trop élevée')
+    .refine(val => val % 0.01 === 0, 'Quantité invalide (2 décimales max)')
+})
+
+// PATCH - Mettre à jour la quantité d'un article du panier
+export const PATCH = withClientSecurity(async (request: NextRequest, session) => {
   try {
-    const itemId = context.params.id
-    
-    // Récupérer le corps de la requête
-    const body = await req.json()
-    const { quantity } = body
-    
-    if (quantity === undefined || quantity <= 0) {
-      return new NextResponse("Quantité invalide", { status: 400 })
-    }
-    
-    // Récupérer l'article pour vérifier s'il appartient à l'utilisateur
-    const orderItem = await prisma.orderItem.findUnique({
-      where: { id: itemId },
-      include: {
-        order: true,
-        product: {
-          include: {
-            stock: true
+    // 1. Extraction et validation de l'ID depuis l'URL
+    const url = new URL(request.url)
+    const pathSegments = url.pathname.split('/')
+    const itemId = pathSegments[pathSegments.indexOf('items') + 1]
+
+    const { id } = validateData(paramsSchema, { id: itemId })
+
+    // 2. Validation des données de mise à jour
+    const rawData = await request.json()
+    const { quantity } = validateData(updateQuantitySchema, rawData)
+
+    console.log(`✏️ Mise à jour quantité item ${id} vers ${quantity} par user ${session.user.id}`)
+
+    // 3. Transaction atomique pour la mise à jour sécurisée
+    const updatedItem = await prisma.$transaction(async (tx) => {
+      // 3.1. Récupération sécurisée de l'article avec toutes les relations
+      const orderItem = await tx.orderItem.findUnique({
+        where: { id },
+        include: {
+          order: {
+            select: {
+              id: true,
+              userId: true,
+              status: true
+            }
+          },
+          product: {
+            include: {
+              stock: true,
+              producer: {
+                select: {
+                  id: true,
+                  companyName: true
+                }
+              }
+            }
           }
         }
+      })
+
+      if (!orderItem) {
+        throw createError.notFound("Article non trouvé")
       }
-    })
-    
-    if (!orderItem) {
-      return new NextResponse("Article non trouvé", { status: 404 })
-    }
-    
-    // Vérifier que l'article appartient à l'utilisateur
-    if (orderItem.order.userId !== session.user.id) {
-      return new NextResponse("Non autorisé", { status: 403 })
-    }
-    
-    // Vérifier que la commande est bien un panier (DRAFT) ou en attente (PENDING)
-    if (orderItem.order.status !== "DRAFT" && orderItem.order.status !== "PENDING") {
-      return new NextResponse(
-        "Impossible de modifier cette commande car son statut est " + orderItem.order.status, 
-        { status: 400 }
-      )
-    }
-    
-    // Calculer la différence de quantité pour la mise à jour du stock
-    const quantityDifference = quantity - orderItem.quantity
-    
-    // Vérifier si le stock est suffisant
-    if (orderItem.product.stock && quantityDifference > 0) {
-      if (orderItem.product.stock.quantity < quantityDifference) {
-        return new NextResponse("Stock insuffisant", { status: 400 })
+
+      // 3.2. SÉCURITÉ CRITIQUE: Vérifier ownership
+      if (orderItem.order.userId !== session.user.id) {
+        console.error(`🚨 Tentative modif item non autorisée: user ${session.user.id} -> item ${id}`)
+        throw createError.forbidden("Non autorisé - Cet article ne vous appartient pas")
       }
-    }
-    
-    // Effectuer les mises à jour dans une transaction
-    const updatedItem = await prisma.$transaction(async (tx) => {
-      // 1. Mettre à jour l'article
+
+      // 3.3. Validation du statut modifiable
+      const editableStatuses: OrderStatus[] = [OrderStatus.DRAFT, OrderStatus.PENDING, OrderStatus.INVOICE_PENDING]
+      if (!editableStatuses.includes(orderItem.order.status as OrderStatus)) {
+        throw createError.validation(
+          `Impossible de modifier cette commande (statut: ${orderItem.order.status})`
+        )
+      }
+
+      // 3.4. Validation de la quantité minimale
+      if (orderItem.product.minOrderQuantity && quantity < orderItem.product.minOrderQuantity) {
+        throw createError.validation(
+          `Quantité minimale requise: ${orderItem.product.minOrderQuantity} ${orderItem.product.unit}`
+        )
+      }
+
+      // 3.5. Calcul sécurisé de la différence de stock
+      const quantityDifference = quantity - orderItem.quantity
+
+      // 3.6. Vérification du stock disponible
+      if (quantityDifference > 0 && orderItem.product.stock) {
+        if (orderItem.product.stock.quantity < quantityDifference) {
+          throw createError.validation(
+            `Stock insuffisant. Besoin de ${quantityDifference} ${orderItem.product.unit} supplémentaires, disponible: ${orderItem.product.stock.quantity}`
+          )
+        }
+      }
+
+      // 3.7. Mise à jour de l'article
       const updated = await tx.orderItem.update({
-        where: { id: itemId },
-        data: { quantity },
+        where: { id },
+        data: { 
+          quantity,
+          // Mettre à jour le prix au prix actuel pour cohérence
+          price: orderItem.product.price
+        },
         include: {
-          product: true
+          product: {
+            select: {
+              id: true,
+              name: true,
+              unit: true,
+              price: true,
+              producer: {
+                select: {
+                  id: true,
+                  companyName: true
+                }
+              }
+            }
+          }
         }
       })
-      
-      // 2. Mettre à jour le stock
+
+      // 3.8. Mise à jour sécurisée du stock
       if (quantityDifference !== 0 && orderItem.product.stock) {
         await tx.stock.update({
           where: { productId: orderItem.product.id },
           data: {
             quantity: {
-              decrement: quantityDifference
+              decrement: quantityDifference // Peut être négatif (remise en stock)
             }
           }
         })
       }
-      
-      // 3. Recalculer le total de la commande
-      const orderItems = await tx.orderItem.findMany({
+
+      // 3.9. Recalcul du total de la commande
+      const allOrderItems = await tx.orderItem.findMany({
         where: { orderId: orderItem.orderId },
         include: {
-          product: true
+          product: {
+            select: { price: true }
+          }
         }
       })
-      
-      const total = orderItems.reduce((sum, item) => sum + (item.price * item.quantity), 0)
-      
+
+      const newTotal = allOrderItems.reduce((sum, item) => 
+        sum + (item.product.price * item.quantity), 0
+      )
+
       await tx.order.update({
         where: { id: orderItem.orderId },
-        data: { total }
+        data: { total: newTotal }
       })
-      
+
+      console.log(`✅ Quantité mise à jour: ${orderItem.quantity} → ${quantity} (diff: ${quantityDifference})`)
+
       return updated
     })
-    
-    return NextResponse.json(updatedItem)
-    
+
+    // 4. Log d'audit sécurisé
+    console.log(`📋 Audit - Item modifié:`, {
+      userId: session.user.id,
+      itemId: id,
+      newQuantity: quantity,
+      timestamp: new Date().toISOString()
+    })
+
+    return NextResponse.json({
+      success: true,
+      item: updatedItem,
+      message: `Quantité mise à jour: ${quantity}`
+    })
+
   } catch (error) {
-    console.error("Erreur lors de la mise à jour de l'article:", error)
-    return new NextResponse(
-      "Erreur lors de la mise à jour de l'article", 
-      { status: 500 }
-    )
+    console.error("❌ Erreur mise à jour item:", error)
+    return handleError(error, request.url)
   }
 })
 
-// Supprimer un article du panier
-export const DELETE = apiAuthMiddleware(async (
-  req: NextRequest,
-  session: Session,
-  context: { params: { [key: string]: string } }
-) => {
+// DELETE - Supprimer un article du panier
+export const DELETE = withClientSecurity(async (request: NextRequest, session) => {
   try {
-    const itemId = context.params.id
-    
-    // Récupérer l'article pour vérifier s'il appartient à l'utilisateur
-    const orderItem = await prisma.orderItem.findUnique({
-      where: { id: itemId },
-      include: {
-        order: true,
-        product: {
-          include: {
-            stock: true
+    // 1. Extraction et validation de l'ID
+    const url = new URL(request.url)
+    const pathSegments = url.pathname.split('/')
+    const itemId = pathSegments[pathSegments.indexOf('items') + 1]
+
+    const { id } = validateData(paramsSchema, { id: itemId })
+
+    console.log(`🗑️ Suppression item ${id} par user ${session.user.id}`)
+
+    // 2. Transaction atomique pour la suppression sécurisée
+    await prisma.$transaction(async (tx) => {
+      // 2.1. Récupération sécurisée de l'article
+      const orderItem = await tx.orderItem.findUnique({
+        where: { id },
+        include: {
+          order: {
+            select: {
+              id: true,
+              userId: true,
+              status: true
+            }
+          },
+          product: {
+            include: {
+              stock: true
+            }
           }
         }
-      }
-    })
-    
-    if (!orderItem) {
-      return new NextResponse("Article non trouvé", { status: 404 })
-    }
-    
-    // Vérifier que l'article appartient à l'utilisateur
-    if (orderItem.order.userId !== session.user.id) {
-      return new NextResponse("Non autorisé", { status: 403 })
-    }
-    
-    // Vérifier que la commande est bien un panier (DRAFT) ou en attente (PENDING)
-    if (orderItem.order.status !== "DRAFT" && orderItem.order.status !== "PENDING") {
-      return new NextResponse(
-        "Impossible de modifier cette commande car son statut est " + orderItem.order.status, 
-        { status: 400 }
-      )
-    }
-    
-    // Effectuer les mises à jour dans une transaction
-    await prisma.$transaction(async (tx) => {
-      // 1. Supprimer l'article
-      await tx.orderItem.delete({
-        where: { id: itemId }
       })
-      
-      // 2. Remettre la quantité en stock
+
+      if (!orderItem) {
+        throw createError.notFound("Article non trouvé")
+      }
+
+      // 2.2. SÉCURITÉ CRITIQUE: Vérifier ownership
+      if (orderItem.order.userId !== session.user.id) {
+        console.error(`🚨 Tentative suppression item non autorisée: user ${session.user.id} -> item ${id}`)
+        throw createError.forbidden("Non autorisé - Cet article ne vous appartient pas")
+      }
+
+      // 2.3. Validation du statut modifiable
+      const editableStatuses: OrderStatus[] = [OrderStatus.DRAFT, OrderStatus.PENDING, OrderStatus.INVOICE_PENDING]
+      if (!editableStatuses.includes(orderItem.order.status as OrderStatus)) {
+        throw createError.validation(
+          `Impossible de modifier cette commande (statut: ${orderItem.order.status})`
+        )
+      }
+
+      // 2.4. Suppression de l'article
+      await tx.orderItem.delete({
+        where: { id }
+      })
+
+      // 2.5. Remise en stock sécurisée
       if (orderItem.product.stock) {
         await tx.stock.update({
           where: { productId: orderItem.product.id },
@@ -170,30 +248,43 @@ export const DELETE = apiAuthMiddleware(async (
           }
         })
       }
-      
-      // 3. Recalculer le total de la commande
-      const orderItems = await tx.orderItem.findMany({
+
+      // 2.6. Recalcul du total de la commande
+      const remainingItems = await tx.orderItem.findMany({
         where: { orderId: orderItem.orderId },
         include: {
-          product: true
+          product: {
+            select: { price: true }
+          }
         }
       })
-      
-      const total = orderItems.reduce((sum, item) => sum + (item.price * item.quantity), 0)
-      
+
+      const newTotal = remainingItems.reduce((sum, item) => 
+        sum + (item.product.price * item.quantity), 0
+      )
+
       await tx.order.update({
         where: { id: orderItem.orderId },
-        data: { total }
+        data: { total: newTotal }
       })
+
+      console.log(`✅ Article supprimé et ${orderItem.quantity} ${orderItem.product.unit} remis en stock`)
     })
-    
-    return new NextResponse(null, { status: 204 })
-    
+
+    // 3. Log d'audit sécurisé
+    console.log(`📋 Audit - Item supprimé:`, {
+      userId: session.user.id,
+      itemId: id,
+      timestamp: new Date().toISOString()
+    })
+
+    return NextResponse.json({
+      success: true,
+      message: 'Article supprimé du panier'
+    }, { status: 200 })
+
   } catch (error) {
-    console.error("Erreur lors de la suppression de l'article:", error)
-    return new NextResponse(
-      "Erreur lors de la suppression de l'article", 
-      { status: 500 }
-    )
+    console.error("❌ Erreur suppression item:", error)
+    return handleError(error, request.url)
   }
 })

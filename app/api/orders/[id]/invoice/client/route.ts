@@ -1,27 +1,36 @@
 // app/api/orders/[id]/invoice/client/route.ts
 import { NextRequest, NextResponse } from 'next/server'
-import { apiAuthMiddleware } from '@/lib/api-middleware'
-import { Session } from 'next-auth'
+import { withClientSecurity, validateData, commonSchemas } from "@/lib/api-security"
+import { handleError, createError } from "@/lib/error-handler"
 import { prisma } from '@/lib/prisma'
+import { z } from "zod"
+
+// Schéma de validation pour les paramètres d'URL
+const paramsSchema = z.object({
+  id: commonSchemas.id
+})
 
 // Fonction helper pour formater les nombres
 function formatNumber(num: number): string {
   return num.toFixed(2)
 }
 
-export const GET = apiAuthMiddleware(async (
-  req: NextRequest,
-  session: Session,
-  context: { params: { [key: string]: string } }
-) => {
+export const GET = withClientSecurity(async (request: NextRequest, session) => {
   try {
-    const orderId = context.params.id
+    // 1. Extraction et validation de l'ID depuis l'URL
+    const url = new URL(request.url)
+    const pathSegments = url.pathname.split('/')
+    const orderId = pathSegments[pathSegments.indexOf('orders') + 1]
 
-    // Récupérer la commande avec la facture
+    const { id } = validateData(paramsSchema, { id: orderId })
+
+    console.log(`🧾 Génération facture client pour commande ${id} par user ${session.user.id}`)
+
+    // 2. Récupération sécurisée avec vérification d'ownership stricte
     const order = await prisma.order.findUnique({
       where: { 
-        id: orderId,
-        userId: session.user.id // S'assurer que la commande appartient au client
+        id,
+        userId: session.user.id // SÉCURITÉ CRITIQUE: seul le client peut voir sa facture
       },
       include: {
         user: true,
@@ -60,10 +69,11 @@ export const GET = apiAuthMiddleware(async (
     })
 
     if (!order) {
-      return new NextResponse('Commande non trouvée', { status: 404 })
+      console.warn(`⚠️ Tentative génération facture client non autorisée ${id} par user ${session.user.id}`)
+      throw createError.notFound('Commande non trouvée ou non autorisée')
     }
 
-    // Parser les métadonnées de livraison
+    // 3. Parsing sécurisé des métadonnées de livraison
     let deliveryInfo = null
     if (order.metadata) {
       try {
@@ -79,11 +89,11 @@ export const GET = apiAuthMiddleware(async (
           paymentMethod: metadata.paymentMethod
         }
       } catch (e) {
-        console.error('Erreur parsing metadata:', e)
+        console.error('Erreur parsing metadata facture client:', e)
       }
     }
 
-    // Calculer les totaux
+    // 4. Calculs sécurisés des totaux
     const itemsTotal = order.items.reduce((sum, item) => sum + (item.price * item.quantity), 0)
     const bookingsTotal = order.bookings.reduce((sum, booking) => {
       const price = booking.price ?? booking.deliverySlot.product.price
@@ -94,13 +104,13 @@ export const GET = apiAuthMiddleware(async (
     const deliveryFee = deliveryInfo?.type === 'delivery' ? 15 : 0
     const totalWithDelivery = subtotal + deliveryFee
 
-    // Informations de la facture
+    // 5. Détermination sécurisée du statut de paiement
     const invoiceNumber = order.invoice 
       ? `FACT-${order.invoice.id.substring(0, 8).toUpperCase()}`
       : `CMD-${order.id.substring(0, 8).toUpperCase()}`
     const invoiceDate = order.createdAt.toLocaleDateString('fr-FR')
     
-    // Vérifier si la facture/commande est payée (plusieurs sources possibles)
+    // Vérification multi-source du statut de paiement
     let isPaid = false
     let paidAt = null
     let paymentMethod = null
@@ -132,6 +142,7 @@ export const GET = apiAuthMiddleware(async (
     if (!isPaid) {
       isPaid = order.status === 'INVOICE_PAID'
     }
+    
     // Si pas de méthode de paiement trouvée, utiliser celle des métadonnées de livraison
     if (!paymentMethod && deliveryInfo?.paymentMethod) {
       paymentMethod = deliveryInfo.paymentMethod
@@ -139,7 +150,7 @@ export const GET = apiAuthMiddleware(async (
     
     const dueDate = order.invoice?.dueDate ? new Date(order.invoice.dueDate).toLocaleDateString('fr-FR') : null
 
-    // Template HTML similaire à celui des producteurs
+    // 6. Template HTML sécurisé pour client
     const html = `
 <!DOCTYPE html>
 <html lang="fr">
@@ -320,7 +331,7 @@ export const GET = apiAuthMiddleware(async (
         <p style="margin: 5px 0 0 0; font-size: 14px;">Merci pour votre paiement. Cette facture est soldée.</p>
     </div>
     ` : order.invoice && dueDate ? `
-    <div class="payment-status" style="background: #fff3cd; border: 1px solid #ffeaa7; color: #856404;">
+    <div class="payment-status">
         <h3 style="margin: 0 0 10px 0;">⏳ FACTURE EN ATTENTE</h3>
         <p style="margin: 0;">Paiement requis avant le ${dueDate}</p>
         <p style="margin: 5px 0 0 0; font-size: 14px;">
@@ -432,15 +443,32 @@ export const GET = apiAuthMiddleware(async (
 </body>
 </html>`
 
+    // 7. Log d'audit sécurisé
+    console.log(`📋 Audit - Facture client générée:`, {
+      orderId: id,
+      userId: session.user.id,
+      totalAmount: totalWithDelivery,
+      isPaid,
+      paymentMethod,
+      timestamp: new Date().toISOString()
+    })
+
+    console.log(`✅ Facture client générée pour commande ${id}`)
+
+    // 8. Réponse sécurisée avec headers appropriés
     return new NextResponse(html, {
       headers: {
         'Content-Type': 'text/html; charset=utf-8',
-        'Content-Disposition': `inline; filename="Facture_${invoiceNumber}.html"`
+        'Content-Disposition': `inline; filename="Facture_${invoiceNumber}.html"`,
+        // Headers de sécurité
+        'X-Content-Type-Options': 'nosniff',
+        'X-Frame-Options': 'SAMEORIGIN',
+        'Cache-Control': 'private, no-cache, no-store, must-revalidate'
       }
     })
 
   } catch (error) {
-    console.error('Erreur génération facture client:', error)
-    return new NextResponse('Erreur interne du serveur', { status: 500 })
+    console.error('❌ Erreur génération facture client:', error)
+    return handleError(error, request.url)
   }
-}, ["CLIENT"]) // Uniquement pour les clients
+})

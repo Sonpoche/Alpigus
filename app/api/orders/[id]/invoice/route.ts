@@ -1,21 +1,34 @@
-// app/api/orders/[id]/invoice/route.ts (version producteur originale)
+// app/api/orders/[id]/invoice/route.ts
 import { NextRequest, NextResponse } from 'next/server'
-import { apiAuthMiddleware } from '@/lib/api-middleware'
-import { Session } from 'next-auth'
+import { withAuthSecurity, validateData, commonSchemas } from "@/lib/api-security"
+import { handleError, createError } from "@/lib/error-handler"
 import { prisma } from '@/lib/prisma'
-import { formatNumber } from '@/lib/number-utils'
+import { z } from "zod"
 
-export const GET = apiAuthMiddleware(async (
-  req: NextRequest,
-  session: Session,
-  context: { params: { [key: string]: string } }
-) => {
+// Schéma de validation pour les paramètres d'URL
+const paramsSchema = z.object({
+  id: commonSchemas.id
+})
+
+// Fonction utilitaire pour formater les nombres
+function formatNumber(num: number): string {
+  return num.toFixed(2)
+}
+
+export const GET = withAuthSecurity(async (request: NextRequest, session) => {
   try {
-    const orderId = context.params.id
+    // 1. Extraction et validation de l'ID depuis l'URL
+    const url = new URL(request.url)
+    const pathSegments = url.pathname.split('/')
+    const orderId = pathSegments[pathSegments.indexOf('orders') + 1]
 
-    // Récupérer la commande avec toutes les relations
+    const { id } = validateData(paramsSchema, { id: orderId })
+
+    console.log(`🧾 Génération facture producteur pour commande ${id} par ${session.user.role} ${session.user.id}`)
+
+    // 2. Récupération sécurisée de la commande avec toutes les relations
     const order = await prisma.order.findUnique({
-      where: { id: orderId },
+      where: { id },
       include: {
         user: true,
         items: {
@@ -52,40 +65,48 @@ export const GET = apiAuthMiddleware(async (
     })
 
     if (!order) {
-      return new NextResponse('Commande non trouvée', { status: 404 })
+      console.warn(`⚠️ Tentative génération facture commande inexistante ${id} par user ${session.user.id}`)
+      throw createError.notFound('Commande non trouvée')
     }
 
-    // Vérifier les autorisations
-    const isProducer = session.user.role === 'PRODUCER'
-    const isAdmin = session.user.role === 'ADMIN'
+    // 3. Vérifications d'autorisation strictes
+    if (session.user.role === 'PRODUCER') {
+      // Vérifier que le producteur a des produits dans cette commande
+      const producer = await prisma.producer.findUnique({
+        where: { userId: session.user.id },
+        select: { id: true, companyName: true }
+      })
 
-    if (!isAdmin) {
-      if (isProducer) {
-        const hasProducts = order.items.some(item => 
-          item.product.producer.userId === session.user.id
-        ) || order.bookings.some(booking => 
-          booking.deliverySlot.product.producer.userId === session.user.id
-        )
-        
-        if (!hasProducts) {
-          return new NextResponse('Accès interdit', { status: 403 })
-        }
-      } else {
-        return new NextResponse('Accès interdit', { status: 403 })
+      if (!producer) {
+        throw createError.notFound("Profil producteur non trouvé")
       }
-    }
 
-    // Récupérer le producteur principal
-    let producer
+      const hasProducts = order.items.some(item => 
+        item.product.producer.userId === session.user.id
+      ) || order.bookings.some(booking => 
+        booking.deliverySlot.product.producer.userId === session.user.id
+      )
+      
+      if (!hasProducts) {
+        console.warn(`⚠️ Producteur ${session.user.id} tentative génération facture non autorisée ${id}`)
+        throw createError.forbidden('Non autorisé - Vous n\'avez pas de produits dans cette commande')
+      }
+
+      console.log(`🏭 Producteur ${producer.companyName || 'Inconnu'} génère facture commande ${id}`)
+    }
+    // Les ADMIN peuvent générer toutes les factures (pas de vérification supplémentaire)
+
+    // 4. Détermination sécurisée du producteur principal
+    let producer = null
     if (order.items.length > 0) {
       producer = order.items[0].product.producer
     } else if (order.bookings.length > 0) {
       producer = order.bookings[0].deliverySlot.product.producer
     } else {
-      return new NextResponse('Aucun produit dans la commande', { status: 400 })
+      throw createError.validation('Aucun produit dans la commande')
     }
 
-    // Parser les métadonnées de livraison
+    // 5. Parsing sécurisé des métadonnées de livraison
     let deliveryInfo = null
     if (order.metadata) {
       try {
@@ -100,11 +121,11 @@ export const GET = apiAuthMiddleware(async (
           phone: metadata.deliveryInfo?.phone || metadata.phone
         }
       } catch (e) {
-        // Ignore
+        console.error('Erreur parsing metadata facture:', e)
       }
     }
 
-    // Calculer les totaux et commissions
+    // 6. Calculs sécurisés des totaux et commissions
     const itemsTotal = order.items.reduce((sum, item) => sum + (item.price * item.quantity), 0)
     const bookingsTotal = order.bookings.reduce((sum, booking) => {
       const price = booking.price ?? booking.deliverySlot.product.price
@@ -119,10 +140,11 @@ export const GET = apiAuthMiddleware(async (
     const platformCommission = subtotal * 0.05
     const producerAmount = subtotal - platformCommission
 
+    // 7. Génération sécurisée des identifiants
     const invoiceNumber = `INV-${order.id.substring(0, 8).toUpperCase()}`
     const invoiceDate = order.createdAt.toLocaleDateString('fr-FR')
 
-    // Template personnalisé pour producteur
+    // 8. Template HTML sécurisé pour producteur
     const html = `
 <!DOCTYPE html>
 <html lang="fr">
@@ -154,15 +176,6 @@ export const GET = apiAuthMiddleware(async (
             margin: 0; 
             letter-spacing: 1px;
         }
-        .invoice-info { 
-            text-align: right; 
-        }
-        .invoice-info h2 { 
-            margin: 0; 
-            font-size: 24px; 
-            color: #2c3e50; 
-            font-weight: 300;
-        }
         .producer-badge {
             background: #34495e;
             color: white;
@@ -179,6 +192,15 @@ export const GET = apiAuthMiddleware(async (
             color: #7f8c8d; 
             margin: 8px 0 0 0;
             font-size: 14px;
+            font-weight: 300;
+        }
+        .invoice-info { 
+            text-align: right; 
+        }
+        .invoice-info h2 { 
+            margin: 0; 
+            font-size: 24px; 
+            color: #2c3e50; 
             font-weight: 300;
         }
         .info-section { 
@@ -208,68 +230,6 @@ export const GET = apiAuthMiddleware(async (
         .producer-info { 
             background: #f8f9fa; 
             border: 1px solid #34495e; 
-        }
-        .order-info { 
-            background: #f8f9fa; 
-            padding: 25px; 
-            border: 1px solid #e9ecef;
-            border-radius: 4px; 
-            margin-bottom: 30px;
-        }
-        .order-info h3 {
-            color: #2c3e50; 
-            margin-top: 0;
-            font-size: 16px;
-            font-weight: 600;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-            border-bottom: 1px solid #dee2e6;
-            padding-bottom: 10px;
-            margin-bottom: 20px;
-        }
-        .order-details {
-            display: grid; 
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); 
-            gap: 20px;
-        }
-        .order-details p {
-            margin: 8px 0;
-            font-size: 14px;
-        }
-        table { 
-            width: 100%; 
-            border-collapse: collapse; 
-            margin-bottom: 30px;
-            border: 1px solid #dee2e6;
-            border-radius: 4px;
-            overflow: hidden;
-        }
-        th { 
-            background: #34495e; 
-            color: white; 
-            padding: 18px 15px; 
-            text-align: left;
-            font-weight: 500;
-            font-size: 14px;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-        }
-        td { 
-            padding: 15px; 
-            border-bottom: 1px solid #dee2e6;
-            font-size: 14px;
-        }
-        tr:nth-child(even) { 
-            background: #f8f9fa; 
-        }
-        .product-name {
-            font-weight: 600;
-            color: #2c3e50;
-        }
-        .delivery-info {
-            color: #6c757d;
-            font-size: 12px;
-            margin-top: 4px;
         }
         .commission-section {
             background: #f8f9fa;
@@ -320,32 +280,31 @@ export const GET = apiAuthMiddleware(async (
             margin-bottom: 8px;
             opacity: 0.8;
         }
-        .total-section { 
-            display: flex; 
-            justify-content: flex-end; 
-            margin-bottom: 40px;
-        }
-        .total-box { 
-            width: 350px;
+        table { 
+            width: 100%; 
+            border-collapse: collapse; 
+            margin-bottom: 30px;
             border: 1px solid #dee2e6;
             border-radius: 4px;
             overflow: hidden;
         }
-        .total-row { 
-            display: flex; 
-            justify-content: space-between; 
-            padding: 15px 20px; 
-            border-bottom: 1px solid #dee2e6;
+        th { 
+            background: #34495e; 
+            color: white; 
+            padding: 18px 15px; 
+            text-align: left;
+            font-weight: 500;
+            font-size: 14px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        td { 
+            padding: 15px; 
+            border-bottom: 1px solid #e9ecef;
             font-size: 14px;
         }
-        .total-row:last-child {
-            border-bottom: none;
-        }
-        .grand-total { 
-            font-size: 16px; 
-            font-weight: 600; 
-            color: #2c3e50; 
-            background: #f8f9fa;
+        tr:nth-child(even) { 
+            background: #f8f9fa; 
         }
         .footer { 
             text-align: center; 
@@ -400,16 +359,6 @@ export const GET = apiAuthMiddleware(async (
         </div>
     </div>
 
-    <div class="order-info">
-        <h3>Détails de la Commande</h3>
-        <div class="order-details">
-            <p><strong>N° Commande:</strong> #${order.id.substring(0, 8).toUpperCase()}</p>
-            <p><strong>Date:</strong> ${order.createdAt.toLocaleDateString('fr-FR')}</p>
-            <p><strong>Mode de livraison:</strong> ${deliveryInfo?.type === 'pickup' ? 'Retrait sur place' : 'Livraison à domicile'}</p>
-            <p><strong>Statut:</strong> ${order.status}</p>
-        </div>
-    </div>
-
     <table>
         <thead>
             <tr>
@@ -422,7 +371,7 @@ export const GET = apiAuthMiddleware(async (
         <tbody>
             ${order.items.map(item => `
                 <tr>
-                    <td><span class="product-name">${item.product.name}</span></td>
+                    <td><span style="font-weight: 600;">${item.product.name}</span></td>
                     <td style="text-align: center;">${formatNumber(item.quantity)} ${item.product.unit}</td>
                     <td style="text-align: right;">${formatNumber(item.price)} CHF</td>
                     <td style="text-align: right;"><strong>${formatNumber(item.price * item.quantity)} CHF</strong></td>
@@ -434,8 +383,8 @@ export const GET = apiAuthMiddleware(async (
               return `
                 <tr>
                     <td>
-                        <span class="product-name">${booking.deliverySlot.product.name}</span>
-                        <div class="delivery-info">Livraison programmée: ${booking.deliverySlot.date.toLocaleDateString('fr-FR')}</div>
+                        <span style="font-weight: 600;">${booking.deliverySlot.product.name}</span>
+                        <div style="color: #7f8c8d; font-size: 12px; margin-top: 4px;">Livraison programmée: ${booking.deliverySlot.date.toLocaleDateString('fr-FR')}</div>
                     </td>
                     <td style="text-align: center;">${formatNumber(booking.quantity)} ${booking.deliverySlot.product.unit}</td>
                     <td style="text-align: right;">${formatNumber(price)} CHF</td>
@@ -470,25 +419,6 @@ export const GET = apiAuthMiddleware(async (
         </div>
     </div>
 
-    <div class="total-section">
-        <div class="total-box">
-            <div class="total-row">
-                <span>Sous-total produits:</span>
-                <span>${formatNumber(subtotal)} CHF</span>
-            </div>
-            ${deliveryFee > 0 ? `
-                <div class="total-row">
-                    <span>Frais de livraison:</span>
-                    <span>${formatNumber(deliveryFee)} CHF</span>
-                </div>
-            ` : ''}
-            <div class="total-row grand-total">
-                <span>Total Commande:</span>
-                <span>${formatNumber(totalWithDelivery)} CHF</span>
-            </div>
-        </div>
-    </div>
-
     <div class="footer">
         <p><strong>alpigus</strong></p>
         <p>Plateforme spécialisée dans les champignons de qualité</p>
@@ -508,15 +438,42 @@ export const GET = apiAuthMiddleware(async (
 </body>
 </html>`
 
+    // 9. Log d'audit sécurisé
+    console.log(`📋 Audit - Facture producteur générée:`, {
+      orderId: id,
+      producerId: producer.id,
+      generatedBy: session.user.id,
+      role: session.user.role,
+      subtotal,
+      commission: platformCommission,
+      producerAmount,
+      timestamp: new Date().toISOString()
+    })
+
+    console.log(`✅ Facture producteur générée pour commande ${id}`)
+
+    // 10. Réponse sécurisée avec headers appropriés
     return new NextResponse(html, {
       headers: {
         'Content-Type': 'text/html; charset=utf-8',
-        'Content-Disposition': `inline; filename="Recapitulatif_${invoiceNumber}.html"`
+        'Content-Disposition': `inline; filename="Recapitulatif_${invoiceNumber}.html"`,
+        // Headers de sécurité
+        'X-Content-Type-Options': 'nosniff',
+        'X-Frame-Options': 'SAMEORIGIN',
+        'Cache-Control': 'private, no-cache, no-store, must-revalidate'
       }
     })
 
   } catch (error) {
-    console.error('Erreur génération facture:', error)
-    return new NextResponse('Erreur interne du serveur', { status: 500 })
+    console.error('❌ Erreur génération facture producteur:', error)
+    return handleError(error, request.url)
   }
-}, ["PRODUCER", "ADMIN"]) // Seulement pour producteurs et admins
+}, {
+  requireAuth: true,
+  allowedRoles: ['PRODUCER', 'ADMIN'],
+  allowedMethods: ['GET'],
+  rateLimit: {
+    requests: 20, // 20 générations par minute (génération coûteuse)
+    window: 60
+  }
+})
