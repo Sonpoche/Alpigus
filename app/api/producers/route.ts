@@ -10,7 +10,7 @@ const producersQuerySchema = z.object({
   page: z.coerce.number().min(1).default(1),
   limit: z.coerce.number().min(1).max(100).default(20),
   search: z.string().max(100).optional(),
-  sortBy: z.enum(['companyName', 'createdAt', 'updatedAt']).default('companyName'),
+  sortBy: z.enum(['companyName']).default('companyName'),
   sortOrder: z.enum(['asc', 'desc']).default('asc')
 })
 
@@ -27,9 +27,6 @@ const createProducerSchema = z.object({
   description: z.string()
     .max(1000, 'Description trop longue')
     .optional(),
-  siretNumber: z.string()
-    .regex(/^[0-9]{14}$/, 'SIRET invalide (14 chiffres)')
-    .optional(),
   bankAccountName: z.string()
     .min(2, 'Nom titulaire compte requis')
     .max(100, 'Nom titulaire trop long')
@@ -38,8 +35,45 @@ const createProducerSchema = z.object({
     .min(15, 'IBAN invalide')
     .max(34, 'IBAN trop long')
     .regex(/^[A-Z]{2}[0-9]{2}[A-Z0-9]+$/, 'Format IBAN invalide')
+    .optional(),
+  bankName: z.string()
+    .min(2, 'Nom banque requis')
+    .max(100, 'Nom banque trop long')
+    .optional(),
+  bic: z.string()
+    .min(8, 'BIC invalide')
+    .max(11, 'BIC trop long')
+    .regex(/^[A-Z]{6}[A-Z0-9]{2}([A-Z0-9]{3})?$/, 'Format BIC invalide')
     .optional()
 }).strict()
+
+// Définition des types
+type ProducerWithUser = {
+  id: string
+  userId: string
+  companyName: string | null
+  address: string | null
+  description: string | null
+  bankName: string | null
+  bankAccountName: string | null
+  iban: string | null
+  bic: string | null
+  user: {
+    id: string
+    name: string | null
+    email: string | null
+    phone: string
+    profileCompleted: boolean
+    createdAt: Date
+  }
+  products?: Array<{
+    id: string
+    available: boolean
+  }>
+  _count?: {
+    products: number
+  }
+}
 
 // GET - Obtenir la liste des producteurs
 export const GET = withAuthSecurity(async (request: NextRequest, session) => {
@@ -92,7 +126,7 @@ export const GET = withAuthSecurity(async (request: NextRequest, session) => {
     }
 
     // 3. Récupération sécurisée des producteurs avec pagination
-    const [producers, totalCount] = await Promise.all([
+    const [producersResult, totalCount] = await Promise.all([
       prisma.producer.findMany({
         where: whereClause,
         include: {
@@ -121,26 +155,25 @@ export const GET = withAuthSecurity(async (request: NextRequest, session) => {
             }
           })
         },
-        orderBy: sortBy === 'companyName' ? { companyName: sortOrder } :
-                 sortBy === 'createdAt' ? { createdAt: sortOrder } :
-                 sortBy === 'updatedAt' ? { updatedAt: sortOrder } :
-                 { companyName: sortOrder }, // fallback
+        orderBy: {
+          companyName: sortOrder
+        },
         skip: (page - 1) * limit,
         take: limit
       }),
       prisma.producer.count({ where: whereClause })
     ])
 
+    const producers = producersResult as unknown as ProducerWithUser[]
+
     // 4. Filtrage des données selon le rôle
-    const filteredProducers = producers.map(producer => {
+    const filteredProducers = producers.map((producer: ProducerWithUser) => {
       // Données de base pour tous les rôles
       const baseData = {
         id: producer.id,
         companyName: producer.companyName,
         description: producer.description,
         address: producer.address,
-        createdAt: producer.createdAt,
-        updatedAt: producer.updatedAt,
         user: {
           id: producer.user.id,
           name: producer.user.name,
@@ -161,11 +194,12 @@ export const GET = withAuthSecurity(async (request: NextRequest, session) => {
           // Statistiques admin
           stats: {
             totalProducts: producer._count?.products || 0,
-            activeProducts: producer.products?.filter(p => p.available).length || 0
+            activeProducts: producer.products?.filter((p: any) => p.available).length || 0
           },
           // Informations sensibles pour admin seulement
-          siretNumber: producer.siretNumber,
+          bankName: producer.bankName,
           bankAccountName: producer.bankAccountName,
+          bic: producer.bic,
           // IBAN partiellement masqué même pour admin
           ibanPreview: producer.iban ? `${producer.iban.substring(0, 4)}****` : null
         }
@@ -228,9 +262,10 @@ export const POST = withAuthSecurity(async (request: NextRequest, session) => {
       companyName, 
       address, 
       description, 
-      siretNumber, 
       bankAccountName, 
-      iban 
+      iban,
+      bankName,
+      bic
     } = validatedData
 
     console.log(`🏭 Création producteur par admin ${session.user.id} pour user ${userId}`)
@@ -262,36 +297,28 @@ export const POST = withAuthSecurity(async (request: NextRequest, session) => {
       throw createError.validation("L'utilisateur doit avoir le rôle PRODUCER")
     }
 
-    // 3. Vérification d'unicité des données métier
-    if (siretNumber) {
-      const existingSiret = await prisma.producer.findFirst({
-        where: { siretNumber }
-      })
-      if (existingSiret) {
-        throw createError.validation("Ce numéro SIRET est déjà utilisé")
-      }
-    }
-
-    // 4. Nettoyage et validation des données sensibles
+    // 3. Nettoyage et validation des données sensibles
     const cleanCompanyName = companyName.trim()
     const cleanAddress = address.trim()
     const cleanIban = iban ? iban.trim().toUpperCase() : undefined
+    const cleanBic = bic ? bic.trim().toUpperCase() : undefined
 
     // Validation IBAN spécifique (si fourni)
     if (cleanIban && !cleanIban.startsWith('FR') && !cleanIban.startsWith('CH')) {
       console.warn(`⚠️ IBAN suspect lors de création producteur: ${cleanIban.substring(0, 4)}...`)
     }
 
-    // 5. Création sécurisée du producteur
+    // 4. Création sécurisée du producteur
     const producer = await prisma.producer.create({
       data: {
         userId,
         companyName: cleanCompanyName,
         address: cleanAddress,
         description: description?.trim() || '',
-        siretNumber: siretNumber?.trim() || null,
         bankAccountName: bankAccountName?.trim() || null,
-        iban: cleanIban || null
+        iban: cleanIban || null,
+        bankName: bankName?.trim() || null,
+        bic: cleanBic || null
       },
       include: {
         user: {
@@ -306,20 +333,20 @@ export const POST = withAuthSecurity(async (request: NextRequest, session) => {
       }
     })
 
-    // 6. Log d'audit sécurisé (sans données sensibles)
+    // 5. Log d'audit sécurisé (sans données sensibles)
     console.log(`📋 Audit - Producteur créé:`, {
       producerId: producer.id,
       createdBy: session.user.id,
       targetUserId: userId,
       companyName: cleanCompanyName,
       hasIban: !!cleanIban,
-      hasSiret: !!siretNumber,
+      hasBic: !!cleanBic,
       timestamp: new Date().toISOString()
     })
 
     console.log(`✅ Producteur créé: ${producer.id} pour user ${userId}`)
 
-    // 7. Réponse sécurisée (IBAN masqué)
+    // 6. Réponse sécurisée (IBAN masqué)
     const response = {
       ...producer,
       // Masquer l'IBAN dans la réponse

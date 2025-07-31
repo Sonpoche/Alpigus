@@ -24,9 +24,6 @@ const updateProducerSchema = z.object({
   description: z.string()
     .max(1000, 'Description trop longue')
     .optional(),
-  siretNumber: z.string()
-    .regex(/^[0-9]{14}$/, 'SIRET invalide (14 chiffres)')
-    .optional(),
   bankAccountName: z.string()
     .min(2, 'Nom titulaire compte requis')
     .max(100, 'Nom titulaire trop long')
@@ -35,8 +32,49 @@ const updateProducerSchema = z.object({
     .min(15, 'IBAN invalide')
     .max(34, 'IBAN trop long')
     .regex(/^[A-Z]{2}[0-9]{2}[A-Z0-9]+$/, 'Format IBAN invalide')
+    .optional(),
+  bankName: z.string()
+    .min(2, 'Nom banque requis')
+    .max(100, 'Nom banque trop long')
+    .optional(),
+  bic: z.string()
+    .min(8, 'BIC invalide')
+    .max(11, 'BIC trop long')
+    .regex(/^[A-Z]{6}[A-Z0-9]{2}([A-Z0-9]{3})?$/, 'Format BIC invalide')
     .optional()
 }).strict()
+
+// Définition des types pour une meilleure lisibilité
+type ProducerWithRelations = {
+  id: string
+  userId: string
+  companyName: string | null
+  address: string | null
+  description: string | null
+  bankName: string | null
+  bankAccountName: string | null
+  iban: string | null
+  bic: string | null
+  user: {
+    id: string
+    name: string | null
+    email: string | null
+    phone: string
+    profileCompleted: boolean
+    createdAt: Date
+    updatedAt: Date
+  }
+  products?: Array<{
+    id: string
+    name: string
+    available: boolean
+    price: number
+    createdAt: Date
+  }>
+  _count?: {
+    products: number
+  }
+}
 
 // GET - Obtenir un producteur spécifique
 export const GET = withAuthSecurity(async (request: NextRequest, session) => {
@@ -51,7 +89,7 @@ export const GET = withAuthSecurity(async (request: NextRequest, session) => {
     console.log(`🔍 Récupération producteur ${id} par ${session.user.role} ${session.user.id}`)
 
     // 2. Récupération sécurisée du producteur
-    const producer = await prisma.producer.findUnique({
+    const producer: ProducerWithRelations | null = await prisma.producer.findUnique({
       where: { id },
       include: {
         user: {
@@ -66,8 +104,7 @@ export const GET = withAuthSecurity(async (request: NextRequest, session) => {
           }
         },
         // Statistiques pour admins et le producteur lui-même
-        ...(session.user.role === 'ADMIN' || 
-           (session.user.role === 'PRODUCER' && session.user.id === producer?.userId)) && {
+        ...(session.user.role === 'ADMIN' ? {
           products: {
             select: {
               id: true,
@@ -82,7 +119,24 @@ export const GET = withAuthSecurity(async (request: NextRequest, session) => {
               products: true
             }
           }
-        }
+        } : {}),
+        // Pour le producteur lui-même
+        ...(session.user.role === 'PRODUCER' ? {
+          products: {
+            select: {
+              id: true,
+              name: true,
+              available: true,
+              price: true,
+              createdAt: true
+            }
+          },
+          _count: {
+            select: {
+              products: true
+            }
+          }
+        } : {})
       }
     })
 
@@ -108,8 +162,6 @@ export const GET = withAuthSecurity(async (request: NextRequest, session) => {
       companyName: producer.companyName,
       description: producer.description,
       address: producer.address, // Visible pour tous (nécessaire pour livraisons)
-      createdAt: producer.createdAt,
-      updatedAt: producer.updatedAt,
       user: {
         id: producer.user.id,
         name: producer.user.name,
@@ -131,8 +183,9 @@ export const GET = withAuthSecurity(async (request: NextRequest, session) => {
           updatedAt: producer.user.updatedAt
         },
         // Informations commerciales sensibles
-        siretNumber: producer.siretNumber,
+        bankName: producer.bankName,
         bankAccountName: producer.bankAccountName,
+        bic: producer.bic,
         // IBAN partiellement masqué même pour le propriétaire (sécurité)
         ibanPreview: producer.iban ? `${producer.iban.substring(0, 4)}****` : null,
         
@@ -140,9 +193,9 @@ export const GET = withAuthSecurity(async (request: NextRequest, session) => {
         ...(producer.products && {
           stats: {
             totalProducts: producer._count?.products || 0,
-            activeProducts: producer.products.filter(p => p.available).length || 0,
+            activeProducts: producer.products.filter((p: any) => p.available).length || 0,
             averagePrice: producer.products.length > 0 
-              ? producer.products.reduce((sum, p) => sum + p.price, 0) / producer.products.length 
+              ? producer.products.reduce((sum: number, p: any) => sum + p.price, 0) / producer.products.length 
               : 0
           }
         })
@@ -150,7 +203,7 @@ export const GET = withAuthSecurity(async (request: NextRequest, session) => {
 
       // Produits détaillés pour admin seulement
       if (session.user.role === 'ADMIN' && producer.products) {
-        responseData.products = producer.products.map(product => ({
+        responseData.products = producer.products.map((product: any) => ({
           id: product.id,
           name: product.name,
           available: product.available,
@@ -216,7 +269,6 @@ export const PATCH = withAuthSecurity(async (request: NextRequest, session) => {
         id: true,
         userId: true,
         companyName: true,
-        siretNumber: true,
         iban: true
       }
     })
@@ -240,20 +292,7 @@ export const PATCH = withAuthSecurity(async (request: NextRequest, session) => {
       throw createError.forbidden("Non autorisé - Vous ne pouvez modifier que votre propre profil producteur")
     }
 
-    // 5. Vérifications d'unicité pour les champs critiques
-    if (validatedData.siretNumber && validatedData.siretNumber !== existingProducer.siretNumber) {
-      const existingSiret = await prisma.producer.findFirst({
-        where: { 
-          siretNumber: validatedData.siretNumber,
-          NOT: { id }
-        }
-      })
-      if (existingSiret) {
-        throw createError.validation("Ce numéro SIRET est déjà utilisé par un autre producteur")
-      }
-    }
-
-    // 6. Nettoyage des données
+    // 5. Nettoyage des données
     const updateData: any = {}
     
     if (validatedData.companyName) {
@@ -268,12 +307,16 @@ export const PATCH = withAuthSecurity(async (request: NextRequest, session) => {
       updateData.description = validatedData.description?.trim() || ''
     }
     
-    if (validatedData.siretNumber !== undefined) {
-      updateData.siretNumber = validatedData.siretNumber?.trim() || null
-    }
-    
     if (validatedData.bankAccountName !== undefined) {
       updateData.bankAccountName = validatedData.bankAccountName?.trim() || null
+    }
+    
+    if (validatedData.bankName !== undefined) {
+      updateData.bankName = validatedData.bankName?.trim() || null
+    }
+    
+    if (validatedData.bic !== undefined) {
+      updateData.bic = validatedData.bic?.trim().toUpperCase() || null
     }
     
     if (validatedData.iban !== undefined) {
@@ -286,7 +329,7 @@ export const PATCH = withAuthSecurity(async (request: NextRequest, session) => {
       }
     }
 
-    // 7. Mise à jour sécurisée
+    // 6. Mise à jour sécurisée
     const updatedProducer = await prisma.producer.update({
       where: { id },
       data: updateData,
@@ -302,7 +345,7 @@ export const PATCH = withAuthSecurity(async (request: NextRequest, session) => {
       }
     })
 
-    // 8. Log d'audit sécurisé
+    // 7. Log d'audit sécurisé
     console.log(`📋 Audit - Producteur modifié:`, {
       producerId: id,
       modifiedBy: session.user.id,
@@ -313,7 +356,7 @@ export const PATCH = withAuthSecurity(async (request: NextRequest, session) => {
 
     console.log(`✅ Producteur ${id} mis à jour avec succès`)
 
-    // 9. Réponse sécurisée (IBAN masqué)
+    // 8. Réponse sécurisée (IBAN masqué)
     const response = {
       ...updatedProducer,
       iban: undefined,

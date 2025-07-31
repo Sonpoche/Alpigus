@@ -1,123 +1,126 @@
 // app/api/products/route.ts
 import { NextRequest, NextResponse } from "next/server"
+import { withAuthSecurity, validateData } from "@/lib/api-security"
+import { handleError, createError } from "@/lib/error-handler"
 import { prisma } from "@/lib/prisma"
-import { apiAuthMiddleware } from "@/lib/api-middleware"
-import { Session } from "next-auth"
+import { z } from "zod"
 import { ProductType, Prisma } from "@prisma/client"
 import { PRESET_IMAGES } from '@/types/images'
 
-export const GET = apiAuthMiddleware(async (
-  req: NextRequest,
-  session: Session
-) => {
+// Schémas de validation
+const productsQuerySchema = z.object({
+  page: z.coerce.number().min(1).default(1),
+  limit: z.coerce.number().min(1).max(100).default(10),
+  type: z.nativeEnum(ProductType).optional(),
+  category: z.string().optional(),
+  available: z.coerce.boolean().optional(),
+  minPrice: z.coerce.number().min(0).optional(),
+  maxPrice: z.coerce.number().min(0).optional(),
+  sortBy: z.enum(['price_asc', 'price_desc', 'popular', 'newest']).default('newest'),
+  search: z.string().max(100).optional()
+})
+
+const createProductSchema = z.object({
+  name: z.string().min(1, 'Nom requis').max(200, 'Nom trop long'),
+  description: z.string().max(2000, 'Description trop longue').optional(),
+  price: z.number().min(0.01, 'Prix invalide'),
+  type: z.nativeEnum(ProductType),
+  unit: z.string().min(1, 'Unité requise').max(50, 'Unité trop longue'),
+  categories: z.array(z.string().cuid()).max(10, 'Trop de catégories').optional(),
+  initialStock: z.number().min(0, 'Stock initial invalide').default(0),
+  imagePreset: z.string().optional(),
+  acceptDeferred: z.boolean().default(false),
+  minOrderQuantity: z.number().min(0, 'Quantité minimale invalide').default(0)
+}).strict()
+
+// GET - Obtenir la liste des produits
+export const GET = withAuthSecurity(async (request: NextRequest, session) => {
   try {
-    const { searchParams } = new URL(req.url);
-    const page = parseInt(searchParams.get('page') ?? '1');
-    const limit = parseInt(searchParams.get('limit') ?? '10');
-    const typeParam = searchParams.get('type');
-    const category = searchParams.get('category');
-    const availableParam = searchParams.get('available');
-    const minPrice = searchParams.get('minPrice');
-    const maxPrice = searchParams.get('maxPrice');
-    const sortBy = searchParams.get('sortBy');
-    const search = searchParams.get('search');
-
-    console.log("Requête API produits:", { 
-      typeParam, category, availableParam, minPrice, maxPrice, sortBy, search 
-    });
-
-    // Validation du type de produit
-    if (typeParam && !Object.values(ProductType).includes(typeParam as ProductType)) {
-      return new NextResponse("Type de produit invalide", { status: 400 });
-    }
-
-    // Construction du filtre de base
-    const baseWhere: Prisma.ProductWhereInput = {};
+    // 1. Validation des paramètres de requête
+    const { searchParams } = new URL(request.url)
+    const queryParams = Object.fromEntries(searchParams.entries())
     
-    // Ajouter uniquement les filtres définis
-    if (typeParam) {
-      baseWhere.type = typeParam as ProductType;
+    const validatedQuery = validateData(productsQuerySchema, queryParams)
+    const { type, category, available, minPrice, maxPrice, sortBy, search } = validatedQuery
+    
+    // Assurer que page et limit ont des valeurs définies (garanties par les valeurs par défaut Zod)
+    const page = validatedQuery.page!
+    const limit = validatedQuery.limit!
+
+    console.log(`🛍️ Récupération produits par ${session.user.role} ${session.user.id}`)
+
+    // 2. Construction des filtres de base sécurisés
+    const baseWhere: Prisma.ProductWhereInput = {}
+    
+    if (type) {
+      baseWhere.type = type
     }
     
     if (category) {
-      baseWhere.categories = { some: { id: category } };
+      baseWhere.categories = { some: { id: category } }
     }
 
-    // Traitement du filtre de disponibilité
-    if (availableParam !== null && availableParam !== undefined) {
-      baseWhere.available = availableParam === 'true';
+    if (available !== undefined) {
+      baseWhere.available = available
     }
 
-    // Traitement des filtres de prix
-    if (minPrice || maxPrice) {
-      baseWhere.price = {};
-      
-      if (minPrice) {
-        baseWhere.price.gte = parseFloat(minPrice);
-      }
-      
-      if (maxPrice) {
-        baseWhere.price.lte = parseFloat(maxPrice);
-      }
+    if (minPrice !== undefined || maxPrice !== undefined) {
+      baseWhere.price = {}
+      if (minPrice !== undefined) baseWhere.price.gte = minPrice
+      if (maxPrice !== undefined) baseWhere.price.lte = maxPrice
     }
 
-    // Ajout de la recherche textuelle
-    if (search && search.trim() !== '') {
-      const searchTerm = search.trim();
+    if (search && search.trim()) {
+      const searchTerm = search.trim()
       baseWhere.OR = [
         { name: { contains: searchTerm, mode: 'insensitive' } },
         { description: { contains: searchTerm, mode: 'insensitive' } },
         { categories: { some: { name: { contains: searchTerm, mode: 'insensitive' } } } }
-      ];
+      ]
     }
 
-    // Ajout des filtres spécifiques selon le rôle
-    let where: Prisma.ProductWhereInput = { ...baseWhere };
+    // 3. Filtres selon le rôle utilisateur
+    let where: Prisma.ProductWhereInput = { ...baseWhere }
     
     if (session.user.role === 'PRODUCER') {
-      // Les producteurs ne voient que leurs produits
+      // Producteurs ne voient que leurs produits
       where = {
         ...where,
         producer: {
           userId: session.user.id
         }
-      };
+      }
     } else if (session.user.role === 'CLIENT') {
-      // Les clients ne voient que les produits disponibles par défaut
-      // Mais respectent le filtre explicite s'il est fourni
-      if (availableParam === null || availableParam === undefined) {
+      // Clients ne voient que les produits disponibles par défaut
+      if (available === undefined) {
         where = {
           ...where,
           available: true
-        };
+        }
       }
     }
-    // Les admins voient tous les produits
+    // Admins voient tous les produits
 
-    console.log("Filtres appliqués:", where);
-
-    // Déterminer l'ordre de tri
-    let orderBy: Prisma.ProductOrderByWithRelationInput = { createdAt: 'desc' };
+    // 4. Configuration du tri sécurisé
+    let orderBy: Prisma.ProductOrderByWithRelationInput = { createdAt: 'desc' }
     
-    if (sortBy) {
-      switch (sortBy) {
-        case 'price_asc':
-          orderBy = { price: 'asc' };
-          break;
-        case 'price_desc':
-          orderBy = { price: 'desc' };
-          break;
-        case 'popular':
-          // Si vous avez un mécanisme de popularité, utilisez-le ici
-          // Sinon, utilisez une autre valeur comme fallback
-          orderBy = { createdAt: 'desc' };
-          break;
-        default:
-          orderBy = { createdAt: 'desc' }; // Default to newest
-      }
+    switch (sortBy) {
+      case 'price_asc':
+        orderBy = { price: 'asc' }
+        break
+      case 'price_desc':
+        orderBy = { price: 'desc' }
+        break
+      case 'popular':
+        // Pour la popularité, on pourrait trier par le nombre de commandes
+        orderBy = { createdAt: 'desc' } // Fallback
+        break
+      case 'newest':
+      default:
+        orderBy = { createdAt: 'desc' }
     }
 
-    // Exécution des requêtes
+    // 5. Récupération sécurisée des produits
     const [products, total] = await Promise.all([
       prisma.product.findMany({
         where,
@@ -127,8 +130,8 @@ export const GET = apiAuthMiddleware(async (
               user: {
                 select: {
                   name: true,
-                  email: true,
-                  phone: true,
+                  email: session.user.role === 'ADMIN', // Email visible pour admin seulement
+                  phone: session.user.role !== 'CLIENT' // Téléphone masqué pour clients
                 }
               }
             }
@@ -141,121 +144,128 @@ export const GET = apiAuthMiddleware(async (
         orderBy
       }),
       prisma.product.count({ where })
-    ]);
+    ])
 
-    console.log(`Trouvé ${products.length} produits sur un total de ${total}`);
+    // 6. Log d'audit sécurisé
+    console.log(`📋 Audit - Produits consultés:`, {
+      consultedBy: session.user.id,
+      role: session.user.role,
+      productsCount: products.length,
+      filters: { type, category, available, search: !!search },
+      timestamp: new Date().toISOString()
+    })
 
+    console.log(`✅ ${products.length} produits récupérés sur ${total}`)
+
+    // 7. Réponse sécurisée
     return NextResponse.json({
       products,
       pagination: {
         page,
         limit,
         total,
-        pages: Math.ceil(total / limit)
+        pages: Math.ceil(total / limit),
+        hasNextPage: page * limit < total,
+        hasPreviousPage: page > 1
+      },
+      meta: {
+        accessLevel: session.user.role,
+        filtersApplied: { type, category, available, search: !!search }
       }
-    });
+    })
+
   } catch (error) {
-    console.error("Erreur lors de la récupération des produits:", error);
-    return new NextResponse(
-      "Erreur lors de la récupération des produits", 
-      { status: 500 }
-    );
+    console.error("❌ Erreur récupération produits:", error)
+    return handleError(error, request.url)
   }
-});
+}, {
+  requireAuth: true,
+  allowedRoles: ['CLIENT', 'PRODUCER', 'ADMIN'],
+  allowedMethods: ['GET'],
+  rateLimit: {
+    requests: 200, // Consultation fréquente
+    window: 60
+  }
+})
 
-export const POST = apiAuthMiddleware(
-  async (req: NextRequest, session: Session) => {
-    try {
-      const producer = await prisma.producer.findUnique({
-        where: { userId: session.user.id }
-      });
+// POST - Créer un nouveau produit (PRODUCTEUR uniquement)
+export const POST = withAuthSecurity(async (request: NextRequest, session) => {
+  try {
+    // 1. Validation des données d'entrée
+    const rawData = await request.json()
+    const validatedData = validateData(createProductSchema, rawData)
+    
+    const { 
+      name, 
+      description, 
+      price, 
+      type, 
+      unit, 
+      categories, 
+      imagePreset,
+      acceptDeferred,
+      minOrderQuantity
+    } = validatedData
+    
+    // Assurer que initialStock a une valeur définie (garantie par valeur par défaut Zod)
+    const initialStock = validatedData.initialStock!
 
-      if (!producer) {
-        return new NextResponse("Producteur non trouvé", { status: 404 });
+    console.log(`🏭 Création produit par producteur ${session.user.id}`)
+
+    // 2. Vérification du profil producteur
+    const producer = await prisma.producer.findUnique({
+      where: { userId: session.user.id },
+      select: { id: true, companyName: true }
+    })
+
+    if (!producer) {
+      throw createError.notFound("Profil producteur non trouvé")
+    }
+
+    // 3. Gestion sécurisée de l'image prédéfinie
+    let imageUrl: string | null = null
+    if (imagePreset) {
+      const preset = PRESET_IMAGES.find(p => p.id === imagePreset)
+      if (preset) {
+        imageUrl = preset.src
+      } else {
+        throw createError.validation("Image prédéfinie non valide")
       }
+    }
 
-      const body = await req.json();
-      const { 
-        name, 
-        description, 
-        price, 
-        type, 
-        unit, 
-        categories, 
-        initialStock,
-        imagePreset,
-        acceptDeferred,   // Nouvel attribut
-        minOrderQuantity  // Nouvel attribut
-      } = body;
+    // 4. Validation des catégories si fournies
+    if (categories && categories.length > 0) {
+      const existingCategories = await prisma.category.findMany({
+        where: { id: { in: categories } },
+        select: { id: true }
+      })
 
-      // Validations
-      if (!name || !price || !type || !unit) {
-        return new NextResponse("Champs requis manquants", { status: 400 });
+      if (existingCategories.length !== categories.length) {
+        throw createError.validation("Une ou plusieurs catégories n'existent pas")
       }
+    }
 
-      if (price < 0) {
-        return new NextResponse("Le prix ne peut pas être négatif", { status: 400 });
-      }
-
-      if (initialStock < 0) {
-        return new NextResponse("Le stock initial ne peut pas être négatif", { status: 400 });
-      }
-
-      if (minOrderQuantity < 0) {
-        return new NextResponse("La quantité minimale ne peut pas être négative", { status: 400 });
-      }
-
-      if (!Object.values(ProductType).includes(type)) {
-        return new NextResponse("Type de produit invalide", { status: 400 });
-      }
-
-      // Gérer l'image prédéfinie
-      let imageUrl = null;
-      if (imagePreset) {
-        const preset = PRESET_IMAGES.find(p => p.id === imagePreset);
-        if (preset) {
-          imageUrl = preset.src;
-        } else {
-          return new NextResponse("Image prédéfinie non valide", { status: 400 });
-        }
-      }
-
-      // Validation des catégories
-      if (categories?.length > 0) {
-        const existingCategories = await prisma.category.findMany({
-          where: {
-            id: {
-              in: categories
-            }
-          }
-        });
-
-        if (existingCategories.length !== categories.length) {
-          return new NextResponse(
-            "Une ou plusieurs catégories n'existent pas",
-            { status: 400 }
-          );
-        }
-      }
-
-      const product = await prisma.product.create({
+    // 5. Création sécurisée du produit avec transaction
+    const product = await prisma.$transaction(async (tx) => {
+      // Créer le produit
+      const newProduct = await tx.product.create({
         data: {
-          name,
-          description,
+          name: name.trim(),
+          description: description?.trim() || '',
           price,
-          type: type as ProductType,
-          unit,
+          type,
+          unit: unit.trim(),
           image: imageUrl,
           producerId: producer.id,
           available: true,
-          acceptDeferred: acceptDeferred === true,          // Nouvelle valeur
-          minOrderQuantity: minOrderQuantity || 0,          // Nouvelle valeur
+          acceptDeferred,
+          minOrderQuantity,
           stock: {
             create: {
               quantity: initialStock
             }
           },
-          ...(categories && {
+          ...(categories && categories.length > 0 && {
             categories: {
               connect: categories.map((id: string) => ({ id }))
             }
@@ -264,18 +274,60 @@ export const POST = apiAuthMiddleware(
         include: {
           stock: true,
           categories: true,
-          producer: true
+          producer: {
+            select: {
+              id: true,
+              companyName: true,
+              user: {
+                select: {
+                  name: true
+                }
+              }
+            }
+          }
         }
-      });
+      })
 
-      return NextResponse.json(product);
-    } catch (error) {
-      console.error("Erreur création produit:", error);
-      return new NextResponse(
-        "Erreur lors de la création du produit", 
-        { status: 500 }
-      );
-    }
-  },
-  ["PRODUCER"]
-);
+      // Créer une entrée d'historique de stock initial
+      if (initialStock > 0) {
+        await tx.stockHistory.create({
+          data: {
+            productId: newProduct.id,
+            quantity: initialStock,
+            type: 'initial',
+            note: 'Stock initial à la création'
+          }
+        })
+      }
+
+      return newProduct
+    })
+
+    // 6. Log d'audit sécurisé
+    console.log(`📋 Audit - Produit créé:`, {
+      productId: product.id,
+      createdBy: session.user.id,
+      producerId: producer.id,
+      productName: name,
+      price,
+      initialStock,
+      timestamp: new Date().toISOString()
+    })
+
+    console.log(`✅ Produit créé: ${product.id} par ${producer.companyName}`)
+
+    return NextResponse.json(product, { status: 201 })
+
+  } catch (error) {
+    console.error("❌ Erreur création produit:", error)
+    return handleError(error, request.url)
+  }
+}, {
+  requireAuth: true,
+  allowedRoles: ['PRODUCER'], // Seuls les producteurs peuvent créer
+  allowedMethods: ['POST'],
+  rateLimit: {
+    requests: 20, // Création limitée
+    window: 60
+  }
+})

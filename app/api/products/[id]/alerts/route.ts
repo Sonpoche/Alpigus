@@ -1,90 +1,215 @@
 // app/api/products/[id]/alerts/route.ts
 import { NextRequest, NextResponse } from "next/server"
+import { withAuthSecurity, validateData, commonSchemas } from "@/lib/api-security"
+import { handleError, createError } from "@/lib/error-handler"
 import { prisma } from "@/lib/prisma"
-import { apiAuthMiddleware } from "@/lib/api-middleware"
-import { Session } from "next-auth"
+import { z } from "zod"
 
-export const GET = apiAuthMiddleware(async (
-  req: NextRequest,
-  session: Session,
-  context: { params: { [key: string]: string } }
-) => {
+// Schémas de validation
+const paramsSchema = z.object({
+  id: commonSchemas.id
+})
+
+const createAlertSchema = z.object({
+  threshold: z.number().min(0, 'Seuil invalide').max(10000, 'Seuil trop élevé'),
+  percentage: z.boolean().default(false),
+  emailAlert: z.boolean().default(true)
+}).strict()
+
+// GET - Obtenir les alertes de stock configurées
+export const GET = withAuthSecurity(async (request: NextRequest, session) => {
   try {
-    const productId = context.params.id;
-    
-    // Vérifier que le produit appartient au producteur
+    // 1. Extraction et validation de l'ID
+    const url = new URL(request.url)
+    const pathSegments = url.pathname.split('/')
+    const productId = pathSegments[pathSegments.indexOf('products') + 1]
+
+    const { id } = validateData(paramsSchema, { id: productId })
+
+    console.log(`🚨 Récupération alertes stock produit ${id} par ${session.user.role} ${session.user.id}`)
+
+    // 2. Vérification d'autorisation
     const product = await prisma.product.findUnique({
-      where: { id: productId },
-      include: { producer: true }
-    });
+      where: { id },
+      include: { 
+        producer: {
+          select: {
+            userId: true,
+            companyName: true
+          }
+        }
+      }
+    })
 
     if (!product) {
-      return new NextResponse("Produit non trouvé", { status: 404 });
+      throw createError.notFound("Produit non trouvé")
     }
 
-    if (product.producer.userId !== session.user.id && session.user.role !== 'ADMIN') {
-      return new NextResponse("Non autorisé", { status: 403 });
+    if (session.user.role !== 'ADMIN' && product.producer.userId !== session.user.id) {
+      throw createError.forbidden("Vous ne pouvez consulter que les alertes de vos propres produits")
     }
 
-    // Récupérer les alertes configurées
+    // 3. Récupération des alertes configurées
     const alert = await prisma.stockAlert.findUnique({
-      where: { productId }
-    });
+      where: { productId: id },
+      select: {
+        id: true,
+        threshold: true,
+        percentage: true,
+        emailAlert: true,
+        createdAt: true,
+        updatedAt: true
+      }
+    })
 
-    return NextResponse.json(alert || { threshold: 0, percentage: false, emailAlert: true });
-  } catch (error) {
-    console.error("Erreur lors de la récupération des alertes de stock:", error);
-    return new NextResponse("Erreur serveur", { status: 500 });
-  }
-}, ["PRODUCER", "ADMIN"]);
+    // 4. Récupération du stock actuel pour contexte
+    const stock = await prisma.stock.findUnique({
+      where: { productId: id },
+      select: {
+        quantity: true
+      }
+    })
 
-export const POST = apiAuthMiddleware(async (
-  req: NextRequest,
-  session: Session,
-  context: { params: { [key: string]: string } }
-) => {
-  try {
-    const productId = context.params.id;
-    const { threshold, percentage, emailAlert } = await req.json();
-    
-    // Validation
-    if (threshold < 0) {
-      return new NextResponse("Le seuil doit être positif", { status: 400 });
+    // 5. Calcul du statut d'alerte actuel
+    const currentQuantity = stock?.quantity || 0
+    let alertStatus = 'ok'
+    let alertTriggered = false
+
+    if (alert) {
+      if (alert.percentage) {
+        // Logique de pourcentage (nécessiterait une référence de stock "normal")
+        // Pour simplifier, on considère 100 comme stock de référence
+        const referenceStock = 100
+        const thresholdQuantity = (alert.threshold / 100) * referenceStock
+        alertTriggered = currentQuantity <= thresholdQuantity
+      } else {
+        // Seuil absolu
+        alertTriggered = currentQuantity <= alert.threshold
+      }
+
+      alertStatus = alertTriggered ? 'triggered' : 'ok'
     }
-    
-    // Vérifier que le produit appartient au producteur
+
+    console.log(`✅ Alertes récupérées - Statut: ${alertStatus}`)
+
+    // 6. Réponse sécurisée
+    const response = {
+      productId: id,
+      product: {
+        name: product.name,
+        unit: product.unit
+      },
+      alert: alert || {
+        threshold: 0,
+        percentage: false,
+        emailAlert: true,
+        configured: false
+      },
+      currentStock: {
+        quantity: currentQuantity,
+        status: alertStatus,
+        alertTriggered
+      },
+      meta: {
+        hasAlert: !!alert,
+        alertActive: alert?.emailAlert || false
+      }
+    }
+
+    return NextResponse.json(response)
+
+  } catch (error) {
+    console.error("❌ Erreur récupération alertes:", error)
+    return handleError(error, request.url)
+  }
+}, {
+  requireAuth: true,
+  allowedRoles: ['PRODUCER', 'ADMIN'],
+  allowedMethods: ['GET'],
+  rateLimit: {
+    requests: 100,
+    window: 60
+  }
+})
+
+// POST - Configurer les alertes de stock
+export const POST = withAuthSecurity(async (request: NextRequest, session) => {
+  try {
+    // 1. Extraction et validation de l'ID
+    const url = new URL(request.url)
+    const pathSegments = url.pathname.split('/')
+    const productId = pathSegments[pathSegments.indexOf('products') + 1]
+
+    const { id } = validateData(paramsSchema, { id: productId })
+
+    // 2. Validation des données
+    const rawData = await request.json()
+    const { threshold, percentage, emailAlert } = validateData(createAlertSchema, rawData)
+
+    console.log(`🚨 Configuration alertes stock produit ${id} par ${session.user.role} ${session.user.id}`)
+
+    // 3. Vérification d'autorisation
     const product = await prisma.product.findUnique({
-      where: { id: productId },
-      include: { producer: true }
-    });
+      where: { id },
+      include: { 
+        producer: {
+          select: {
+            userId: true,
+            companyName: true
+          }
+        }
+      }
+    })
 
     if (!product) {
-      return new NextResponse("Produit non trouvé", { status: 404 });
+      throw createError.notFound("Produit non trouvé")
     }
 
-    if (product.producer.userId !== session.user.id && session.user.role !== 'ADMIN') {
-      return new NextResponse("Non autorisé", { status: 403 });
+    if (session.user.role !== 'ADMIN' && product.producer.userId !== session.user.id) {
+      throw createError.forbidden("Vous ne pouvez configurer que les alertes de vos propres produits")
     }
 
-    // Créer ou mettre à jour l'alerte
+    // 4. Création/mise à jour sécurisée de l'alerte
     const alert = await prisma.stockAlert.upsert({
-      where: { productId },
+      where: { productId: id },
       update: {
         threshold,
-        percentage: !!percentage,
-        emailAlert: !!emailAlert
+        percentage,
+        emailAlert
       },
       create: {
-        productId,
+        productId: id,
         threshold,
-        percentage: !!percentage,
-        emailAlert: !!emailAlert
+        percentage,
+        emailAlert
       }
-    });
+    })
 
-    return NextResponse.json(alert);
+    // 5. Log d'audit sécurisé
+    console.log(`📋 Audit - Alertes stock configurées:`, {
+      productId: id,
+      configuredBy: session.user.id,
+      role: session.user.role,
+      threshold,
+      percentage,
+      emailAlert,
+      timestamp: new Date().toISOString()
+    })
+
+    console.log(`✅ Alertes configurées: seuil ${threshold}${percentage ? '%' : ' unités'}`)
+
+    return NextResponse.json(alert)
+
   } catch (error) {
-    console.error("Erreur lors de la configuration des alertes de stock:", error);
-    return new NextResponse("Erreur serveur", { status: 500 });
+    console.error("❌ Erreur configuration alertes:", error)
+    return handleError(error, request.url)
   }
-}, ["PRODUCER", "ADMIN"]);
+}, {
+  requireAuth: true,
+  allowedRoles: ['PRODUCER', 'ADMIN'],
+  allowedMethods: ['POST'],
+  rateLimit: {
+    requests: 10,
+    window: 60
+  }
+})

@@ -1,94 +1,284 @@
 // app/api/products/[id]/production-schedule/route.ts
 import { NextRequest, NextResponse } from "next/server"
+import { withAuthSecurity, validateData, commonSchemas } from "@/lib/api-security"
+import { handleError, createError } from "@/lib/error-handler"
 import { prisma } from "@/lib/prisma"
-import { apiAuthMiddleware } from "@/lib/api-middleware"
-import { Session } from "next-auth"
+import { z } from "zod"
 
-export const GET = apiAuthMiddleware(async (
-  req: NextRequest,
-  session: Session,
-  context: { params: { [key: string]: string } }
-) => {
+// Schémas de validation
+const paramsSchema = z.object({
+  id: commonSchemas.id
+})
+
+const scheduleQuerySchema = z.object({
+  future: z.coerce.boolean().default(false),
+  limit: z.coerce.number().min(1).max(100).default(50)
+})
+
+const createScheduleSchema = z.object({
+  date: z.string().datetime('Date invalide'),
+  quantity: z.number().min(0.01, 'Quantité invalide'),
+  note: z.string().max(500, 'Note trop longue').optional(),
+  isPublic: z.boolean().default(true)
+}).strict()
+
+// GET - Obtenir le calendrier de production
+export const GET = withAuthSecurity(async (request: NextRequest, session) => {
   try {
-    const productId = context.params.id;
-    const { searchParams } = new URL(req.url);
-    const futureOnly = searchParams.get('future') === 'true';
-    
-    // Déterminer les contraintes de visibilité selon le rôle
-    let visibilityConstraint = {};
-    if (session.user.role === 'CLIENT') {
-      visibilityConstraint = { isPublic: true };
+    // 1. Extraction et validation de l'ID
+    const url = new URL(request.url)
+    const pathSegments = url.pathname.split('/')
+    const productId = pathSegments[pathSegments.indexOf('products') + 1]
+
+    const { id } = validateData(paramsSchema, { id: productId })
+
+    // 2. Validation des paramètres de requête
+    const { searchParams } = new URL(request.url)
+    const queryParams = {
+      future: searchParams.get('future'),
+      limit: searchParams.get('limit')
     }
-    
-    // Contrainte de date future si demandée
-    let dateConstraint = {};
-    if (futureOnly) {
+
+    const { future, limit } = validateData(scheduleQuerySchema, queryParams)
+
+    console.log(`📅 Récupération calendrier production produit ${id} par ${session.user.role} ${session.user.id}`)
+
+    // 3. Vérification d'existence du produit
+    const product = await prisma.product.findUnique({
+      where: { id },
+      include: {
+        producer: {
+          select: {
+            userId: true,
+            companyName: true
+          }
+        }
+      }
+    })
+
+    if (!product) {
+      throw createError.notFound("Produit non trouvé")
+    }
+
+    // 4. Construction des contraintes selon le rôle
+    let visibilityConstraint = {}
+    let canViewPrivate = false
+
+    if (session.user.role === 'ADMIN') {
+      canViewPrivate = true
+      // Admin voit tout
+    } else if (session.user.role === 'PRODUCER' && product.producer.userId === session.user.id) {
+      canViewPrivate = true
+      // Producteur voit ses propres plannings privés et publics
+    } else if (session.user.role === 'CLIENT') {
+      // Clients ne voient que les plannings publics
+      visibilityConstraint = { isPublic: true }
+    } else {
+      throw createError.forbidden("Accès non autorisé à ce calendrier de production")
+    }
+
+    // 5. Contraintes de date si demandées
+    let dateConstraint = {}
+    if (future) {
       dateConstraint = {
         date: {
           gte: new Date()
         }
-      };
+      }
     }
-    
-    // Récupérer le calendrier de production
+
+    // 6. Récupération sécurisée du calendrier
     const schedule = await prisma.productionSchedule.findMany({
       where: { 
-        productId,
+        productId: id,
         ...visibilityConstraint,
         ...dateConstraint
       },
-      orderBy: { date: 'asc' }
-    });
+      orderBy: { date: 'asc' },
+      take: limit
+    })
 
-    return NextResponse.json(schedule);
-  } catch (error) {
-    console.error("Erreur lors de la récupération du calendrier de production:", error);
-    return new NextResponse("Erreur serveur", { status: 500 });
-  }
-});
+    // 7. Calcul des statistiques pour propriétaires
+    let statistics = null
+    if (canViewPrivate) {
+      const now = new Date()
+      const oneMonthFromNow = new Date()
+      oneMonthFromNow.setMonth(now.getMonth() + 1)
 
-export const POST = apiAuthMiddleware(async (
-  req: NextRequest,
-  session: Session,
-  context: { params: { [key: string]: string } }
-) => {
-  try {
-    const productId = context.params.id;
-    const { date, quantity, note, isPublic } = await req.json();
-    
-    // Validation
-    if (!date || !quantity || quantity <= 0) {
-      return new NextResponse("Date et quantité positive requises", { status: 400 });
+      const upcomingProduction = await prisma.productionSchedule.aggregate({
+        where: {
+          productId: id,
+          date: {
+            gte: now,
+            lte: oneMonthFromNow
+          }
+        },
+        _sum: {
+          quantity: true
+        },
+        _count: {
+          id: true
+        }
+      })
+
+      statistics = {
+        upcomingEntries: upcomingProduction._count.id,
+        plannedQuantity: upcomingProduction._sum.quantity || 0,
+        nextProductionDate: schedule.find(s => new Date(s.date) > now)?.date || null
+      }
     }
-    
-    // Vérifier que le produit appartient au producteur
+
+    // 8. Log d'audit sécurisé
+    console.log(`📋 Audit - Calendrier production consulté:`, {
+      productId: id,
+      consultedBy: session.user.id,
+      role: session.user.role,
+      entriesCount: schedule.length,
+      canViewPrivate,
+      futureOnly: future,
+      timestamp: new Date().toISOString()
+    })
+
+    console.log(`✅ Calendrier récupéré: ${schedule.length} entrées`)
+
+    // 9. Réponse sécurisée
+    const response = {
+      productId: id,
+      product: {
+        name: product.name,
+        unit: product.unit
+      },
+      schedule: schedule.map(entry => ({
+        id: entry.id,
+        date: entry.date.toISOString(),
+        quantity: entry.quantity,
+        note: canViewPrivate ? entry.note : null, // Notes masquées pour clients
+        isPublic: entry.isPublic,
+        createdAt: entry.createdAt,
+        updatedAt: entry.updatedAt
+      })),
+      ...(statistics && { statistics }),
+      meta: {
+        count: schedule.length,
+        futureOnly: future,
+        accessLevel: canViewPrivate ? 'full' : 'public',
+        viewerRole: session.user.role
+      }
+    }
+
+    return NextResponse.json(response)
+
+  } catch (error) {
+    console.error("❌ Erreur récupération calendrier production:", error)
+    return handleError(error, request.url)
+  }
+}, {
+  requireAuth: true,
+  allowedRoles: ['CLIENT', 'PRODUCER', 'ADMIN'], // Tous peuvent consulter
+  allowedMethods: ['GET'],
+  rateLimit: {
+    requests: 100,
+    window: 60
+  }
+})
+
+// POST - Ajouter une entrée au calendrier de production
+export const POST = withAuthSecurity(async (request: NextRequest, session) => {
+  try {
+    // 1. Extraction et validation de l'ID
+    const url = new URL(request.url)
+    const pathSegments = url.pathname.split('/')
+    const productId = pathSegments[pathSegments.indexOf('products') + 1]
+
+    const { id } = validateData(paramsSchema, { id: productId })
+
+    // 2. Validation des données
+    const rawData = await request.json()
+    const { date, quantity, note, isPublic } = validateData(createScheduleSchema, rawData)
+
+    console.log(`📅 Ajout calendrier production produit ${id} par ${session.user.role} ${session.user.id}`)
+
+    // 3. Vérification d'autorisation
     const product = await prisma.product.findUnique({
-      where: { id: productId },
-      include: { producer: true }
-    });
+      where: { id },
+      include: { 
+        producer: {
+          select: {
+            userId: true,
+            companyName: true
+          }
+        }
+      }
+    })
 
     if (!product) {
-      return new NextResponse("Produit non trouvé", { status: 404 });
+      throw createError.notFound("Produit non trouvé")
     }
 
-    if (product.producer.userId !== session.user.id && session.user.role !== 'ADMIN') {
-      return new NextResponse("Non autorisé", { status: 403 });
+    if (session.user.role !== 'ADMIN' && product.producer.userId !== session.user.id) {
+      throw createError.forbidden("Vous ne pouvez planifier que la production de vos propres produits")
     }
 
-    // Créer l'entrée dans le calendrier
+    // 4. Validation de logique métier
+    const plannedDate = new Date(date)
+    const now = new Date()
+    
+    if (plannedDate < now) {
+      throw createError.validation("Impossible de planifier une production dans le passé")
+    }
+
+    // Vérifier s'il y a déjà une planification le même jour
+    const existingSchedule = await prisma.productionSchedule.findFirst({
+      where: {
+        productId: id,
+        date: {
+          gte: new Date(plannedDate.toDateString()),
+          lt: new Date(plannedDate.getTime() + 24 * 60 * 60 * 1000)
+        }
+      }
+    })
+
+    if (existingSchedule) {
+      throw createError.validation("Il existe déjà une planification pour cette date")
+    }
+
+    // 5. Création sécurisée de l'entrée
     const scheduleEntry = await prisma.productionSchedule.create({
       data: {
-        productId,
-        date: new Date(date),
+        productId: id,
+        date: plannedDate,
         quantity,
-        note,
-        isPublic: isPublic !== undefined ? isPublic : true
+        note: note?.trim() || null,
+        isPublic
       }
-    });
+    })
 
-    return NextResponse.json(scheduleEntry);
+    // 6. Log d'audit sécurisé
+    console.log(`📋 Audit - Planification production ajoutée:`, {
+      scheduleId: scheduleEntry.id,
+      productId: id,
+      createdBy: session.user.id,
+      role: session.user.role,
+      date: plannedDate.toISOString(),
+      quantity,
+      isPublic,
+      timestamp: new Date().toISOString()
+    })
+
+    console.log(`✅ Production planifiée: ${quantity} ${product.unit} le ${plannedDate.toLocaleDateString()}`)
+
+    return NextResponse.json(scheduleEntry, { status: 201 })
+
   } catch (error) {
-    console.error("Erreur lors de l'ajout au calendrier de production:", error);
-    return new NextResponse("Erreur serveur", { status: 500 });
+    console.error("❌ Erreur ajout calendrier production:", error)
+    return handleError(error, request.url)
   }
-}, ["PRODUCER", "ADMIN"]);
+}, {
+  requireAuth: true,
+  allowedRoles: ['PRODUCER', 'ADMIN'], // Seuls producteurs et admins peuvent planifier
+  allowedMethods: ['POST'],
+  rateLimit: {
+    requests: 20, // Planifications limitées
+    window: 60
+  }
+})
