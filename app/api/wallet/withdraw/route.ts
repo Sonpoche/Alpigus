@@ -73,10 +73,10 @@ export const POST = withAuthSecurity(async (request: NextRequest, session) => {
       )
     }
 
-    // 4. Vérifier qu'il n'y a pas de retrait en cours
+    // 4. CORRECTION : Utiliser wallet.id au lieu de producerId
     const existingPendingWithdrawal = await prisma.withdrawal.findFirst({
       where: {
-        producerId: producer.id,
+        walletId: producer.wallet.id, // ✅ Correction ici
         status: 'PENDING'
       }
     })
@@ -100,18 +100,13 @@ export const POST = withAuthSecurity(async (request: NextRequest, session) => {
       throw createError.validation("Format IBAN invalide dans votre profil")
     }
 
-    // 7. Création sécurisée de la demande de retrait via le service
+    // 7. CORRECTION : Utiliser seulement 3 paramètres selon la signature du service
     let withdrawal
     try {
       withdrawal = await WalletService.createWithdrawalRequest(
         producer.id, 
         amount, 
-        bankDetails,
-        {
-          reason: reason || 'Retrait de revenus',
-          requestedBy: session.user.id,
-          userAgent: request.headers.get('user-agent')?.substring(0, 100) || 'unknown'
-        }
+        bankDetails // ✅ Correction : suppression du 4ème paramètre
       )
     } catch (serviceError) {
       console.error("Erreur WalletService:", serviceError)
