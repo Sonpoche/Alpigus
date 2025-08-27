@@ -1,5 +1,4 @@
 // components/ui/card.tsx
-
 import * as React from "react"
 import { cn } from "@/lib/utils"
 
@@ -10,7 +9,7 @@ const Card = React.forwardRef<
   <div
     ref={ref}
     className={cn(
-      "card", // Utilise votre classe CSS existante
+      "bg-card text-card-foreground border border-border rounded-lg shadow-card hover:shadow-hover transition-all duration-200",
       className
     )}
     {...props}
@@ -24,7 +23,7 @@ const CardHeader = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <div 
     ref={ref} 
-    className={cn("card-header p-6 pb-0", className)} 
+    className={cn("flex flex-col space-y-1.5 p-6 pb-4", className)} 
     {...props} 
   />
 ))
@@ -36,7 +35,10 @@ const CardTitle = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <h3
     ref={ref}
-    className={cn("card-title", className)}
+    className={cn(
+      "font-montserrat font-semibold leading-none tracking-tight text-foreground text-lg",
+      className
+    )}
     {...props}
   />
 ))
@@ -48,7 +50,7 @@ const CardDescription = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <p
     ref={ref}
-    className={cn("card-subtitle", className)}
+    className={cn("text-sm text-muted-foreground", className)}
     {...props}
   />
 ))
@@ -60,7 +62,7 @@ const CardContent = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <div 
     ref={ref} 
-    className={cn("card-body p-6 pt-0", className)} 
+    className={cn("p-6 pt-0", className)} 
     {...props} 
   />
 ))
@@ -78,4 +80,44 @@ const CardFooter = React.forwardRef<
 ))
 CardFooter.displayName = "CardFooter"
 
-export { Card, CardHeader, CardFooter, CardTitle, CardDescription, CardContent }
+// Variantes spécialisées pour le style minimaliste
+const CardMinimal = React.forwardRef<
+  HTMLDivElement,
+  React.HTMLAttributes<HTMLDivElement>
+>(({ className, ...props }, ref) => (
+  <div
+    ref={ref}
+    className={cn(
+      "bg-background border border-border rounded-md hover:border-foreground/20 transition-colors duration-200",
+      className
+    )}
+    {...props}
+  />
+))
+CardMinimal.displayName = "CardMinimal"
+
+const CardElevated = React.forwardRef<
+  HTMLDivElement,
+  React.HTMLAttributes<HTMLDivElement>
+>(({ className, ...props }, ref) => (
+  <div
+    ref={ref}
+    className={cn(
+      "bg-card text-card-foreground border border-border rounded-lg shadow-hover hover:shadow-dropdown transition-all duration-300 hover:-translate-y-0.5",
+      className
+    )}
+    {...props}
+  />
+))
+CardElevated.displayName = "CardElevated"
+
+export { 
+  Card, 
+  CardHeader, 
+  CardFooter, 
+  CardTitle, 
+  CardDescription, 
+  CardContent,
+  CardMinimal,
+  CardElevated
+}

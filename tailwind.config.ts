@@ -24,16 +24,11 @@ export default {
         roboto: ['var(--font-roboto)', ...fontFamily.sans]
       },
       colors: {
+        // Système noir/blanc minimaliste
         background: 'hsl(var(--background))',
         foreground: 'hsl(var(--foreground))',
-        custom: {
-          title: 'var(--title-color)',
-          text: 'var(--text-color)',
-          accent: 'var(--accent-color)',
-          accentHover: 'var(--accent-hover-color)',
-          accentLight: 'var(--accent-light-color)',
-          background: 'var(--background)'
-        },
+        
+        // Système shadcn/ui adapté au noir/blanc pur
         card: {
           DEFAULT: 'hsl(var(--card))',
           foreground: 'hsl(var(--card-foreground))'
@@ -58,6 +53,7 @@ export default {
           DEFAULT: 'hsl(var(--accent))',
           foreground: 'hsl(var(--accent-foreground))'
         },
+        // États fonctionnels en nuances de noir/blanc/gris uniquement
         destructive: {
           DEFAULT: 'hsl(var(--destructive))',
           foreground: 'hsl(var(--destructive-foreground))'
@@ -77,6 +73,8 @@ export default {
         border: 'hsl(var(--border))',
         input: 'hsl(var(--input))',
         ring: 'hsl(var(--ring))',
+        
+        // Charts en nuances de gris uniquement
         chart: {
           '1': 'hsl(var(--chart-1))',
           '2': 'hsl(var(--chart-2))',
@@ -91,10 +89,12 @@ export default {
         sm: 'calc(var(--radius) - 4px)'
       },
       boxShadow: {
-        'soft': '0 2px 10px rgba(0, 0, 0, 0.05)',
-        'hover': '0 10px 25px -5px rgba(0, 0, 0, 0.1)',
-        'card': '0 4px 10px rgba(0, 0, 0, 0.03), 0 0 2px rgba(0, 0, 0, 0.06)',
-        'dropdown': '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)',
+        // Ombres subtiles pour hiérarchie visuelle sans couleur
+        'minimal': '0 1px 3px rgba(0, 0, 0, 0.1)',
+        'card': '0 2px 8px rgba(0, 0, 0, 0.08)',
+        'hover': '0 4px 12px rgba(0, 0, 0, 0.12)',
+        'focus': '0 0 0 2px rgba(0, 0, 0, 0.2)',
+        'dropdown': '0 4px 16px rgba(0, 0, 0, 0.1)',
       },
       maxWidth: {
         'screen': '100vw',
@@ -130,6 +130,11 @@ export default {
           '0%, 100%': { opacity: '1' },
           '50%': { opacity: '0.5' },
         },
+        // Animation pour les micro-interactions
+        scaleIn: {
+          '0%': { transform: 'scale(0.95)', opacity: '0' },
+          '100%': { transform: 'scale(1)', opacity: '1' },
+        },
       },
       animation: {
         shimmer: 'shimmer 1.5s infinite',
@@ -137,6 +142,7 @@ export default {
         fadeOut: 'fadeOut 0.2s ease-out',
         slideIn: 'slideIn 0.2s ease-out',
         pulse: 'pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+        scaleIn: 'scaleIn 0.15s ease-out',
       },
     }
   },

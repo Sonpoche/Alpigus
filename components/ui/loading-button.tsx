@@ -8,17 +8,30 @@ const buttonVariants = cva(
   {
     variants: {
       variant: {
-        default: "bg-custom-accent text-white hover:bg-custom-accentHover focus:ring-custom-accent",
-        outline: "border border-foreground/10 bg-background hover:bg-foreground/5 text-foreground focus:ring-custom-accent",
-        ghost: "bg-transparent hover:bg-foreground/5 text-foreground focus:ring-foreground/10",
+        // Style par défaut - noir pur
+        default: "bg-primary text-primary-foreground hover:bg-primary/90 focus:ring-ring",
+        
+        // Style outline - bordure uniquement
+        outline: "border border-border bg-background hover:bg-accent hover:text-accent-foreground text-foreground focus:ring-ring",
+        
+        // Style ghost - transparent avec hover
+        ghost: "bg-transparent hover:bg-accent hover:text-accent-foreground text-foreground focus:ring-ring",
+        
+        // États fonctionnels en nuances de gris
         destructive: "bg-destructive text-destructive-foreground hover:bg-destructive/90 focus:ring-destructive",
         success: "bg-success text-success-foreground hover:bg-success/90 focus:ring-success",
+        
+        // Style secondaire
+        secondary: "bg-secondary text-secondary-foreground hover:bg-secondary/80 focus:ring-ring",
+        
+        // Style minimal - très discret
+        minimal: "bg-transparent text-foreground border border-transparent hover:border-border hover:bg-muted focus:ring-ring",
       },
       size: {
-        xs: "text-xs px-2 py-1",
-        sm: "text-sm px-3 py-2",
-        default: "text-base px-4 py-2",
-        lg: "text-lg px-6 py-3",
+        xs: "text-xs px-2 py-1 h-7",
+        sm: "text-sm px-3 py-2 h-8",
+        default: "text-sm px-4 py-2 h-9",
+        lg: "text-base px-6 py-3 h-10",
       },
       width: {
         auto: "w-auto",
@@ -39,6 +52,7 @@ interface LoadingButtonProps
   isLoading?: boolean;
   children: React.ReactNode;
   icon?: React.ReactNode;
+  loadingText?: string;
 }
 
 export function LoadingButton({ 
@@ -50,6 +64,7 @@ export function LoadingButton({
   size,
   width,
   icon,
+  loadingText = "Chargement...",
   ...props 
 }: LoadingButtonProps) {
   return (
@@ -61,7 +76,7 @@ export function LoadingButton({
       {isLoading ? (
         <>
           <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-          <span>Chargement...</span>
+          <span>{loadingText}</span>
         </>
       ) : (
         <>

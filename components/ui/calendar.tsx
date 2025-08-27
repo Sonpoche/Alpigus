@@ -1,3 +1,4 @@
+// components/ui/calendar.tsx
 import { DatePicker } from '@mantine/dates'
 import { isBefore, startOfDay } from "date-fns"
 import { fr } from "date-fns/locale"
@@ -9,7 +10,7 @@ export interface CalendarProps {
   onSelect?: (date: Date | null) => void;
   bookedDates?: Date[];
   disabled?: (date: Date) => boolean;
-  showLegend?: boolean; // Nouvelle prop
+  showLegend?: boolean;
 }
 
 function Calendar({
@@ -18,7 +19,7 @@ function Calendar({
   onSelect,
   bookedDates,
   disabled,
-  showLegend = true, // Valeur par défaut
+  showLegend = true,
 }: CalendarProps) {
   const today = startOfDay(new Date())
 
@@ -34,17 +35,18 @@ function Calendar({
 
     if (isBooked) {
       return {
-        backgroundColor: 'rgba(255, 90, 95, 0.2)',
-        color: '#FF5A5F',
+        backgroundColor: 'hsl(var(--muted))',
+        color: 'hsl(var(--muted-foreground))',
         cursor: isPast ? 'not-allowed' : 'pointer',
-        opacity: isPast ? 0.25 : 1
+        opacity: isPast ? 0.4 : 0.7,
+        textDecoration: 'line-through'
       };
     }
     if (isPast) {
       return {
-        color: '#999',
+        color: 'hsl(var(--muted-foreground))',
         cursor: 'not-allowed',
-        opacity: 0.25
+        opacity: 0.4
       };
     }
     return {};
@@ -66,35 +68,36 @@ function Calendar({
             })}
             className="w-full [&_.mantine-DatePicker-month]:w-full [&_.mantine-DatePicker-monthRow]:w-full [&_.mantine-DatePicker-monthRow]:grid [&_.mantine-DatePicker-monthRow]:grid-cols-7 [&_.mantine-DatePicker-monthRow]:gap-0 [&_.mantine-DatePicker-day]:w-full [&_.mantine-DatePicker-weekday]:w-full [&_.mantine-DatePicker-weekdaysRow]:w-full [&_.mantine-DatePicker-weekdaysRow]:grid [&_.mantine-DatePicker-weekdaysRow]:grid-cols-7 [&_.mantine-DatePicker-calendarHeader]:w-full"
             classNames={{
-              day: "dark:text-[#FF5A5F] dark:data-[selected]:text-white",
-              weekday: "dark:text-gray-400",
-              calendarHeaderControl: "dark:text-[#FF5A5F] dark:hover:bg-[rgba(255,90,95,0.1)]"
+              day: "dark:text-foreground dark:data-[selected]:text-primary-foreground",
+              weekday: "dark:text-muted-foreground",
+              calendarHeaderControl: "dark:text-foreground dark:hover:bg-accent"
             }}
             styles={{
               day: {
                 '&[aria-selected="true"]': {
-                  backgroundColor: '#FF5A5F !important',
-                  color: 'white !important'
+                  backgroundColor: 'hsl(var(--primary)) !important',
+                  color: 'hsl(var(--primary-foreground)) !important'
                 },
                 '&.today': {
-                  color: '#FF5A5F !important'
+                  color: 'hsl(var(--primary)) !important',
+                  fontWeight: 'bold'
                 },
-                '&:hover': {
-                  backgroundColor: 'rgba(255, 90, 95, 0.3) !important',
-                  color: '#FF5A5F !important'
+                '&:hover:not([aria-selected="true"])': {
+                  backgroundColor: 'hsl(var(--accent)) !important',
+                  color: 'hsl(var(--accent-foreground)) !important'
                 },
                 '@media (prefers-color-scheme: dark)': {
-                  '&:hover': {
-                    backgroundColor: 'rgba(255, 90, 95, 0.3) !important',
-                    color: 'white !important',
+                  '&:hover:not([aria-selected="true"])': {
+                    backgroundColor: 'hsl(var(--accent)) !important',
+                    color: 'hsl(var(--accent-foreground)) !important',
                   },
                   '&[aria-selected="true"]': {
-                    backgroundColor: '#FF5A5F !important',
-                    color: 'white !important'
+                    backgroundColor: 'hsl(var(--primary)) !important',
+                    color: 'hsl(var(--primary-foreground)) !important'
                   },
                   '&[data-outside]': {
-                    color: '#666 !important',
-                    opacity: 0.25
+                    color: 'hsl(var(--muted-foreground)) !important',
+                    opacity: 0.4
                   }
                 }
               },
@@ -106,32 +109,32 @@ function Calendar({
         </div>
       </div>
 
-      {/* Légende conditionnelle */}
+      {/* Légende en noir/blanc */}
       {showLegend && (
         <div className="flex flex-wrap gap-6 px-4">
           <div className="flex items-center gap-2">
-            <div className="w-6 h-6 rounded bg-[rgba(255,90,95,0.2)] text-[#FF5A5F] flex items-center justify-center">
+            <div className="w-6 h-6 rounded bg-muted text-muted-foreground flex items-center justify-center text-xs line-through">
               21
             </div>
-            <span className="text-sm text-foreground/80">Date réservée</span>
+            <span className="text-sm text-muted-foreground">Date réservée</span>
           </div>
           <div className="flex items-center gap-2">
-            <div className="w-6 h-6 rounded bg-[#FF5A5F] text-white flex items-center justify-center">
+            <div className="w-6 h-6 rounded bg-primary text-primary-foreground flex items-center justify-center text-xs font-bold">
               21
             </div>
-            <span className="text-sm text-foreground/80">Date sélectionnée</span>
+            <span className="text-sm text-muted-foreground">Date sélectionnée</span>
           </div>
           <div className="flex items-center gap-2">
-            <div className="w-6 h-6 rounded hover:bg-[rgba(255,90,95,0.3)] hover:text-[#FF5A5F] border border-foreground/10 flex items-center justify-center transition-colors">
+            <div className="w-6 h-6 rounded hover:bg-accent hover:text-accent-foreground border border-border flex items-center justify-center text-xs transition-colors">
               21
             </div>
-            <span className="text-sm text-foreground/80">Date disponible</span>
+            <span className="text-sm text-muted-foreground">Date disponible</span>
           </div>
           <div className="flex items-center gap-2">
-            <div className="w-6 h-6 rounded text-[#999] opacity-25 border border-foreground/10 flex items-center justify-center">
+            <div className="w-6 h-6 rounded text-muted-foreground opacity-40 border border-border flex items-center justify-center text-xs">
               21
             </div>
-            <span className="text-sm text-foreground/80">Date passée</span>
+            <span className="text-sm text-muted-foreground">Date passée</span>
           </div>
         </div>
       )}

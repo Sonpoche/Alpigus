@@ -15,6 +15,7 @@ interface DialogProps {
 interface DialogContentProps {
   className?: string;
   children: React.ReactNode;
+  size?: 'sm' | 'md' | 'lg' | 'xl';
 }
 
 // Contexte du Dialog
@@ -65,31 +66,39 @@ function SimpleDialog({ open, onOpenChange, children }: DialogProps) {
 }
 
 // Contenu du Dialog
-function SimpleDialogContent({ className, children }: DialogContentProps) {
+function SimpleDialogContent({ className, children, size = 'md' }: DialogContentProps) {
   const { open, onOpenChange } = useDialogContext()
   
   if (!open) return null
+  
+  const sizeClasses = {
+    sm: 'max-w-sm',
+    md: 'max-w-lg', 
+    lg: 'max-w-2xl',
+    xl: 'max-w-4xl'
+  }
   
   // Overlay et contenu
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto">
       {/* Overlay avec transition */}
       <div 
-        className="fixed inset-0 bg-black/80" 
+        className="fixed inset-0 bg-background/80 backdrop-blur-sm animate-in fade-in-0" 
         onClick={() => onOpenChange(false)}
       />
       
       {/* Contenu */}
       <div
         className={cn(
-          "relative bg-background rounded-lg shadow-lg p-6 max-w-lg w-full mx-4 z-50 border border-foreground/10",
+          "relative bg-background rounded-lg shadow-hover p-6 w-full mx-4 z-50 border border-border animate-in fade-in-0 zoom-in-95 duration-200",
+          sizeClasses[size],
           className
         )}
         onClick={(e) => e.stopPropagation()}
       >
         {/* Bouton de fermeture */}
         <button
-          className="absolute top-4 right-4 text-muted-foreground hover:text-foreground focus:outline-none transition-colors"
+          className="absolute top-4 right-4 text-muted-foreground hover:text-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 rounded-sm transition-colors"
           onClick={() => onOpenChange(false)}
         >
           <X className="h-4 w-4" />
@@ -120,7 +129,7 @@ function SimpleDialogFooter({ className, ...props }: React.HTMLProps<HTMLDivElem
 }
 
 function SimpleDialogTitle({ className, ...props }: React.HTMLProps<HTMLHeadingElement>) {
-  return <h3 className={cn("text-lg font-semibold text-foreground", className)} {...props} />
+  return <h3 className={cn("text-lg font-semibold text-foreground font-montserrat", className)} {...props} />
 }
 
 function SimpleDialogDescription({ className, ...props }: React.HTMLProps<HTMLParagraphElement>) {

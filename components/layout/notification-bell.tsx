@@ -44,13 +44,9 @@ export function NotificationBell() {
     }
   }
 
-  // Initialiser et configurer le polling des notifications
   useEffect(() => {
     fetchNotifications()
-    
-    // Configurer un polling pour vérifier les nouvelles notifications toutes les 30 secondes
     const interval = setInterval(fetchNotifications, 30000)
-    
     return () => clearInterval(interval)
   }, [])
   
@@ -59,9 +55,9 @@ export function NotificationBell() {
     try {
       if (notification.read) {
         if (navigate && notification.link) {
-          handleNavigation(notification.link);
+          handleNavigation(notification.link)
         }
-        return;
+        return
       }
       
       const response = await fetch(`/api/notifications/${notification.id}/read`, {
@@ -70,38 +66,28 @@ export function NotificationBell() {
       
       if (!response.ok) throw new Error('Erreur de mise à jour')
       
-      // Mettre à jour l'état local
       setNotifications(prev => 
         prev.map(n => n.id === notification.id ? { ...n, read: true } : n)
       )
       setUnreadCount(prev => Math.max(0, prev - 1))
       
-      // Naviguer si nécessaire
       if (navigate && notification.link) {
-        handleNavigation(notification.link);
+        handleNavigation(notification.link)
       }
     } catch (error) {
       console.error('Erreur:', error)
     }
   }
 
-  // Helper pour gérer la navigation avec param de modal
   const handleNavigation = (link: string) => {
-    // Si le lien contient un paramètre pour ouvrir une modal
     if (link.includes('?view=')) {
-      const orderId = link.split('?view=')[1];
-      // Stocker l'ID dans localStorage pour que la page de destination puisse l'utiliser
-      window.localStorage.setItem('openOrderModal', orderId);
-    } else if (link.includes('?edit=')) {
-      const productId = link.split('?edit=')[1];
-      // Stocker l'ID pour éditer un produit
-      window.localStorage.setItem('editProduct', productId);
+      const orderId = link.split('?view=')[1]
+      window.localStorage.setItem('openOrderModal', orderId)
     }
     
-    // Fermer le dropdown et naviguer
-    setIsOpen(false);
-    router.push(link);
-  };
+    setIsOpen(false)
+    router.push(link)
+  }
   
   // Fermer le dropdown quand on clique ailleurs
   useEffect(() => {
@@ -116,78 +102,73 @@ export function NotificationBell() {
     return () => document.removeEventListener('click', handleClickOutside)
   }, [isOpen])
 
-  // Obtenir l'icône appropriée pour le type de notification
+  // Icône de notification minimaliste
   const getNotificationIcon = (type: string) => {
-    switch (type) {
-      case 'NEW_ORDER':
-        return <div className="w-6 h-6 sm:w-8 sm:h-8 bg-blue-100 dark:bg-blue-900/20 rounded-full flex items-center justify-center flex-shrink-0"><Bell className="h-3 w-3 sm:h-4 sm:w-4 text-blue-600 dark:text-blue-400" /></div>
-      case 'ORDER_STATUS_CHANGED':
-        return <div className="w-6 h-6 sm:w-8 sm:h-8 bg-purple-100 dark:bg-purple-900/20 rounded-full flex items-center justify-center flex-shrink-0"><Bell className="h-3 w-3 sm:h-4 sm:w-4 text-purple-600 dark:text-purple-400" /></div>
-      case 'LOW_STOCK':
-        return <div className="w-6 h-6 sm:w-8 sm:h-8 bg-amber-100 dark:bg-amber-900/20 rounded-full flex items-center justify-center flex-shrink-0"><Bell className="h-3 w-3 sm:h-4 sm:w-4 text-amber-600 dark:text-amber-400" /></div>
-      default:
-        return <div className="w-6 h-6 sm:w-8 sm:h-8 bg-gray-100 dark:bg-gray-800 rounded-full flex items-center justify-center flex-shrink-0"><Bell className="h-3 w-3 sm:h-4 sm:w-4 text-gray-600 dark:text-gray-400" /></div>
-    }
+    return (
+      <div className="w-6 h-6 bg-muted rounded-full flex items-center justify-center flex-shrink-0">
+        <div className="w-2 h-2 bg-foreground rounded-full"></div>
+      </div>
+    )
   }
 
   return (
     <div className="relative" ref={menuRef}>
       <button 
-        className="relative p-2 rounded-full hover:bg-foreground/5 transition-colors"
+        className="relative p-2 rounded-md hover:bg-accent transition-colors"
         onClick={() => setIsOpen(!isOpen)}
         aria-label="Notifications"
       >
-        <Bell className="h-5 w-5" />
+        <Bell className="h-4 w-4 text-foreground" />
         {unreadCount > 0 && (
-          <span className="absolute top-0 right-0 inline-flex items-center justify-center px-2 py-1 text-xs font-bold leading-none text-red-100 transform translate-x-1/2 -translate-y-1/2 bg-red-600 rounded-full">
+          <div className="absolute -top-1 -right-1 min-w-[18px] h-[18px] bg-foreground text-background text-xs font-bold rounded-full flex items-center justify-center px-1">
             {unreadCount > 99 ? '99+' : unreadCount}
-          </span>
+          </div>
         )}
       </button>
       
       {isOpen && (
-        <div className="absolute right-0 mt-2 w-72 sm:w-80 bg-background border border-foreground/10 rounded-md shadow-lg z-50 overflow-hidden max-w-[calc(100vw-2rem)] sm:max-w-none">
-          <div className="p-3 border-b border-foreground/10 flex justify-between items-center">
-            <h3 className="font-medium text-sm sm:text-base">Notifications</h3>
+        <div className="absolute right-0 mt-2 w-80 bg-background border border-border rounded-md shadow-hover z-50 overflow-hidden">
+          <div className="p-4 border-b border-border flex justify-between items-center">
+            <h3 className="font-medium text-foreground">Notifications</h3>
             <Link 
               href="/notifications" 
-              className="text-xs text-custom-accent hover:underline"
+              className="text-xs text-muted-foreground hover:text-foreground transition-colors"
               onClick={() => setIsOpen(false)}
             >
               Voir tout
             </Link>
           </div>
           
-          <div className="max-h-[60vh] sm:max-h-[400px] overflow-y-auto">
+          <div className="max-h-[400px] overflow-y-auto">
             {isLoading ? (
-              <div className="p-4 text-center">
-                <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-custom-accent mx-auto"></div>
-                <p className="text-sm text-muted-foreground mt-2">Chargement...</p>
+              <div className="p-6 text-center">
+                <div className="w-6 h-6 border-2 border-muted border-t-foreground rounded-full animate-spin mx-auto mb-2"></div>
+                <p className="text-sm text-muted-foreground">Chargement...</p>
               </div>
             ) : notifications.length > 0 ? (
-              <div className="divide-y divide-foreground/5">
+              <div className="divide-y divide-border">
                 {notifications.map(notification => (
                   <div 
                     key={notification.id}
                     className={cn(
-                      "p-3 hover:bg-foreground/5 cursor-pointer transition-colors",
-                      !notification.read && "bg-foreground/5"
+                      "p-4 hover:bg-accent cursor-pointer transition-colors",
+                      !notification.read && "bg-muted/30"
                     )}
                     onClick={() => markAsRead(notification)}
                   >
-                    <div className="flex gap-2 sm:gap-3">
+                    <div className="flex gap-3">
                       {getNotificationIcon(notification.type)}
                       <div className="flex-1 min-w-0">
                         <p className={cn(
-                          "text-xs sm:text-sm font-medium line-clamp-2",
-                          !notification.read && "font-semibold"
+                          "text-sm line-clamp-2",
+                          !notification.read ? "font-medium text-foreground" : "text-muted-foreground"
                         )}>
                           {notification.title}
                         </p>
                         <p className="text-xs text-muted-foreground mt-1 line-clamp-2">
                           {notification.message}
                         </p>
-                        <p className="text-xs text-muted-foreground mt-1">
+                        <p className="text-xs text-muted-foreground mt-2">
                           {formatDistanceToNow(new Date(notification.createdAt), { 
                             addSuffix: true,
                             locale: fr
@@ -195,26 +176,17 @@ export function NotificationBell() {
                         </p>
                       </div>
                       {!notification.read && (
-                        <div className="w-2 h-2 bg-custom-accent rounded-full self-start mt-1 sm:mt-2 flex-shrink-0"></div>
+                        <div className="w-2 h-2 bg-foreground rounded-full self-start mt-2 flex-shrink-0"></div>
                       )}
                     </div>
                   </div>
                 ))}
               </div>
             ) : (
-              <div className="p-4 text-center">
+              <div className="p-6 text-center">
                 <p className="text-sm text-muted-foreground">Aucune notification</p>
               </div>
             )}
-          </div>
-          
-          <div className="p-2 border-t border-foreground/10 bg-foreground/5">
-            <button
-              onClick={() => setIsOpen(false)}
-              className="w-full p-2 text-sm text-center rounded hover:bg-foreground/10 transition-colors"
-            >
-              Fermer
-            </button>
           </div>
         </div>
       )}

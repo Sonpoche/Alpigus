@@ -20,13 +20,13 @@ export function ThemeToggleMinimal() {
   return (
     <button
       onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
-      className="fixed bottom-4 right-4 p-3 rounded-full bg-foreground/10 hover:bg-foreground/20 transition-colors"
+      className="fixed bottom-4 right-4 p-3 rounded-full bg-card border border-border hover:bg-accent hover:text-accent-foreground transition-all duration-200 shadow-card hover:shadow-hover group"
       aria-label="Changer le thème"
     >
       {theme === 'dark' ? (
-        <Sun className="h-5 w-5 text-foreground" />
+        <Sun className="h-5 w-5 text-foreground group-hover:rotate-180 transition-transform duration-300" />
       ) : (
-        <Moon className="h-5 w-5 text-foreground" />
+        <Moon className="h-5 w-5 text-foreground group-hover:-rotate-12 transition-transform duration-300" />
       )}
     </button>
   )

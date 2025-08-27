@@ -57,7 +57,7 @@ export function ImageSelector({
 
     return (
       <div key={category} className="space-y-3">
-        <h3 className="text-lg font-montserrat text-custom-title font-semibold">
+        <h3 className="text-lg font-montserrat text-foreground font-semibold">
           {CATEGORY_LABELS[category]}
         </h3>
         <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
@@ -65,24 +65,26 @@ export function ImageSelector({
             <div
               key={image.id}
               className={cn(
-                "relative cursor-pointer group rounded-lg overflow-hidden border-2",
+                "relative cursor-pointer group rounded-lg overflow-hidden border-2 transition-all duration-200",
                 selectedPreset === image.id
-                  ? "border-custom-accent"
-                  : "border-transparent hover:border-foreground/10"
+                  ? "border-primary shadow-hover"
+                  : "border-border hover:border-foreground/30 hover:shadow-card"
               )}
               onClick={() => handlePresetSelect(image.id)}
             >
               <img
                 src={image.src}
                 alt={image.alt}
-                className="w-full aspect-square object-cover"
+                className="w-full aspect-square object-cover transition-transform duration-200 group-hover:scale-105"
               />
               {selectedPreset === image.id && (
-                <div className="absolute inset-0 bg-custom-accent/20 flex items-center justify-center">
-                  <Check className="w-8 h-8 text-white" />
+                <div className="absolute inset-0 bg-primary/20 flex items-center justify-center backdrop-blur-sm">
+                  <div className="bg-primary text-primary-foreground rounded-full p-2">
+                    <Check className="w-6 h-6" />
+                  </div>
                 </div>
               )}
-              <div className="absolute bottom-0 left-0 right-0 bg-black/50 text-white p-2 text-sm text-center">
+              <div className="absolute bottom-0 left-0 right-0 bg-background/90 backdrop-blur-sm text-foreground p-2 text-sm text-center border-t border-border">
                 {image.label}
               </div>
             </div>
@@ -95,15 +97,15 @@ export function ImageSelector({
   return (
     <div className={cn("space-y-4", className)}>
       {/* Toggle entre preset et upload personnalisé */}
-      <div className="flex gap-4">
+      <div className="flex gap-2 p-1 bg-muted rounded-lg">
         <button
           type="button"
           onClick={() => setUseCustomImage(false)}
           className={cn(
-            "flex-1 py-2 px-4 rounded-md border transition-colors",
+            "flex-1 py-2 px-4 rounded-md transition-all duration-200 text-sm font-medium",
             !useCustomImage
-              ? "bg-custom-accent text-white border-custom-accent"
-              : "border-foreground/10 hover:bg-foreground/5"
+              ? "bg-primary text-primary-foreground shadow-minimal"
+              : "text-muted-foreground hover:text-foreground hover:bg-background"
           )}
         >
           Images prédéfinies
@@ -112,10 +114,10 @@ export function ImageSelector({
           type="button"
           onClick={() => setUseCustomImage(true)}
           className={cn(
-            "flex-1 py-2 px-4 rounded-md border transition-colors",
+            "flex-1 py-2 px-4 rounded-md transition-all duration-200 text-sm font-medium",
             useCustomImage
-              ? "bg-custom-accent text-white border-custom-accent"
-              : "border-foreground/10 hover:bg-foreground/5"
+              ? "bg-primary text-primary-foreground shadow-minimal"
+              : "text-muted-foreground hover:text-foreground hover:bg-background"
           )}
         >
           Upload personnalisé
@@ -125,13 +127,13 @@ export function ImageSelector({
       {useCustomImage ? (
         <div className="space-y-4">
           <div className="flex items-center justify-center w-full">
-            <label className="flex flex-col items-center justify-center w-full h-64 border-2 border-dashed rounded-lg cursor-pointer border-foreground/10 bg-background hover:bg-foreground/5">
+            <label className="flex flex-col items-center justify-center w-full h-64 border-2 border-dashed rounded-lg cursor-pointer border-border bg-background hover:bg-accent hover:border-foreground/30 transition-all duration-200 group">
               <div className="flex flex-col items-center justify-center pt-5 pb-6">
-                <Upload className="w-8 h-8 mb-4 text-foreground/60" />
-                <p className="mb-2 text-sm text-foreground/60">
+                <Upload className="w-8 h-8 mb-4 text-muted-foreground group-hover:text-foreground transition-colors" />
+                <p className="mb-2 text-sm text-muted-foreground group-hover:text-foreground transition-colors">
                   <span className="font-semibold">Cliquez pour uploader</span> ou glissez-déposez
                 </p>
-                <p className="text-xs text-foreground/60">PNG, JPG ou WebP (MAX. 5MB)</p>
+                <p className="text-xs text-muted-foreground">PNG, JPG ou WebP (MAX. 5MB)</p>
               </div>
               <input
                 type="file"
@@ -146,8 +148,11 @@ export function ImageSelector({
               <img
                 src={imagePreview}
                 alt="Aperçu"
-                className="rounded-lg border border-foreground/10"
+                className="rounded-lg border border-border shadow-card"
               />
+              <div className="absolute -top-2 -right-2 bg-primary text-primary-foreground rounded-full p-1">
+                <Check className="w-4 h-4" />
+              </div>
             </div>
           )}
         </div>

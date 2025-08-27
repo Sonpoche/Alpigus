@@ -10,6 +10,7 @@ interface PriceInputProps extends Omit<React.InputHTMLAttributes<HTMLInputElemen
   showCurrency?: boolean
   maxValue?: number
   minValue?: number
+  variant?: 'default' | 'minimal' | 'ghost'
 }
 
 export const PriceInput = forwardRef<HTMLInputElement, PriceInputProps>(
@@ -20,6 +21,7 @@ export const PriceInput = forwardRef<HTMLInputElement, PriceInputProps>(
     showCurrency = false,
     maxValue = 999999.99,
     minValue = 0,
+    variant = 'default',
     className,
     onBlur,
     ...props 
@@ -55,6 +57,14 @@ export const PriceInput = forwardRef<HTMLInputElement, PriceInputProps>(
       }
     }
 
+    const baseClasses = "w-full text-sm ring-offset-background transition-all duration-200 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50"
+    
+    const variantClasses = {
+      default: "rounded-md border border-input bg-background px-3 py-2 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
+      minimal: "border-0 border-b border-border bg-transparent px-0 py-2 rounded-none focus-visible:border-foreground focus-visible:ring-0 focus-visible:ring-offset-0",
+      ghost: "rounded-md border border-transparent bg-muted/50 px-3 py-2 hover:bg-muted focus-visible:bg-background focus-visible:border-border focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+    }
+
     return (
       <div className="relative">
         <input
@@ -67,14 +77,19 @@ export const PriceInput = forwardRef<HTMLInputElement, PriceInputProps>(
           min={minValue}
           max={maxValue}
           className={cn(
-            "w-full rounded-md border border-foreground/10 bg-background px-3 py-2",
-            showCurrency && "pr-12",
+            baseClasses,
+            variantClasses[variant],
+            showCurrency && variant !== 'minimal' && "pr-12",
+            showCurrency && variant === 'minimal' && "pr-8",
             className
           )}
           {...props}
         />
         {showCurrency && (
-          <div className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground pointer-events-none">
+          <div className={cn(
+            "absolute top-1/2 -translate-y-1/2 text-sm text-muted-foreground pointer-events-none font-medium",
+            variant === 'minimal' ? "right-0" : "right-3"
+          )}>
             {currency}
           </div>
         )}

@@ -9,12 +9,10 @@ export function ThemeToggle() {
   const { theme, setTheme } = useTheme()
   const [mounted, setMounted] = useState(false)
 
-  // Attendez que le composant soit monté pour éviter les erreurs d'hydratation
   useEffect(() => {
     setMounted(true)
   }, [])
 
-  // Ne rendez rien jusqu'à ce que le composant soit monté
   if (!mounted) {
     return null
   }
@@ -22,9 +20,14 @@ export function ThemeToggle() {
   return (
     <button
       onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
-      className="p-2 rounded-md bg-custom-accent text-white"
+      className="p-2 rounded-md bg-transparent border border-border hover:bg-accent hover:text-accent-foreground transition-all duration-200 group"
+      aria-label="Changer le thème"
     >
-      {theme === 'dark' ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
+      {theme === 'dark' ? (
+        <Sun className="h-4 w-4 text-foreground group-hover:rotate-180 transition-transform duration-300" />
+      ) : (
+        <Moon className="h-4 w-4 text-foreground group-hover:-rotate-12 transition-transform duration-300" />
+      )}
     </button>
   )
 }
