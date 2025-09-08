@@ -11,27 +11,27 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { cn } from '@/lib/utils'
 
 const clientNavItems = [
-  { href: '/dashboard', label: 'Tableau de bord' },
-  { href: '/products', label: 'Mes produits' }, 
-  { href: '/orders', label: 'Commandes' },
-  { href: '/invoices', label: 'Factures' },
+  { href: '/tableau-de-bord', label: 'Tableau de bord' },
+  { href: '/produits', label: 'Mes produits' }, 
+  { href: '/commandes', label: 'Commandes' },
+  { href: '/factures', label: 'Factures' },
 ]
 
 const producerNavItems = [
-  { href: '/dashboard', label: 'Tableau de bord' },
-  { href: '/producer', label: 'Mes produits' },
-  { href: '/producer/orders', label: 'Commandes' },
-  { href: '/producer/delivery-slots/overview', label: 'Livraisons' },
-  { href: '/producer/stats', label: 'Archive' },
-  { href: '/producer/wallet', label: 'Blog' },
+  { href: '/tableau-de-bord', label: 'Tableau de bord' },
+  { href: '/producteur', label: 'Mes produits' },
+  { href: '/producteur/commandes', label: 'Commandes' },
+  { href: '/producteur/creneaux-livraison/apercu', label: 'Livraisons' },
+  { href: '/producteur/statistiques', label: 'Archive' },
+  { href: '/producteur/portefeuille', label: 'Blog' },
 ]
 
 const adminNavItems = [
-  { href: '/dashboard', label: 'Tableau de bord' },
+  { href: '/tableau-de-bord', label: 'Tableau de bord' },
   { href: '/admin', label: 'Administration' },
-  { href: '/admin/users', label: 'Utilisateurs' },
-  { href: '/admin/products', label: 'Produits' },
-  { href: '/admin/stats', label: 'Statistiques' },
+  { href: '/admin/utilisateurs', label: 'Utilisateurs' },
+  { href: '/admin/produits', label: 'Produits' },
+  { href: '/admin/statistiques', label: 'Statistiques' },
 ]
 
 export function Header() {
@@ -53,7 +53,7 @@ export function Header() {
   const navItems = getNavItems()
   
   const isActiveLink = (href: string) => {
-    if (href === '/dashboard') return pathname === '/dashboard'
+    if (href === '/tableau-de-bord') return pathname === '/tableau-de-bord'
     return pathname === href || pathname.startsWith(`${href}/`)
   }
 
@@ -67,7 +67,7 @@ export function Header() {
             <div className="flex h-12 items-center justify-between px-6">
               
               {/* Logo minimaliste - plus petit */}
-              <Link href="/dashboard" className="flex items-center">
+              <Link href="/tableau-de-bord" className="flex items-center">
                 <div className="flex items-center">
                   <div className="w-[28px] h-[28px] bg-black rounded-full z-10"></div>
                   <div className="w-[28px] h-[28px] bg-white border-[1.5px] border-black rounded-full -ml-2.5"></div>
@@ -103,7 +103,7 @@ export function Header() {
                     <UserMenu />
                   ) : (
                     <Link 
-                      href="/login" 
+                      href="/connexion" 
                       className="text-sm text-black font-light hover:opacity-60 transition-opacity duration-200"
                     >
                       Compte
@@ -192,7 +192,7 @@ export function Header() {
                       <p className="text-sm text-gray-600 mb-2">Connecté en tant que</p>
                       <p className="font-medium">{session.user?.email}</p>
                       <Link
-                        href="/account"
+                        href="/compte"
                         className="block mt-4 text-black hover:opacity-60 transition-opacity"
                         onClick={() => setIsMobileMenuOpen(false)}
                       >
@@ -201,7 +201,7 @@ export function Header() {
                     </div>
                   ) : (
                     <Link
-                      href="/login"
+                      href="/connexion"
                       className="block text-lg text-black font-normal hover:opacity-60 transition-opacity"
                       onClick={() => setIsMobileMenuOpen(false)}
                     >

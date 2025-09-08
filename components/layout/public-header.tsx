@@ -12,9 +12,9 @@ import { useLocalCart } from '@/hooks/use-local-cart'
 
 const publicNavItems = [
   { href: '/', label: 'Accueil' },
-  { href: '/about', label: 'À propos' },
-  { href: '/products', label: 'Catalogue' },
-  { href: '/producers', label: 'Producteurs' },
+  { href: '/a-propos', label: 'À propos' },
+  { href: '/produits', label: 'Catalogue' },
+  { href: '/producteurs', label: 'Producteurs' },
   { href: '/contact', label: 'Contact' },
 ]
 
@@ -81,7 +81,7 @@ export function PublicHeader() {
               <div className="flex items-center gap-4">
                 {/* Panier */}
                 <Link 
-                  href="/cart"
+                  href="/panier"
                   className="relative p-2 hover:opacity-60 transition-opacity"
                 >
                   <ShoppingBag className="h-5 w-5" />
@@ -96,14 +96,14 @@ export function PublicHeader() {
                 <div className="hidden lg:block">
                   {session ? (
                     <Link 
-                      href="/dashboard" 
+                      href="/tableau-de-bord" 
                       className="text-sm text-black font-light hover:opacity-60 transition-opacity duration-200"
                     >
-                      Dashboard
+                      Tableau de bord
                     </Link>
                   ) : (
                     <Link 
-                      href="/login" 
+                      href="/connexion" 
                       className="text-sm text-black font-light hover:opacity-60 transition-opacity duration-200"
                     >
                       Se connecter
@@ -187,7 +187,7 @@ export function PublicHeader() {
                   {/* Panier dans le menu mobile */}
                   <li>
                     <Link
-                      href="/cart"
+                      href="/panier"
                       className="flex items-center gap-2 text-lg text-black hover:opacity-60 transition-opacity"
                       onClick={() => setIsMobileMenuOpen(false)}
                     >
@@ -206,15 +206,15 @@ export function PublicHeader() {
                 <div className="mt-8 pt-8 border-t border-gray-200">
                   {session ? (
                     <Link
-                      href="/dashboard"
+                      href="/tableau-de-bord"
                       className="block text-lg text-black font-normal hover:opacity-60 transition-opacity"
                       onClick={() => setIsMobileMenuOpen(false)}
                     >
-                      Accéder au Dashboard
+                      Accéder au tableau de bord
                     </Link>
                   ) : (
                     <Link
-                      href="/login"
+                      href="/connexion"
                       className="block text-lg text-black font-normal hover:opacity-60 transition-opacity"
                       onClick={() => setIsMobileMenuOpen(false)}
                     >

@@ -1,5 +1,4 @@
-// middleware.ts - Version corrigée
-
+// Chemin du fichier: middleware.ts
 import { getToken } from 'next-auth/jwt'
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
@@ -21,58 +20,71 @@ export async function middleware(request: NextRequest) {
     secret: process.env.NEXTAUTH_SECRET
   })
 
-  // Routes publiques (accessibles sans authentification)
-  if (path === '/' || path === '/login' || path === '/register' || path.startsWith('/reset-password')) {
+  // Routes publiques (accessibles sans authentification) - URLs françaises
+  if (
+    path === '/' || 
+    path === '/connexion' || 
+    path === '/inscription' || 
+    path === '/panier' ||
+    path.startsWith('/produits/') ||
+    path.startsWith('/mot-de-passe/')
+  ) {
     if (token) {
-      // ✅ CORRECTION : Ne pas rediriger les admins vers onboarding
+      // Ne pas rediriger les admins vers onboarding
       if (token.role === 'ADMIN') {
+        // Si admin essaie d'accéder à des pages publiques, le laisser faire
+        if (path === '/' || path === '/panier' || path.startsWith('/produits/')) {
+          return NextResponse.next()
+        }
         return NextResponse.redirect(new URL('/admin', request.url))
       }
       
-      // Si connecté, vérifier si le profil est complété
-      if (!token.profileCompleted) {
-        return NextResponse.redirect(new URL('/onboarding', request.url))
+      // Si connecté et essaie d'accéder à connexion/inscription, rediriger
+      if (path === '/connexion' || path === '/inscription') {
+        if (!token.profileCompleted) {
+          return NextResponse.redirect(new URL('/integration', request.url))
+        }
+        return NextResponse.redirect(new URL('/tableau-de-bord', request.url))
       }
-      return NextResponse.redirect(new URL('/dashboard', request.url))
     }
     return NextResponse.next()
   }
 
   // Vérification de l'authentification pour toutes les autres routes
   if (!token) {
-    const url = new URL('/login', request.url)
+    const url = new URL('/connexion', request.url)
     url.searchParams.set('callbackUrl', encodeURI(path))
     return NextResponse.redirect(url)
   }
 
-  // ✅ Gestion de la page d'onboarding
-  if (path === '/onboarding') {
-    // ✅ CORRECTION : Empêcher les admins d'accéder à l'onboarding
+  // Gestion de la page d'onboarding
+  if (path === '/integration') {
+    // Empêcher les admins d'accéder à l'onboarding
     if (token.role === 'ADMIN') {
       return NextResponse.redirect(new URL('/admin', request.url))
     }
     
     // Si le profil est déjà complété, rediriger vers dashboard
     if (token.profileCompleted) {
-      return NextResponse.redirect(new URL('/dashboard', request.url))
+      return NextResponse.redirect(new URL('/tableau-de-bord', request.url))
     }
     // Sinon, permettre l'accès à l'onboarding
     return NextResponse.next()
   }
 
-  // ✅ CORRECTION : Ne forcer l'onboarding que pour les non-admins
+  // Ne forcer l'onboarding que pour les non-admins
   if (!token.profileCompleted && token.role !== 'ADMIN') {
-    console.log('Redirection vers onboarding pour:', token.email)
-    return NextResponse.redirect(new URL('/onboarding', request.url))
+    console.log('Redirection vers integration pour:', token.email)
+    return NextResponse.redirect(new URL('/integration', request.url))
   }
 
   // Protection des routes par rôle (uniquement si profil complété)
   if (path.startsWith('/admin') && token.role !== 'ADMIN') {
-    return NextResponse.redirect(new URL('/dashboard', request.url))
+    return NextResponse.redirect(new URL('/tableau-de-bord', request.url))
   }
 
-  if (path.startsWith('/producer') && token.role !== 'PRODUCER') {
-    return NextResponse.redirect(new URL('/dashboard', request.url))
+  if (path.startsWith('/producteur') && token.role !== 'PRODUCER') {
+    return NextResponse.redirect(new URL('/tableau-de-bord', request.url))
   }
 
   return NextResponse.next()
@@ -81,17 +93,17 @@ export async function middleware(request: NextRequest) {
 export const config = {
   matcher: [
     '/',
-    '/login',
-    '/register',
-    '/onboarding',
-    '/dashboard/:path*',
+    '/connexion',
+    '/inscription', 
+    '/integration',
+    '/tableau-de-bord/:path*',
     '/admin/:path*',
-    '/producer/:path*',
-    '/profile/:path*',
-    '/invoices/:path*',
-    '/orders/:path*',
-    '/checkout/:path*',
-    '/cart',
-    '/invoices'
+    '/producteur/:path*',
+    '/profil/:path*',
+    '/factures/:path*',
+    '/commandes/:path*',
+    '/commande/:path*',
+    '/panier',
+    '/produits/:path*'
   ]
 }
