@@ -1,4 +1,4 @@
-// app/(protected)/layout.tsx - Version mise à jour avec OrderProvider
+// Chemin du fichier: app/(protected)/layout.tsx
 import { Header } from '@/components/layout/header'
 import { Sidebar } from '@/components/layout/sidebar'
 import { Footer } from '@/components/layout/footer'
@@ -6,7 +6,7 @@ import { InvoiceProvider } from '@/contexts/invoice-context'
 import { OrderProvider } from '@/contexts/order-context'
 import { getServerSession } from 'next-auth'
 import { redirect } from 'next/navigation'
-import { authOptions } from '../api/auth/[...nextauth]/route'
+import { authOptions } from '@/app/api/auth/[...nextauth]/route'
 
 export default async function ProtectedLayout({
   children,
@@ -15,7 +15,6 @@ export default async function ProtectedLayout({
 }) {
   const session = await getServerSession(authOptions)
 
-  // Si pas de session, rediriger vers login
   if (!session) {
     redirect('/login')
   }
