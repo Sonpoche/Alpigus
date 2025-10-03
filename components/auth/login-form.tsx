@@ -1,11 +1,11 @@
-// components/auth/login-form.tsx
+// Chemin du fichier: components/auth/login-form.tsx
 'use client'
 
 import { useState, useRef, useEffect } from 'react'
 import { signIn } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
 import { LoadingButton } from '@/components/ui/loading-button'
-import { Eye, EyeOff, Mail, Lock } from 'lucide-react'
+import { Eye, EyeOff } from 'lucide-react'
 import { FcGoogle } from 'react-icons/fc'
 import { cn } from '@/lib/utils'
 import Link from 'next/link'
@@ -62,7 +62,7 @@ export function LoginForm() {
         email: formData.get('email'),
         password: formData.get('password'),
         redirect: false,
-        callbackUrl: '/dashboard',
+        callbackUrl: '/tableau-de-bord',
         remember: rememberMe
       })
 
@@ -73,10 +73,10 @@ export function LoginForm() {
 
       toast({
         title: "Connexion réussie",
-        description: "Bienvenue sur Mushroom Marketplace"
+        description: "Bienvenue"
       })
 
-      router.push('/dashboard')
+      router.push('/tableau-de-bord')
       router.refresh()
     } catch (error: any) {
       toast({
@@ -95,10 +95,10 @@ export function LoginForm() {
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.5 }}
     >
-      <form onSubmit={onSubmit} className="space-y-4">
+      <form onSubmit={onSubmit} className="space-y-5">
+        {/* Email */}
         <div>
-          <label htmlFor="email" className="form-label flex items-center gap-2">
-            <Mail className="h-4 w-4 text-custom-accent" />
+          <label htmlFor="email" className="block text-sm font-medium text-black mb-2">
             Email
           </label>
           <input
@@ -108,21 +108,22 @@ export function LoginForm() {
             type="email"
             required
             className={cn(
-              "form-input",
-              fieldErrors.email && "border-destructive"
+              "w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:outline-none focus:border-black transition-colors bg-white text-black",
+              fieldErrors.email && "border-red-500"
             )}
+            placeholder="votre@email.com"
           />
         </div>
 
+        {/* Mot de passe */}
         <div>
-          <div className="flex items-center justify-between mb-1">
-            <label htmlFor="password" className="form-label flex items-center gap-2">
-              <Lock className="h-4 w-4 text-custom-accent" />
+          <div className="flex items-center justify-between mb-2">
+            <label htmlFor="password" className="block text-sm font-medium text-black">
               Mot de passe
             </label>
             <Link 
-              href="/reset-password"
-              className="text-sm font-medium text-custom-accent hover:opacity-90 transition-opacity"
+              href="/mot-de-passe-oublie"
+              className="text-sm text-gray-600 hover:text-black transition-colors"
             >
               Mot de passe oublié ?
             </Link>
@@ -134,24 +135,26 @@ export function LoginForm() {
               type={showPassword ? "text" : "password"}
               required
               className={cn(
-                "form-input pr-10",
-                fieldErrors.password && "border-destructive"
+                "w-full px-4 py-3 pr-12 border-2 border-gray-200 rounded-lg focus:outline-none focus:border-black transition-colors bg-white text-black",
+                fieldErrors.password && "border-red-500"
               )}
+              placeholder="••••••••"
             />
             <button
               type="button"
-              className="absolute inset-y-0 right-0 flex items-center pr-3 text-muted-foreground hover:text-foreground"
+              className="absolute inset-y-0 right-0 flex items-center pr-4 text-gray-400 hover:text-black transition-colors"
               onClick={() => setShowPassword(!showPassword)}
             >
               {showPassword ? (
-                <EyeOff className="h-4 w-4" />
+                <EyeOff className="h-5 w-5" />
               ) : (
-                <Eye className="h-4 w-4" />
+                <Eye className="h-5 w-5" />
               )}
             </button>
           </div>
         </div>
 
+        {/* Se souvenir de moi */}
         <div className="flex items-center">
           <input
             id="remember"
@@ -159,45 +162,49 @@ export function LoginForm() {
             type="checkbox"
             checked={rememberMe}
             onChange={(e) => setRememberMe(e.target.checked)}
-            className="h-4 w-4 rounded border-input text-custom-accent focus:ring-custom-accent"
+            className="h-4 w-4 rounded border-gray-300 text-black focus:ring-black focus:ring-offset-0"
           />
-          <label htmlFor="remember" className="ml-2 block text-sm text-foreground">
+          <label htmlFor="remember" className="ml-2 block text-sm text-gray-600">
             Se souvenir de moi
           </label>
         </div>
 
+        {/* Message d'erreur */}
         {error && (
           <motion.div 
             initial={{ opacity: 0, y: -10 }}
             animate={{ opacity: 1, y: 0 }}
-            className="p-3 rounded-md bg-destructive/10 border border-destructive"
+            className="p-3 rounded-lg bg-red-50 border border-red-200"
           >
-            <p className="text-sm text-destructive">{error}</p>
+            <p className="text-sm text-red-600">{error}</p>
           </motion.div>
         )}
 
+        {/* Bouton de connexion */}
         <LoadingButton 
           type="submit" 
           isLoading={isLoading}
-          className="w-full"
+          className="w-full bg-black text-white py-3 rounded-lg hover:bg-gray-800 transition-colors font-medium"
         >
           Se connecter
         </LoadingButton>
 
-        <div className="relative">
+        {/* Séparateur avec texte */}
+        <div className="relative py-4">
           <div className="absolute inset-0 flex items-center">
-            <span className="w-full border-t border-foreground/10" />
+            <div className="w-full border-t border-gray-200"></div>
           </div>
-          <div className="relative flex justify-center text-xs uppercase">
-            <span className="bg-background px-2 text-muted-foreground">
+          <div className="relative flex justify-center">
+            <span className="px-4 text-sm text-gray-500 bg-white">
               Ou continuer avec
             </span>
           </div>
         </div>
 
+        {/* Bouton Google */}
         <button
-          onClick={() => signIn('google', { callbackUrl: '/dashboard' })}
-          className="w-full flex items-center justify-center gap-2 rounded-md border border-foreground/10 bg-background px-3 py-2 text-sm hover:bg-foreground/5 transition-colors"
+          onClick={() => signIn('google', { callbackUrl: '/tableau-de-bord' })}
+          className="w-full flex items-center justify-center gap-3 rounded-lg border-2 border-gray-200 bg-white px-4 py-3 text-sm font-medium text-black hover:bg-gray-50 transition-colors"
           type="button"
           disabled={isLoading}
         >

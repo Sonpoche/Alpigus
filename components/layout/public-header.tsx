@@ -9,6 +9,7 @@ import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { cn } from '@/lib/utils'
 import { useLocalCart } from '@/hooks/use-local-cart'
+import { useCart } from '@/hooks/use-cart'
 
 const publicNavItems = [
   { href: '/', label: 'Accueil' },
@@ -23,16 +24,74 @@ export function PublicHeader() {
   const pathname = usePathname()
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
   const [mounted, setMounted] = useState(false)
+  const [isAnimating, setIsAnimating] = useState(false)
   
-  // Récupérer le nombre d'items du panier
-  const getTotalItems = useLocalCart((state) => state.getTotalItems)
-  const cartItemsCount = getTotalItems()
+  // Panier local (utilisateurs non connectés) - COMPTER LES ARTICLES PAS LA QUANTITÉ
+  const localItems = useLocalCart((state) => state.items)
+  const localCartItemsCount = localItems.length // Nombre d'articles différents
+  
+  // Panier serveur (utilisateurs connectés) - comme dans CartButton
+  const { cartSummary, refreshCart } = useCart()
+  const serverCartItemsCount = cartSummary?.itemCount || 0
+  
+  // Choisir le bon compteur selon l'état de connexion
+  const cartItemsCount = session ? serverCartItemsCount : localCartItemsCount
 
   // Hydrater après le montage
   useEffect(() => {
     useLocalCart.persist.rehydrate()
     setMounted(true)
   }, [])
+
+  // Écouter les événements de panier (même logique que CartButton)
+  useEffect(() => {
+    const handleCartUpdate = (event?: CustomEvent) => {
+      console.log('🔄 Header: Cart update event received:', event?.detail)
+      
+      if (session) {
+        // Pour les utilisateurs connectés, refresh le panier serveur
+        refreshCart()
+        setTimeout(() => refreshCart(), 500)
+      }
+      
+      // Animation de l'icône panier
+      setIsAnimating(true)
+      setTimeout(() => setIsAnimating(false), 1000)
+    }
+
+    const handleCartCreated = (event?: CustomEvent) => {
+      console.log('🆕 Header: Cart created event received:', event?.detail)
+      if (session) {
+        refreshCart()
+        setTimeout(() => refreshCart(), 200)
+      }
+    }
+
+    const handleCartCleared = () => {
+      console.log('🧹 Header: Cart cleared event received')
+      if (session) {
+        refreshCart()
+        setTimeout(() => refreshCart(), 200)
+      }
+      setIsAnimating(true)
+      setTimeout(() => setIsAnimating(false), 1000)
+    }
+
+    // Écouter tous les événements de panier
+    window.addEventListener('cart:updated', handleCartUpdate as EventListener)
+    window.addEventListener('cart:item-added', handleCartUpdate as EventListener)
+    window.addEventListener('cart:item-removed', handleCartUpdate as EventListener)
+    window.addEventListener('cart:created', handleCartCreated as EventListener)
+    window.addEventListener('cart:cleared', handleCartCleared as EventListener)
+    
+    return () => {
+      window.removeEventListener('cart:updated', handleCartUpdate as EventListener)
+      window.removeEventListener('cart:item-added', handleCartUpdate as EventListener)
+      window.removeEventListener('cart:item-removed', handleCartUpdate as EventListener)
+      window.removeEventListener('cart:created', handleCartCreated as EventListener)
+      window.removeEventListener('cart:cleared', handleCartCleared as EventListener)
+    }
+  }, [session, refreshCart])
 
   const isActiveLink = (href: string) => {
     if (href === '/') return pathname === '/'
@@ -79,17 +138,30 @@ export function PublicHeader() {
 
               {/* Actions à droite */}
               <div className="flex items-center gap-4">
-                {/* Panier */}
+                {/* Panier avec animation */}
                 <Link 
                   href="/panier"
                   className="relative p-2 hover:opacity-60 transition-opacity"
                 >
-                  <ShoppingBag className="h-5 w-5" />
-                  {mounted && cartItemsCount > 0 && (
-                    <span className="absolute -top-1 -right-1 bg-black text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">
-                      {cartItemsCount}
-                    </span>
-                  )}
+                  <motion.div
+                    animate={isAnimating ? { scale: [1, 1.2, 1] } : {}}
+                    transition={{ duration: 0.5 }}
+                  >
+                    <ShoppingBag className="h-5 w-5" />
+                  </motion.div>
+                  
+                  <AnimatePresence>
+                    {mounted && cartItemsCount > 0 && (
+                      <motion.span
+                        initial={{ scale: 0 }}
+                        animate={{ scale: 1 }}
+                        exit={{ scale: 0 }}
+                        className="absolute -top-1 -right-1 bg-black text-white text-xs rounded-full w-5 h-5 flex items-center justify-center"
+                      >
+                        {cartItemsCount}
+                      </motion.span>
+                    )}
+                  </AnimatePresence>
                 </Link>
 
                 {/* Lien Compte ou Login - desktop */}

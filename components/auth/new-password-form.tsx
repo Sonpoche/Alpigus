@@ -1,4 +1,4 @@
-// components/auth/new-password-form.tsx
+// Chemin du fichier: components/auth/new-password-form.tsx
 'use client'
 
 import { useState, useRef, useEffect } from 'react'
@@ -75,7 +75,7 @@ export function NewPasswordForm({ token }: NewPasswordFormProps) {
       })
 
       setTimeout(() => {
-        router.push('/login')
+        router.push('/connexion')
       }, 2000)
     } catch (error: any) {
       setError(error.message || 'Une erreur est survenue')
@@ -90,12 +90,12 @@ export function NewPasswordForm({ token }: NewPasswordFormProps) {
   }
 
   return (
-    <form onSubmit={onSubmit} className="space-y-4">
+    <form onSubmit={onSubmit} className="space-y-5">
       <div>
-        <label htmlFor="password" className="block text-sm font-montserrat text-title">
+        <label htmlFor="password" className="block text-sm font-medium text-black mb-2">
           Nouveau mot de passe
         </label>
-        <div className="relative mt-1">
+        <div className="relative">
           <input
             ref={passwordRef}
             id="password"
@@ -103,61 +103,55 @@ export function NewPasswordForm({ token }: NewPasswordFormProps) {
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             required
-            className={cn(
-              "block w-full rounded-md border border-foreground/10 bg-background px-3 py-2 pr-10 text-foreground focus:border-custom-accent focus:ring-1 focus:ring-custom-accent"
-            )}
+            className="w-full px-4 py-3 pr-12 border-2 border-gray-200 rounded-lg focus:outline-none focus:border-black transition-colors bg-white text-black"
+            placeholder="••••••••"
           />
           <button
             type="button"
-            className="absolute inset-y-0 right-0 flex items-center pr-3"
+            className="absolute inset-y-0 right-0 flex items-center pr-4 text-gray-400 hover:text-black transition-colors"
             onClick={() => setShowPassword(!showPassword)}
           >
-            {showPassword ? (
-              <EyeOff className="h-5 w-5 text-foreground/60" />
-            ) : (
-              <Eye className="h-5 w-5 text-foreground/60" />
-            )}
+            {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
           </button>
         </div>
         {password && <PasswordStrength password={password} />}
       </div>
 
       <div>
-        <label htmlFor="confirmPassword" className="block text-sm font-montserrat text-title">
+        <label htmlFor="confirmPassword" className="block text-sm font-medium text-black mb-2">
           Confirmer le mot de passe
         </label>
-        <div className="relative mt-1">
+        <div className="relative">
           <input
             id="confirmPassword"
             type={showConfirmPassword ? "text" : "password"}
             value={confirmPassword}
             onChange={(e) => setConfirmPassword(e.target.value)}
             required
-            className={cn(
-              "block w-full rounded-md border border-foreground/10 bg-background px-3 py-2 pr-10 text-foreground focus:border-custom-accent focus:ring-1 focus:ring-custom-accent"
-            )}
+            className="w-full px-4 py-3 pr-12 border-2 border-gray-200 rounded-lg focus:outline-none focus:border-black transition-colors bg-white text-black"
+            placeholder="••••••••"
           />
           <button
             type="button"
-            className="absolute inset-y-0 right-0 flex items-center pr-3"
+            className="absolute inset-y-0 right-0 flex items-center pr-4 text-gray-400 hover:text-black transition-colors"
             onClick={() => setShowConfirmPassword(!showConfirmPassword)}
           >
-            {showConfirmPassword ? (
-              <EyeOff className="h-5 w-5 text-foreground/60" />
-            ) : (
-              <Eye className="h-5 w-5 text-foreground/60" />
-            )}
+            {showConfirmPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
           </button>
         </div>
       </div>
 
       {error && (
-        <div className="p-3 rounded-md bg-destructive/10 border border-destructive">
-          <p className="text-sm font-roboto text-destructive">{error}</p>
+        <div className="p-3 rounded-lg bg-red-50 border border-red-200">
+          <p className="text-sm text-red-600">{error}</p>
         </div>
       )}
 
-      <LoadingButton type="submit" isLoading={isLoading}>
+      <LoadingButton 
+        type="submit" 
+        isLoading={isLoading}
+        className="w-full bg-black text-white py-3 rounded-lg hover:bg-gray-800 transition-colors font-medium"
+      >
         Réinitialiser le mot de passe
       </LoadingButton>
     </form>

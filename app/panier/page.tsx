@@ -11,6 +11,7 @@ import { useToast } from '@/hooks/use-toast'
 import Image from 'next/image'
 import { formatNumber } from '@/lib/number-utils'
 import { formatDateToFrench } from '@/lib/date-utils'
+import { PublicHeader } from '@/components/layout/public-header'
 
 // Types pour la version connectée
 interface ServerCartItem {
@@ -132,9 +133,12 @@ export default function CartPage() {
   // Si pas encore monté, afficher un loader
   if (!mounted) {
     return (
-      <div className="flex justify-center items-center min-h-[400px]">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-black" />
-      </div>
+      <>
+        <PublicHeader />
+        <div className="flex justify-center items-center min-h-[400px]">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-black" />
+        </div>
+      </>
     )
   }
 
@@ -371,316 +375,419 @@ export default function CartPage() {
 
   if (isLoadingServer && isConnected) {
     return (
-      <div className="flex justify-center items-center min-h-[400px]">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-black" />
-      </div>
+      <>
+        <PublicHeader />
+        <div className="flex justify-center items-center min-h-[400px]">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-black" />
+        </div>
+      </>
     )
   }
 
   return (
-    <div className="min-h-screen bg-white">
-      <div className="container mx-auto px-4 py-8">
-        <h1 className="text-2xl font-bold mb-6 flex items-center gap-2 text-black">
-          <ShoppingCart className="h-6 w-6" />
-          Votre Panier
-        </h1>
+    <>
+      <PublicHeader />
+      <div className="min-h-screen bg-white">
+        <div className="max-w-7xl mx-auto px-4 sm:px-8 py-4 sm:py-8">
+          <h1 className="text-xl sm:text-2xl font-bold mb-4 sm:mb-6 flex items-center gap-2 text-black">
+            <ShoppingCart className="h-6 w-6" />
+            Votre Panier
+          </h1>
 
-        {isCartEmpty ? (
-          <div className="bg-white border border-gray-200 rounded-lg p-8 text-center">
-            <ShoppingCart className="h-16 w-16 mx-auto text-gray-400 mb-4" />
-            <h2 className="text-xl font-medium mb-2 text-black">Votre panier est vide</h2>
-            <p className="text-gray-600 mb-6">Vous n'avez pas encore ajouté de produits à votre panier.</p>
-            <Link 
-              href="/" 
-              className="bg-black text-white px-6 py-3 rounded-lg hover:bg-gray-800 transition-colors"
-            >
-              Découvrir nos produits
-            </Link>
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-            {/* Colonne principale avec les produits */}
-            <div className="lg:col-span-2 space-y-6">
-              {/* Produits standards */}
-              {items && items.length > 0 && (
-                <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
-                  <div className="p-4 border-b border-gray-200">
-                    <div className="flex justify-between items-center">
-                      <h2 className="font-semibold text-black">Produits ({items.length})</h2>
-                      <button
-                        onClick={handleClearCart}
-                        className="text-sm text-gray-500 hover:text-red-600 transition-colors"
-                      >
-                        Vider le panier
-                      </button>
+          {isCartEmpty ? (
+            <div className="bg-white border border-gray-200 rounded-lg p-8 text-center">
+              <ShoppingCart className="h-16 w-16 mx-auto text-gray-400 mb-4" />
+              <h2 className="text-xl font-medium mb-2 text-black">Votre panier est vide</h2>
+              <p className="text-gray-600 mb-6">Vous n'avez pas encore ajouté de produits à votre panier.</p>
+              <Link 
+                href="/" 
+                className="bg-black text-white px-6 py-3 rounded-lg hover:bg-gray-800 transition-colors"
+              >
+                Découvrir nos produits
+              </Link>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 lg:gap-8">
+              {/* Colonne principale avec les produits */}
+              <div className="lg:col-span-2 space-y-4 lg:space-y-6">
+                {/* Produits standards */}
+                {items && items.length > 0 && (
+                  <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
+                    <div className="p-4 border-b border-gray-200">
+                      <div className="flex justify-between items-center">
+                        <h2 className="font-semibold text-black">Produits ({items.length})</h2>
+                        <button
+                          onClick={handleClearCart}
+                          className="text-sm text-gray-500 hover:text-red-600 transition-colors"
+                        >
+                          Vider le panier
+                        </button>
+                      </div>
                     </div>
-                  </div>
-                  
-                  <div className="divide-y divide-gray-200">
-                    {items.map((item: any) => {
-                      const isServerItem = 'product' in item
-                      const productId = isServerItem ? item.id : item.productId
-                      const productName = isServerItem ? item.product.name : item.productName
-                      const productUnit = isServerItem ? item.product.unit : item.unit
-                      const productImage = isServerItem ? item.product.image : item.image
-                      const price = item.price
-                      const quantity = item.quantity
+                    
+                    <div className="divide-y divide-gray-200">
+                      {items.map((item: any) => {
+                        const isServerItem = 'product' in item
+                        const productId = isServerItem ? item.id : item.productId
+                        const productName = isServerItem ? item.product.name : item.productName
+                        const productUnit = isServerItem ? item.product.unit : item.unit
+                        const productImage = isServerItem ? item.product.image : item.image
+                        const price = item.price
+                        const quantity = item.quantity
 
-                      return (
-                        <div key={productId} className="p-4 flex items-center">
-                          {/* Image du produit */}
-                          <div className="w-16 h-16 bg-gray-100 rounded-lg overflow-hidden flex-shrink-0 mr-4">
-                            {productImage ? (
-                              <Image
-                                src={productImage}
-                                alt={productName}
-                                width={64}
-                                height={64}
-                                className="w-full h-full object-cover"
-                              />
-                            ) : (
-                              <div className="w-full h-full flex items-center justify-center text-gray-400">
-                                <ShoppingBag className="h-8 w-8" />
-                              </div>
-                            )}
-                          </div>
-                          
-                          {/* Informations du produit */}
-                          <div className="flex-1">
-                            <div className="font-medium text-black">
-                              {productName}
-                            </div>
-                            <div className="text-sm text-gray-600">
-                              {formatNumber ? formatNumber(price) : price.toFixed(2)} CHF / {productUnit}
-                            </div>
-                          </div>
-                          
-                          {/* Contrôles de quantité */}
-                          <div className="flex items-center gap-4">
-                            <div className="flex items-center">
-                              <button
-                                onClick={() => {
-                                  if (isServerItem) {
-                                    updateServerItemQuantity(productId, Math.max(0.1, quantity - 0.1))
-                                  } else {
-                                    handleLocalQuantityChange(productId, quantity - 1)
-                                  }
-                                }}
-                                disabled={isUpdating}
-                                className="w-8 h-8 flex items-center justify-center border border-gray-300 rounded-l-lg hover:bg-gray-50"
-                              >
-                                <Minus className="h-4 w-4" />
-                              </button>
-                              <input
-                                type="number"
-                                value={formatNumber ? formatNumber(quantity) : quantity.toFixed(1)}
-                                onChange={(e) => {
-                                  const value = parseFloat(e.target.value)
-                                  if (!isNaN(value) && value > 0) {
-                                    if (isServerItem) {
-                                      updateServerItemQuantity(productId, value)
-                                    } else {
-                                      handleLocalQuantityChange(productId, value)
-                                    }
-                                  }
-                                }}
-                                min="0.1"
-                                step="0.1"
-                                className="w-16 h-8 border-y border-gray-300 text-center bg-white text-black"
-                              />
-                              <button
-                                onClick={() => {
-                                  if (isServerItem) {
-                                    updateServerItemQuantity(productId, quantity + 0.1)
-                                  } else {
-                                    handleLocalQuantityChange(productId, quantity + 1)
-                                  }
-                                }}
-                                disabled={isUpdating}
-                                className="w-8 h-8 flex items-center justify-center border border-gray-300 rounded-r-lg hover:bg-gray-50"
-                              >
-                                <Plus className="h-4 w-4" />
-                              </button>
-                            </div>
-                            
-                            {/* Sous-total */}
-                            <div className="w-24 text-right font-medium text-black">
-                              {formatNumber ? formatNumber(price * quantity) : (price * quantity).toFixed(2)} CHF
-                            </div>
-                            
-                            {/* Bouton supprimer */}
-                            <button
-                              onClick={() => {
-                                if (isServerItem) {
-                                  removeServerItem(productId)
-                                } else {
-                                  handleLocalRemoveItem(productId, productName)
-                                }
-                              }}
-                              disabled={isUpdating}
-                              className="text-gray-400 hover:text-red-600 transition-colors p-2"
-                              aria-label="Supprimer l'article"
-                            >
-                              {updatingItemId === productId && isUpdating ? (
-                                <Loader2 className="h-5 w-5 animate-spin" />
-                              ) : (
-                                <Trash2 className="h-5 w-5" />
-                              )}
-                            </button>
-                          </div>
-                        </div>
-                      )
-                    })}
-                  </div>
-                </div>
-              )}
-
-              {/* Réservations (uniquement pour les utilisateurs connectés) */}
-              {isConnected && bookings.length > 0 && (
-                <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
-                  <div className="p-4 border-b border-gray-200">
-                    <h2 className="font-semibold text-black">Réservations de Livraison</h2>
-                  </div>
-                  
-                  <div className="divide-y divide-gray-200">
-                    {bookings.map((booking) => {
-                      const deliveryDate = new Date(booking.deliverySlot.date)
-                      const { isExpiring, timeRemaining } = getExpiryInfo(booking)
-                      const bookingPrice = booking.price || booking.deliverySlot.product.price || 0
-                      const bookingTotal = bookingPrice * booking.quantity
-                      
-                      return (
-                        <div key={booking.id} className="p-4">
-                          <div className="flex items-start gap-4">
-                            {/* Image du produit */}
-                            <div className="w-16 h-16 bg-gray-100 rounded-lg overflow-hidden flex-shrink-0 mr-4">
-                              {booking.deliverySlot.product.image ? (
-                                <Image
-                                  src={booking.deliverySlot.product.image}
-                                  alt={booking.deliverySlot.product.name}
-                                  width={64}
-                                  height={64}
-                                  className="w-full h-full object-cover"
-                                />
-                              ) : (
-                                <div className="w-full h-full flex items-center justify-center text-blue-600 bg-blue-50">
-                                  <Calendar className="h-8 w-8" />
+                        return (
+                          <div key={productId} className="p-3 sm:p-4">
+                            {/* VERSION MOBILE UNIQUEMENT */}
+                            <div className="block sm:hidden">
+                              {/* Ligne 1: Image + Info + Supprimer */}
+                              <div className="flex items-start gap-3 mb-3">
+                                <div className="w-12 h-12 bg-gray-100 rounded-lg overflow-hidden flex-shrink-0">
+                                  {productImage ? (
+                                    <Image
+                                      src={productImage}
+                                      alt={productName}
+                                      width={48}
+                                      height={48}
+                                      className="w-full h-full object-cover"
+                                    />
+                                  ) : (
+                                    <div className="w-full h-full flex items-center justify-center text-gray-400">
+                                      <ShoppingBag className="h-6 w-6" />
+                                    </div>
+                                  )}
                                 </div>
-                              )}
-                            </div>
-                            
-                            {/* Informations de réservation */}
-                            <div className="flex-1">
-                              <div className="font-medium text-black">
-                                {booking.deliverySlot.product.name}
-                              </div>
-                              <div className="text-sm text-gray-600">
-                                Livraison le {formatDateToFrench(deliveryDate)}
-                              </div>
-                              <div className="text-sm text-black">
-                                Quantité: {formatNumber ? formatNumber(booking.quantity) : booking.quantity} {booking.deliverySlot.product.unit}
-                                <span className="ml-1 font-medium">
-                                  ({formatNumber ? formatNumber(bookingTotal) : bookingTotal.toFixed(2)} CHF)
-                                </span>
+                                <div className="flex-1 min-w-0">
+                                  <div className="font-medium text-black text-sm leading-tight">
+                                    {productName}
+                                  </div>
+                                  <div className="text-xs text-gray-600 mt-0.5">
+                                    {formatNumber ? formatNumber(price) : price.toFixed(2)} CHF / {productUnit}
+                                  </div>
+                                </div>
+                                <button
+                                  onClick={() => {
+                                    if (isServerItem) {
+                                      removeServerItem(productId)
+                                    } else {
+                                      handleLocalRemoveItem(productId, productName)
+                                    }
+                                  }}
+                                  disabled={isUpdating}
+                                  className="text-gray-400 hover:text-red-600 transition-colors p-1"
+                                >
+                                  {updatingItemId === productId && isUpdating ? (
+                                    <Loader2 className="h-4 w-4 animate-spin" />
+                                  ) : (
+                                    <Trash2 className="h-4 w-4" />
+                                  )}
+                                </button>
                               </div>
                               
-                              {/* Notification d'expiration */}
-                              {isExpiring && timeRemaining !== null && (
-                                <div className="mt-2 text-xs text-amber-600 bg-amber-50 p-2 rounded">
-                                  Cette réservation expirera dans {timeRemaining} minute{timeRemaining > 1 ? 's' : ''} si vous ne finalisez pas votre commande.
+                              {/* Ligne 2: Quantité + Prix */}
+                              <div className="flex items-center justify-between">
+                                <div className="flex items-center bg-gray-50 rounded-lg">
+                                  <button
+                                    onClick={() => {
+                                      if (isServerItem) {
+                                        updateServerItemQuantity(productId, Math.max(0.1, quantity - 0.1))
+                                      } else {
+                                        handleLocalQuantityChange(productId, quantity - 1)
+                                      }
+                                    }}
+                                    disabled={isUpdating}
+                                    className="w-8 h-8 flex items-center justify-center rounded-l-lg hover:bg-gray-100 transition-colors"
+                                  >
+                                    <Minus className="h-3 w-3" />
+                                  </button>
+                                  <input
+                                    type="number"
+                                    value={formatNumber ? formatNumber(quantity) : quantity.toFixed(1)}
+                                    onChange={(e) => {
+                                      const value = parseFloat(e.target.value)
+                                      if (!isNaN(value) && value > 0) {
+                                        if (isServerItem) {
+                                          updateServerItemQuantity(productId, value)
+                                        } else {
+                                          handleLocalQuantityChange(productId, value)
+                                        }
+                                      }
+                                    }}
+                                    min="0.1"
+                                    step="0.1"
+                                    className="w-14 h-8 text-center bg-transparent text-black text-sm border-0 focus:outline-none"
+                                  />
+                                  <button
+                                    onClick={() => {
+                                      if (isServerItem) {
+                                        updateServerItemQuantity(productId, quantity + 0.1)
+                                      } else {
+                                        handleLocalQuantityChange(productId, quantity + 1)
+                                      }
+                                    }}
+                                    disabled={isUpdating}
+                                    className="w-8 h-8 flex items-center justify-center rounded-r-lg hover:bg-gray-100 transition-colors"
+                                  >
+                                    <Plus className="h-3 w-3" />
+                                  </button>
                                 </div>
-                              )}
+                                
+                                <div className="font-semibold text-black">
+                                  {formatNumber ? formatNumber(price * quantity) : (price * quantity).toFixed(2)} CHF
+                                </div>
+                              </div>
                             </div>
-                            
-                            {/* Bouton annuler */}
-                            <button
-                              onClick={() => cancelBooking(booking.id)}
-                              disabled={isUpdating}
-                              className="text-gray-400 hover:text-red-600 transition-colors p-2"
-                              aria-label="Annuler la réservation"
-                            >
-                              {updatingItemId === booking.id && isUpdating ? (
-                                <Loader2 className="h-5 w-5 animate-spin" />
-                              ) : (
-                                <Trash2 className="h-5 w-5" />
-                              )}
-                            </button>
-                          </div>
-                        </div>
-                      )
-                    })}
-                  </div>
-                </div>
-              )}
-            </div>
-            
-            {/* Résumé de la commande */}
-            <div className="lg:col-span-1">
-              <div className="bg-white border border-gray-200 rounded-lg p-6 sticky top-4">
-                <h2 className="text-lg font-semibold mb-4 text-black">Résumé de la commande</h2>
-                
-                <div className="space-y-3 mb-6">
-                  <div className="flex justify-between text-sm">
-                    <span className="text-gray-600">Sous-total</span>
-                    <span className="text-black">{formatNumber ? formatNumber(grandTotal) : grandTotal.toFixed(2)} CHF</span>
-                  </div>
-                  <div className="flex justify-between text-sm">
-                    <span className="text-gray-600">Livraison</span>
-                    <span className="text-green-600">Calculée à l'étape suivante</span>
-                  </div>
-                </div>
-                
-                <div className="border-t border-gray-200 pt-4 mb-6">
-                  <div className="flex justify-between font-semibold text-lg">
-                    <span className="text-black">Total</span>
-                    <span className="text-black">{formatNumber ? formatNumber(grandTotal) : grandTotal.toFixed(2)} CHF</span>
-                  </div>
-                  <p className="text-xs text-gray-500 mt-1">TVA incluse</p>
-                </div>
 
-                {/* Message pour utilisateurs non connectés */}
-                {!session && (
-                  <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-                    <p className="text-sm text-blue-800">
-                      <strong>Information :</strong> Vous devrez vous connecter pour finaliser votre commande.
-                    </p>
+                            {/* VERSION DESKTOP */}
+                            <div className="hidden sm:flex sm:items-center">
+                              <div className="w-16 h-16 bg-gray-100 rounded-lg overflow-hidden flex-shrink-0 mr-4">
+                                {productImage ? (
+                                  <Image
+                                    src={productImage}
+                                    alt={productName}
+                                    width={64}
+                                    height={64}
+                                    className="w-full h-full object-cover"
+                                  />
+                                ) : (
+                                  <div className="w-full h-full flex items-center justify-center text-gray-400">
+                                    <ShoppingBag className="h-8 w-8" />
+                                  </div>
+                                )}
+                              </div>
+                              
+                              <div className="flex-1 mr-4">
+                                <div className="font-medium text-black">
+                                  {productName}
+                                </div>
+                                <div className="text-sm text-gray-600">
+                                  {formatNumber ? formatNumber(price) : price.toFixed(2)} CHF / {productUnit}
+                                </div>
+                              </div>
+                              
+                              <div className="flex items-center gap-4">
+                                <div className="flex items-center">
+                                  <button
+                                    onClick={() => {
+                                      if (isServerItem) {
+                                        updateServerItemQuantity(productId, Math.max(0.1, quantity - 0.1))
+                                      } else {
+                                        handleLocalQuantityChange(productId, quantity - 1)
+                                      }
+                                    }}
+                                    disabled={isUpdating}
+                                    className="w-8 h-8 flex items-center justify-center border border-gray-300 rounded-l-lg hover:bg-gray-50"
+                                  >
+                                    <Minus className="h-4 w-4" />
+                                  </button>
+                                  <input
+                                    type="number"
+                                    value={formatNumber ? formatNumber(quantity) : quantity.toFixed(1)}
+                                    onChange={(e) => {
+                                      const value = parseFloat(e.target.value)
+                                      if (!isNaN(value) && value > 0) {
+                                        if (isServerItem) {
+                                          updateServerItemQuantity(productId, value)
+                                        } else {
+                                          handleLocalQuantityChange(productId, value)
+                                        }
+                                      }
+                                    }}
+                                    min="0.1"
+                                    step="0.1"
+                                    className="w-16 h-8 border-y border-gray-300 text-center bg-white text-black text-sm"
+                                  />
+                                  <button
+                                    onClick={() => {
+                                      if (isServerItem) {
+                                        updateServerItemQuantity(productId, quantity + 0.1)
+                                      } else {
+                                        handleLocalQuantityChange(productId, quantity + 1)
+                                      }
+                                    }}
+                                    disabled={isUpdating}
+                                    className="w-8 h-8 flex items-center justify-center border border-gray-300 rounded-r-lg hover:bg-gray-50"
+                                  >
+                                    <Plus className="h-4 w-4" />
+                                  </button>
+                                </div>
+                                
+                                <div className="w-20 text-right font-medium text-black">
+                                  {formatNumber ? formatNumber(price * quantity) : (price * quantity).toFixed(2)} CHF
+                                </div>
+                                
+                                <button
+                                  onClick={() => {
+                                    if (isServerItem) {
+                                      removeServerItem(productId)
+                                    } else {
+                                      handleLocalRemoveItem(productId, productName)
+                                    }
+                                  }}
+                                  disabled={isUpdating}
+                                  className="text-gray-400 hover:text-red-600 transition-colors p-2"
+                                >
+                                  {updatingItemId === productId && isUpdating ? (
+                                    <Loader2 className="h-5 w-5 animate-spin" />
+                                  ) : (
+                                    <Trash2 className="h-5 w-5" />
+                                  )}
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                        )
+                      })}
+                    </div>
                   </div>
                 )}
 
-                <button
-                  onClick={handleCheckout}
-                  disabled={isCartEmpty || isUpdating}
-                  className="w-full bg-black text-white py-3 rounded-lg hover:bg-gray-800 transition-colors font-medium flex items-center justify-center gap-2 disabled:opacity-50"
-                >
-                  {session ? 'Procéder au paiement' : 'Se connecter et commander'}
-                  <ChevronRight className="h-4 w-4" />
-                </button>
+                {/* Réservations (uniquement pour les utilisateurs connectés) */}
+                {isConnected && bookings.length > 0 && (
+                  <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
+                    <div className="p-4 border-b border-gray-200">
+                      <h2 className="font-semibold text-black">Réservations de Livraison</h2>
+                    </div>
+                    
+                    <div className="divide-y divide-gray-200">
+                      {bookings.map((booking) => {
+                        const deliveryDate = new Date(booking.deliverySlot.date)
+                        const { isExpiring, timeRemaining } = getExpiryInfo(booking)
+                        const bookingPrice = booking.price || booking.deliverySlot.product.price || 0
+                        const bookingTotal = bookingPrice * booking.quantity
+                        
+                        return (
+                          <div key={booking.id} className="p-4">
+                            <div className="flex items-start gap-4">
+                              {/* Image du produit */}
+                              <div className="w-16 h-16 bg-gray-100 rounded-lg overflow-hidden flex-shrink-0 mr-4">
+                                {booking.deliverySlot.product.image ? (
+                                  <Image
+                                    src={booking.deliverySlot.product.image}
+                                    alt={booking.deliverySlot.product.name}
+                                    width={64}
+                                    height={64}
+                                    className="w-full h-full object-cover"
+                                  />
+                                ) : (
+                                  <div className="w-full h-full flex items-center justify-center text-blue-600 bg-blue-50">
+                                    <Calendar className="h-8 w-8" />
+                                  </div>
+                                )}
+                              </div>
+                              
+                              {/* Informations de réservation */}
+                              <div className="flex-1">
+                                <div className="font-medium text-black">
+                                  {booking.deliverySlot.product.name}
+                                </div>
+                                <div className="text-sm text-gray-600">
+                                  Livraison le {formatDateToFrench(deliveryDate)}
+                                </div>
+                                <div className="text-sm text-black">
+                                  Quantité: {formatNumber ? formatNumber(booking.quantity) : booking.quantity} {booking.deliverySlot.product.unit}
+                                  <span className="ml-1 font-medium">
+                                    ({formatNumber ? formatNumber(bookingTotal) : bookingTotal.toFixed(2)} CHF)
+                                  </span>
+                                </div>
+                                
+                                {/* Notification d'expiration */}
+                                {isExpiring && timeRemaining !== null && (
+                                  <div className="mt-2 text-xs text-amber-600 bg-amber-50 p-2 rounded">
+                                    Cette réservation expirera dans {timeRemaining} minute{timeRemaining > 1 ? 's' : ''} si vous ne finalisez pas votre commande.
+                                  </div>
+                                )}
+                              </div>
+                              
+                              {/* Bouton annuler */}
+                              <button
+                                onClick={() => cancelBooking(booking.id)}
+                                disabled={isUpdating}
+                                className="text-gray-400 hover:text-red-600 transition-colors p-2"
+                                aria-label="Annuler la réservation"
+                              >
+                                {updatingItemId === booking.id && isUpdating ? (
+                                  <Loader2 className="h-5 w-5 animate-spin" />
+                                ) : (
+                                  <Trash2 className="h-5 w-5" />
+                                )}
+                              </button>
+                            </div>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  </div>
+                )}
+              </div>
+              
+              {/* Résumé de la commande */}
+              <div className="lg:col-span-1">
+                <div className="bg-white border border-gray-200 rounded-lg p-4 sm:p-6 lg:sticky lg:top-4">
+                  <h2 className="text-lg font-semibold mb-4 text-black">Résumé de la commande</h2>
+                  
+                  <div className="space-y-3 mb-6">
+                    <div className="flex justify-between text-sm">
+                      <span className="text-gray-600">Sous-total</span>
+                      <span className="text-black">{formatNumber ? formatNumber(grandTotal) : grandTotal.toFixed(2)} CHF</span>
+                    </div>
+                    <div className="flex justify-between text-sm">
+                      <span className="text-gray-600">Livraison</span>
+                      <span className="text-green-600">Calculée à l'étape suivante</span>
+                    </div>
+                  </div>
+                  
+                  <div className="border-t border-gray-200 pt-4 mb-6">
+                    <div className="flex justify-between font-semibold text-lg">
+                      <span className="text-black">Total</span>
+                      <span className="text-black">{formatNumber ? formatNumber(grandTotal) : grandTotal.toFixed(2)} CHF</span>
+                    </div>
+                    <p className="text-xs text-gray-500 mt-1">TVA incluse</p>
+                  </div>
 
-                <div className="mt-4">
-                  <Link 
-                    href="/"
-                    className="text-sm text-center w-full block text-black hover:text-gray-600 transition-colors"
+                  {/* Message pour utilisateurs non connectés */}
+                  {!session && (
+                    <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                      <p className="text-sm text-blue-800">
+                        <strong>Information :</strong> Vous devrez vous connecter pour finaliser votre commande.
+                      </p>
+                    </div>
+                  )}
+
+                  <button
+                    onClick={handleCheckout}
+                    disabled={isCartEmpty || isUpdating}
+                    className="w-full bg-black text-white py-3 rounded-lg hover:bg-gray-800 transition-colors font-medium flex items-center justify-center gap-2 disabled:opacity-50"
                   >
-                    Continuer mes achats
-                  </Link>
-                </div>
+                    {session ? 'Procéder au paiement' : 'Se connecter et commander'}
+                    <ChevronRight className="h-4 w-4" />
+                  </button>
 
-                {/* Info sécurité */}
-                <div className="mt-6 pt-6 border-t border-gray-200">
-                  <p className="text-xs text-gray-500 text-center">
-                    <span className="inline-flex items-center gap-1">
-                      <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-                      </svg>
-                      Paiement sécurisé • Livraison rapide
-                    </span>
-                  </p>
+                  <div className="mt-4">
+                    <Link 
+                      href="/"
+                      className="text-sm text-center w-full block text-black hover:text-gray-600 transition-colors"
+                    >
+                      Continuer mes achats
+                    </Link>
+                  </div>
+
+                  {/* Info sécurité */}
+                  <div className="mt-6 pt-6 border-t border-gray-200">
+                    <p className="text-xs text-gray-500 text-center">
+                      <span className="inline-flex items-center gap-1">
+                        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                        </svg>
+                        Paiement sécurisé • Livraison rapide
+                      </span>
+                    </p>
+                  </div>
                 </div>
               </div>
             </div>
-          </div>
-        )}
+          )}
+        </div>
       </div>
-    </div>
+    </>
   )
 }

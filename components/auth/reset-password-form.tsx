@@ -1,4 +1,5 @@
-// components/auth/reset-password-form.tsx
+
+// Chemin du fichier: components/auth/reset-password-form.tsx
 'use client'
 
 import { useState, useRef, useEffect } from 'react'
@@ -57,16 +58,18 @@ export function ResetPasswordForm() {
 
   if (success) {
     return (
-      <div className="text-center">
-        <div className="mb-4 text-sm font-roboto text-custom-text">
-          Si un compte existe avec cette adresse email, vous recevrez un lien de réinitialisation dans quelques minutes.
+      <div className="text-center space-y-4">
+        <div className="p-4 bg-green-50 border border-green-200 rounded-lg">
+          <p className="text-sm text-green-800">
+            Si un compte existe avec cette adresse email, vous recevrez un lien de réinitialisation dans quelques minutes.
+          </p>
         </div>
-        <div className="mb-4 text-sm font-roboto text-custom-text">
+        <p className="text-sm text-gray-600">
           Pensez à vérifier vos spams.
-        </div>
+        </p>
         <Link 
-          href="/login"
-          className="text-sm font-medium text-custom-accent hover:opacity-90 transition-opacity"
+          href="/connexion"
+          className="inline-block text-sm font-medium text-black hover:opacity-60 transition-opacity"
         >
           Retour à la connexion
         </Link>
@@ -75,9 +78,9 @@ export function ResetPasswordForm() {
   }
 
   return (
-    <form onSubmit={onSubmit} className="space-y-4">
+    <form onSubmit={onSubmit} className="space-y-5">
       <div>
-        <label htmlFor="email" className="block text-sm font-montserrat text-title">
+        <label htmlFor="email" className="block text-sm font-medium text-black mb-2">
           Email
         </label>
         <input
@@ -88,26 +91,29 @@ export function ResetPasswordForm() {
           value={email}
           onChange={(e) => setEmail(e.target.value)}
           required
-          className={cn(
-            "mt-1 block w-full rounded-md border border-foreground/10 bg-background px-3 py-2 text-foreground focus:border-custom-accent focus:ring-1 focus:ring-custom-accent transition-colors"
-          )}
+          className="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:outline-none focus:border-black transition-colors bg-white text-black"
+          placeholder="votre@email.com"
         />
       </div>
 
       {error && (
-        <div className="p-3 rounded-md bg-destructive/10 border border-destructive">
-          <p className="text-sm font-roboto text-destructive">{error}</p>
+        <div className="p-3 rounded-lg bg-red-50 border border-red-200">
+          <p className="text-sm text-red-600">{error}</p>
         </div>
       )}
 
-      <div className="flex flex-col space-y-4">
-        <LoadingButton type="submit" isLoading={isLoading}>
+      <div className="space-y-3">
+        <LoadingButton 
+          type="submit" 
+          isLoading={isLoading}
+          className="w-full bg-black text-white py-3 rounded-lg hover:bg-gray-800 transition-colors font-medium"
+        >
           Envoyer le lien
         </LoadingButton>
         
         <Link 
-          href="/login"
-          className="text-center text-sm font-medium text-custom-text hover:text-custom-accent transition-colors"
+          href="/connexion"
+          className="block text-center text-sm text-gray-600 hover:text-black transition-colors"
         >
           Retour à la connexion
         </Link>

@@ -401,13 +401,13 @@ export default function ShopHomepage() {
             
             <div className="flex flex-col sm:flex-row gap-4 justify-center max-w-sm mx-auto mb-8">
               <Link 
-                href="/register"
+                href="/inscription"
                 className="flex-1 bg-black text-white px-8 py-4 rounded-xl hover:bg-gray-800 transition-all duration-300 font-light text-center hover:shadow-lg hover:-translate-y-0.5"
               >
                 Créer un compte
               </Link>
               <Link 
-                href="/login"
+                href="/connexion"
                 className="flex-1 border border-gray-300 text-black px-8 py-4 rounded-xl hover:bg-gray-50 hover:shadow-md transition-all duration-300 font-light text-center"
               >
                 Se connecter
