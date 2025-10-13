@@ -4,6 +4,7 @@
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { Home, ArrowLeft } from 'lucide-react'
+import Image from 'next/image'
 
 export default function NotFound() {
   const router = useRouter()
@@ -11,12 +12,15 @@ export default function NotFound() {
   return (
     <div className="min-h-screen bg-white flex items-center justify-center px-4">
       <div className="text-center max-w-md">
-        {/* Logo minimaliste */}
+        {/* Logo */}
         <div className="flex items-center justify-center mb-8">
-          <div className="flex items-center">
-            <div className="w-[40px] h-[40px] bg-black rounded-full z-10"></div>
-            <div className="w-[40px] h-[40px] bg-white border-2 border-black rounded-full -ml-4"></div>
-          </div>
+          <Image
+            src="/logo_alpigus_entier.png"
+            alt="Alpigus"
+            width={120}
+            height={120}
+            className="object-contain"
+          />
         </div>
 
         {/* 404 stylisé */}

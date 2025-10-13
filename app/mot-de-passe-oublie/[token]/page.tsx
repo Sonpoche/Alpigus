@@ -1,6 +1,7 @@
 // Chemin du fichier: app/mot-de-passe-oublie/[token]/page.tsx
 import { NewPasswordForm } from '@/components/auth/new-password-form'
 import Link from 'next/link'
+import Image from 'next/image'
 
 export default function NewPasswordPage({
   params,
@@ -10,6 +11,17 @@ export default function NewPasswordPage({
   return (
     <main className="min-h-screen bg-white flex items-center justify-center px-4 py-12">
       <div className="w-full max-w-md">
+        {/* Logo */}
+        <div className="flex items-center justify-center mb-8">
+          <Image
+            src="/logo_alpigus.png"
+            alt="Alpigus"
+            width={80}
+            height={80}
+            className="object-contain"
+          />
+        </div>
+
         {/* Titre */}
         <div className="text-center mb-8">
           <h1 className="text-3xl font-bold text-black mb-2">

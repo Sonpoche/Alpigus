@@ -1,7 +1,8 @@
-// Chemin du fichier: components/layout/header.tsx
+// Chemin du fichier: components/layout/header.tsx (Protected)
 'use client'
 
 import Link from 'next/link'
+import Image from 'next/image'
 import { useSession } from 'next-auth/react'
 import { usePathname } from 'next/navigation'
 import { Menu, X } from 'lucide-react'
@@ -59,22 +60,22 @@ export function Header() {
 
   return (
     <>
-      {/* Container avec espacement du haut plus important */}
       <div className="w-full pt-6">
-        {/* Navigation avec bordures - largeur 1280px centrée */}
         <div className="max-w-7xl mx-auto px-8">
           <header className="border-t-2 border-b-2 border-black bg-white">
             <div className="flex h-12 items-center justify-between px-6">
               
-              {/* Logo minimaliste - plus petit */}
+              {/* Logo Alpigus */}
               <Link href="/tableau-de-bord" className="flex items-center">
-                <div className="flex items-center">
-                  <div className="w-[28px] h-[28px] bg-black rounded-full z-10"></div>
-                  <div className="w-[28px] h-[28px] bg-white border-[1.5px] border-black rounded-full -ml-2.5"></div>
-                </div>
+                <Image
+                  src="/logo_alpigus.png"
+                  alt="Alpigus"
+                  width={60}
+                  height={60}
+                  className="object-contain"
+                />
               </Link>
 
-              {/* Navigation centrale - desktop */}
               <nav className="hidden lg:flex items-center">
                 <ul className="flex items-center gap-8">
                   {navItems.map((item) => (
@@ -95,9 +96,7 @@ export function Header() {
                 </ul>
               </nav>
 
-              {/* Section Compte */}
               <div className="flex items-center gap-3">
-                {/* Lien Compte - desktop */}
                 <div className="hidden lg:block">
                   {session ? (
                     <UserMenu />
@@ -111,7 +110,6 @@ export function Header() {
                   )}
                 </div>
 
-                {/* Menu burger - mobile - plus petit */}
                 <button
                   onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
                   className="lg:hidden p-1.5"
@@ -129,11 +127,9 @@ export function Header() {
         </div>
       </div>
 
-      {/* Menu mobile - Overlay */}
       <AnimatePresence>
         {isMobileMenuOpen && (
           <>
-            {/* Fond sombre */}
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
@@ -142,7 +138,6 @@ export function Header() {
               onClick={() => setIsMobileMenuOpen(false)}
             />
             
-            {/* Panel de navigation */}
             <motion.div
               initial={{ x: '100%' }}
               animate={{ x: 0 }}
@@ -150,12 +145,14 @@ export function Header() {
               transition={{ type: 'spring', damping: 20 }}
               className="fixed right-0 top-0 h-full w-3/4 max-w-sm bg-white z-50 lg:hidden"
             >
-              {/* Header du menu mobile */}
               <div className="flex items-center justify-between p-6 border-b border-black">
-                <div className="flex items-center">
-                  <div className="w-[30px] h-[30px] bg-black rounded-full z-10"></div>
-                  <div className="w-[30px] h-[30px] bg-white border-2 border-black rounded-full -ml-2.5"></div>
-                </div>
+                <Image
+                  src="/logo_alpigus.png"
+                  alt="Alpigus"
+                  width={60}
+                  height={60}
+                  className="object-contain"
+                />
                 <button
                   onClick={() => setIsMobileMenuOpen(false)}
                   className="p-2"
@@ -164,7 +161,6 @@ export function Header() {
                 </button>
               </div>
 
-              {/* Navigation mobile */}
               <nav className="p-6">
                 <ul className="space-y-6">
                   {navItems.map((item) => (
@@ -185,7 +181,6 @@ export function Header() {
                   ))}
                 </ul>
 
-                {/* Compte - mobile */}
                 <div className="mt-8 pt-8 border-t border-gray-200">
                   {session ? (
                     <div className="text-black">

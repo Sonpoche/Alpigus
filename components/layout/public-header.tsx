@@ -2,6 +2,7 @@
 'use client'
 
 import Link from 'next/link'
+import Image from 'next/image'
 import { useSession } from 'next-auth/react'
 import { usePathname } from 'next/navigation'
 import { Menu, X, ShoppingBag } from 'lucide-react'
@@ -26,41 +27,30 @@ export function PublicHeader() {
   const [mounted, setMounted] = useState(false)
   const [isAnimating, setIsAnimating] = useState(false)
   
-  // Panier local (utilisateurs non connectés) - COMPTER LES ARTICLES PAS LA QUANTITÉ
   const localItems = useLocalCart((state) => state.items)
-  const localCartItemsCount = localItems.length // Nombre d'articles différents
+  const localCartItemsCount = localItems.length
   
-  // Panier serveur (utilisateurs connectés) - comme dans CartButton
   const { cartSummary, refreshCart } = useCart()
   const serverCartItemsCount = cartSummary?.itemCount || 0
   
-  // Choisir le bon compteur selon l'état de connexion
   const cartItemsCount = session ? serverCartItemsCount : localCartItemsCount
 
-  // Hydrater après le montage
   useEffect(() => {
     useLocalCart.persist.rehydrate()
     setMounted(true)
   }, [])
 
-  // Écouter les événements de panier (même logique que CartButton)
   useEffect(() => {
     const handleCartUpdate = (event?: CustomEvent) => {
-      console.log('🔄 Header: Cart update event received:', event?.detail)
-      
       if (session) {
-        // Pour les utilisateurs connectés, refresh le panier serveur
         refreshCart()
         setTimeout(() => refreshCart(), 500)
       }
-      
-      // Animation de l'icône panier
       setIsAnimating(true)
       setTimeout(() => setIsAnimating(false), 1000)
     }
 
     const handleCartCreated = (event?: CustomEvent) => {
-      console.log('🆕 Header: Cart created event received:', event?.detail)
       if (session) {
         refreshCart()
         setTimeout(() => refreshCart(), 200)
@@ -68,7 +58,6 @@ export function PublicHeader() {
     }
 
     const handleCartCleared = () => {
-      console.log('🧹 Header: Cart cleared event received')
       if (session) {
         refreshCart()
         setTimeout(() => refreshCart(), 200)
@@ -77,7 +66,6 @@ export function PublicHeader() {
       setTimeout(() => setIsAnimating(false), 1000)
     }
 
-    // Écouter tous les événements de panier
     window.addEventListener('cart:updated', handleCartUpdate as EventListener)
     window.addEventListener('cart:item-added', handleCartUpdate as EventListener)
     window.addEventListener('cart:item-removed', handleCartUpdate as EventListener)
@@ -100,19 +88,20 @@ export function PublicHeader() {
 
   return (
     <>
-      {/* Container avec espacement du haut */}
       <div className="w-full pt-6">
-        {/* Navigation avec bordures */}
         <div className="max-w-7xl mx-auto px-8">
           <header className="border-t-2 border-b-2 border-black bg-white">
             <div className="flex h-12 items-center justify-between px-6">
               
-              {/* Logo minimaliste */}
+              {/* Logo Alpigus */}
               <Link href="/" className="flex items-center">
-                <div className="flex items-center">
-                  <div className="w-[28px] h-[28px] bg-black rounded-full z-10"></div>
-                  <div className="w-[28px] h-[28px] bg-white border-[1.5px] border-black rounded-full -ml-2.5"></div>
-                </div>
+                <Image
+                  src="/logo_alpigus.png"
+                  alt="Alpigus"
+                  width={60}
+                  height={60}
+                  className="object-contain"
+                />
               </Link>
 
               {/* Navigation centrale - desktop */}
@@ -138,7 +127,6 @@ export function PublicHeader() {
 
               {/* Actions à droite */}
               <div className="flex items-center gap-4">
-                {/* Panier avec animation */}
                 <Link 
                   href="/panier"
                   className="relative p-2 hover:opacity-60 transition-opacity"
@@ -164,7 +152,6 @@ export function PublicHeader() {
                   </AnimatePresence>
                 </Link>
 
-                {/* Lien Compte ou Login - desktop */}
                 <div className="hidden lg:block">
                   {session ? (
                     <Link 
@@ -183,7 +170,6 @@ export function PublicHeader() {
                   )}
                 </div>
 
-                {/* Menu burger - mobile */}
                 <button
                   onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
                   className="lg:hidden p-1.5"
@@ -201,11 +187,10 @@ export function PublicHeader() {
         </div>
       </div>
 
-      {/* Menu mobile - Overlay */}
+      {/* Menu mobile */}
       <AnimatePresence>
         {isMobileMenuOpen && (
           <>
-            {/* Fond sombre */}
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
@@ -214,7 +199,6 @@ export function PublicHeader() {
               onClick={() => setIsMobileMenuOpen(false)}
             />
             
-            {/* Panel de navigation */}
             <motion.div
               initial={{ x: '100%' }}
               animate={{ x: 0 }}
@@ -222,12 +206,14 @@ export function PublicHeader() {
               transition={{ type: 'spring', damping: 20 }}
               className="fixed right-0 top-0 h-full w-3/4 max-w-sm bg-white z-50 lg:hidden"
             >
-              {/* Header du menu mobile */}
               <div className="flex items-center justify-between p-6 border-b border-black">
-                <div className="flex items-center">
-                  <div className="w-[30px] h-[30px] bg-black rounded-full z-10"></div>
-                  <div className="w-[30px] h-[30px] bg-white border-2 border-black rounded-full -ml-2.5"></div>
-                </div>
+                <Image
+                  src="/logo_alpigus.png"
+                  alt="Alpigus"
+                  width={60}
+                  height={60}
+                  className="object-contain"
+                />
                 <button
                   onClick={() => setIsMobileMenuOpen(false)}
                   className="p-2"
@@ -236,7 +222,6 @@ export function PublicHeader() {
                 </button>
               </div>
 
-              {/* Navigation mobile */}
               <nav className="p-6">
                 <ul className="space-y-6">
                   {publicNavItems.map((item) => (
@@ -256,7 +241,6 @@ export function PublicHeader() {
                     </li>
                   ))}
                   
-                  {/* Panier dans le menu mobile */}
                   <li>
                     <Link
                       href="/panier"
@@ -274,7 +258,6 @@ export function PublicHeader() {
                   </li>
                 </ul>
 
-                {/* Login/Dashboard - mobile */}
                 <div className="mt-8 pt-8 border-t border-gray-200">
                   {session ? (
                     <Link
