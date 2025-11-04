@@ -1,4 +1,4 @@
-// app/(protected)/admin/stats/page.tsx
+// Chemin du fichier: app/(protected)/admin/stats/page.tsx
 "use client"
 
 import DashboardStats from '@/components/admin/dashboard-stats'

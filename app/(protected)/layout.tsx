@@ -1,6 +1,5 @@
 // Chemin du fichier: app/(protected)/layout.tsx
 import { Header } from '@/components/layout/header'
-import { Sidebar } from '@/components/layout/sidebar'
 import { Footer } from '@/components/layout/footer'
 import { InvoiceProvider } from '@/contexts/invoice-context'
 import { OrderProvider } from '@/contexts/order-context'
@@ -16,7 +15,7 @@ export default async function ProtectedLayout({
   const session = await getServerSession(authOptions)
 
   if (!session) {
-    redirect('/login')
+    redirect('/connexion')
   }
 
   return (
@@ -24,17 +23,12 @@ export default async function ProtectedLayout({
       <OrderProvider>
         <div className="min-h-screen flex flex-col bg-background">
           <Header />
-          <div className="flex flex-1 overflow-hidden">
-            <Sidebar />
-            <div className="flex-1 flex flex-col">
-              <main className="flex-1 overflow-y-auto">
-                <div className="p-8 font-roboto text-custom-text">
-                  {children}
-                </div>
-              </main>
-              <Footer />
+          <main className="flex-1">
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+              {children}
             </div>
-          </div>
+          </main>
+          <Footer />
         </div>
       </OrderProvider>
     </InvoiceProvider>

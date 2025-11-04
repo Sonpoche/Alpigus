@@ -1,18 +1,9 @@
-// app/api/producers/route.ts
+// Chemin du fichier: app/api/producers/route.ts
 import { NextRequest, NextResponse } from "next/server"
 import { withAuthSecurity, validateData, commonSchemas } from "@/lib/api-security"
 import { handleError, createError } from "@/lib/error-handler"
 import { prisma } from "@/lib/prisma"
 import { z } from "zod"
-
-// Schéma de validation pour les paramètres de requête
-const producersQuerySchema = z.object({
-  page: z.coerce.number().min(1).default(1),
-  limit: z.coerce.number().min(1).max(100).default(20),
-  search: z.string().max(100).optional(),
-  sortBy: z.enum(['companyName']).default('companyName'),
-  sortOrder: z.enum(['asc', 'desc']).default('asc')
-})
 
 // Schéma de validation pour la création de producteur
 const createProducerSchema = z.object({
@@ -47,55 +38,20 @@ const createProducerSchema = z.object({
     .optional()
 }).strict()
 
-// Définition des types
-type ProducerWithUser = {
-  id: string
-  userId: string
-  companyName: string | null
-  address: string | null
-  description: string | null
-  bankName: string | null
-  bankAccountName: string | null
-  iban: string | null
-  bic: string | null
-  user: {
-    id: string
-    name: string | null
-    email: string | null
-    phone: string
-    profileCompleted: boolean
-    createdAt: Date
-  }
-  products?: Array<{
-    id: string
-    available: boolean
-  }>
-  _count?: {
-    products: number
-  }
-}
-
 // GET - Obtenir la liste des producteurs
 export const GET = withAuthSecurity(async (request: NextRequest, session) => {
   try {
-    // 1. Validation des paramètres de requête
     const { searchParams } = new URL(request.url)
-    const queryParams = {
-      page: searchParams.get('page'),
-      limit: searchParams.get('limit'),
-      search: searchParams.get('search'),
-      sortBy: searchParams.get('sortBy'),
-      sortOrder: searchParams.get('sortOrder')
-    }
+    
+    // Récupération directe des paramètres sans validation stricte
+    const page = parseInt(searchParams.get('page') || '1')
+    const limit = parseInt(searchParams.get('limit') || '20')
+    const search = searchParams.get('search') || undefined
+    const sortBy = searchParams.get('sortBy') || 'companyName'
+    const sortOrder = (searchParams.get('sortOrder') || 'asc') as 'asc' | 'desc'
 
-    const validatedQuery = validateData(producersQuerySchema, queryParams)
-    const { search, sortBy, sortOrder } = validatedQuery
-    const page = validatedQuery.page ?? 1
-    const limit = validatedQuery.limit ?? 20
+    console.log(`👥 Récupération producteurs par ${session.user.role} ${session.user.id}`)
 
-    console.log(`👥 Récupération producteurs par ${session.user.role} ${session.user.id} (page: ${page}, search: ${search || 'none'})`)
-
-    // 2. Construction des filtres de recherche
     const whereClause: any = {}
     
     if (search) {
@@ -125,8 +81,7 @@ export const GET = withAuthSecurity(async (request: NextRequest, session) => {
       ]
     }
 
-    // 3. Récupération sécurisée des producteurs avec pagination
-    const [producersResult, totalCount] = await Promise.all([
+    const [producers, totalCount] = await Promise.all([
       prisma.producer.findMany({
         where: whereClause,
         include: {
@@ -140,7 +95,6 @@ export const GET = withAuthSecurity(async (request: NextRequest, session) => {
               createdAt: true
             }
           },
-          // Statistiques agrégées pour les admins
           ...(session.user.role === 'ADMIN' && {
             products: {
               select: {
@@ -164,11 +118,7 @@ export const GET = withAuthSecurity(async (request: NextRequest, session) => {
       prisma.producer.count({ where: whereClause })
     ])
 
-    const producers = producersResult as unknown as ProducerWithUser[]
-
-    // 4. Filtrage des données selon le rôle
-    const filteredProducers = producers.map((producer: ProducerWithUser) => {
-      // Données de base pour tous les rôles
+    const filteredProducers = producers.map((producer: any) => {
       const baseData = {
         id: producer.id,
         companyName: producer.companyName,
@@ -177,30 +127,26 @@ export const GET = withAuthSecurity(async (request: NextRequest, session) => {
         user: {
           id: producer.user.id,
           name: producer.user.name,
+          email: producer.user.email,
           profileCompleted: producer.user.profileCompleted
         }
       }
 
-      // Données supplémentaires pour les admins
       if (session.user.role === 'ADMIN') {
         return {
           ...baseData,
           user: {
             ...baseData.user,
-            email: producer.user.email,
             phone: producer.user.phone,
             createdAt: producer.user.createdAt
           },
-          // Statistiques admin
           stats: {
             totalProducts: producer._count?.products || 0,
             activeProducts: producer.products?.filter((p: any) => p.available).length || 0
           },
-          // Informations sensibles pour admin seulement
           bankName: producer.bankName,
           bankAccountName: producer.bankAccountName,
           bic: producer.bic,
-          // IBAN partiellement masqué même pour admin
           ibanPreview: producer.iban ? `${producer.iban.substring(0, 4)}****` : null
         }
       }
@@ -208,18 +154,8 @@ export const GET = withAuthSecurity(async (request: NextRequest, session) => {
       return baseData
     })
 
-    // 5. Log d'audit sécurisé
-    console.log(`📋 Audit - Producteurs consultés:`, {
-      consultedBy: session.user.id,
-      role: session.user.role,
-      producersCount: filteredProducers.length,
-      searchTerm: search || null,
-      timestamp: new Date().toISOString()
-    })
-
     console.log(`✅ ${filteredProducers.length} producteurs récupérés`)
 
-    // 6. Réponse sécurisée avec pagination
     return NextResponse.json({
       producers: filteredProducers,
       pagination: {
@@ -242,10 +178,10 @@ export const GET = withAuthSecurity(async (request: NextRequest, session) => {
   }
 }, {
   requireAuth: true,
-  allowedRoles: ['CLIENT', 'PRODUCER', 'ADMIN'], // Tous peuvent voir la liste
+  allowedRoles: ['CLIENT', 'PRODUCER', 'ADMIN'],
   allowedMethods: ['GET'],
   rateLimit: {
-    requests: 100, // 100 consultations par minute
+    requests: 100,
     window: 60
   }
 })
@@ -253,7 +189,6 @@ export const GET = withAuthSecurity(async (request: NextRequest, session) => {
 // POST - Créer un nouveau producteur (ADMIN uniquement)
 export const POST = withAuthSecurity(async (request: NextRequest, session) => {
   try {
-    // 1. Validation des données d'entrée
     const rawData = await request.json()
     const validatedData = validateData(createProducerSchema, rawData)
     
@@ -270,8 +205,6 @@ export const POST = withAuthSecurity(async (request: NextRequest, session) => {
 
     console.log(`🏭 Création producteur par admin ${session.user.id} pour user ${userId}`)
 
-    // 2. Vérifications de sécurité préalables
-    // Vérifier que l'utilisateur cible existe
     const targetUser = await prisma.user.findUnique({
       where: { id: userId },
       select: {
@@ -287,28 +220,23 @@ export const POST = withAuthSecurity(async (request: NextRequest, session) => {
       throw createError.notFound("Utilisateur cible non trouvé")
     }
 
-    // Vérifier que l'utilisateur n'a pas déjà un profil producteur
     if (targetUser.producer) {
       throw createError.validation("Cet utilisateur a déjà un profil producteur")
     }
 
-    // Vérifier que l'utilisateur a le bon rôle
     if (targetUser.role !== 'PRODUCER') {
       throw createError.validation("L'utilisateur doit avoir le rôle PRODUCER")
     }
 
-    // 3. Nettoyage et validation des données sensibles
     const cleanCompanyName = companyName.trim()
     const cleanAddress = address.trim()
     const cleanIban = iban ? iban.trim().toUpperCase() : undefined
     const cleanBic = bic ? bic.trim().toUpperCase() : undefined
 
-    // Validation IBAN spécifique (si fourni)
     if (cleanIban && !cleanIban.startsWith('FR') && !cleanIban.startsWith('CH')) {
       console.warn(`⚠️ IBAN suspect lors de création producteur: ${cleanIban.substring(0, 4)}...`)
     }
 
-    // 4. Création sécurisée du producteur
     const producer = await prisma.producer.create({
       data: {
         userId,
@@ -333,7 +261,6 @@ export const POST = withAuthSecurity(async (request: NextRequest, session) => {
       }
     })
 
-    // 5. Log d'audit sécurisé (sans données sensibles)
     console.log(`📋 Audit - Producteur créé:`, {
       producerId: producer.id,
       createdBy: session.user.id,
@@ -346,10 +273,8 @@ export const POST = withAuthSecurity(async (request: NextRequest, session) => {
 
     console.log(`✅ Producteur créé: ${producer.id} pour user ${userId}`)
 
-    // 6. Réponse sécurisée (IBAN masqué)
     const response = {
       ...producer,
-      // Masquer l'IBAN dans la réponse
       iban: undefined,
       ibanPreview: cleanIban ? `${cleanIban.substring(0, 4)}****` : null
     }
@@ -362,10 +287,10 @@ export const POST = withAuthSecurity(async (request: NextRequest, session) => {
   }
 }, {
   requireAuth: true,
-  allowedRoles: ['ADMIN'], // Seuls les admins peuvent créer des producteurs manuellement
+  allowedRoles: ['ADMIN'],
   allowedMethods: ['POST'],
   rateLimit: {
-    requests: 5,  // 5 créations max par minute (action critique)
+    requests: 5,
     window: 60
   }
 })

@@ -1,4 +1,4 @@
-// components/admin/user-edit-modal.tsx
+// Chemin du fichier: components/admin/user-edit-modal.tsx
 'use client'
 
 import { useState, useEffect } from 'react'
@@ -13,6 +13,7 @@ import {
 } from '@/components/ui/simple-dialog'
 import { Button } from '@/components/ui/button'
 import { LoadingButton } from '@/components/ui/loading-button'
+import { Building } from 'lucide-react'
 
 interface User {
   id: string
@@ -47,7 +48,6 @@ export function UserEditModal({ isOpen, onClose, onSubmit, user }: UserEditModal
     companyName: ''
   })
 
-  // Initialiser les données du formulaire
   useEffect(() => {
     if (user) {
       setFormData({
@@ -71,12 +71,10 @@ export function UserEditModal({ isOpen, onClose, onSubmit, user }: UserEditModal
     const { name, value } = e.target
     setFormData(prev => ({ ...prev, [name]: value }))
     
-    // Toggle producer fields when role changes
     if (name === 'role') {
       setShowProducerFields(value === 'PRODUCER')
     }
     
-    // Clear error when field is edited
     if (errors[name]) {
       setErrors(prev => {
         const newErrors = { ...prev }
@@ -108,52 +106,47 @@ export function UserEditModal({ isOpen, onClose, onSubmit, user }: UserEditModal
     return Object.keys(newErrors).length === 0
   }
 
-  // Modification pour le gestionnaire de soumission
-const handleSubmit = async (e: React.FormEvent) => {
-  e.preventDefault()
-  
-  if (!validateForm()) return
-  
-  setIsSubmitting(true)
-  try {
-    // Préparer les données à soumettre
-    const dataToSubmit: Partial<User> = { ...formData }
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
     
-    // Ajouter les données de producteur si nécessaire
-    if (showProducerFields) {
-      // S'assurer que producer et producer.id existent
-      if (user.producer && user.producer.id) {
-        dataToSubmit.producer = {
-          id: user.producer.id, // On s'assure que l'ID est défini
-          companyName: producerData.companyName
+    if (!validateForm()) return
+    
+    setIsSubmitting(true)
+    try {
+      const dataToSubmit: Partial<User> = { ...formData }
+      
+      if (showProducerFields) {
+        if (user.producer && user.producer.id) {
+          dataToSubmit.producer = {
+            id: user.producer.id,
+            companyName: producerData.companyName
+          }
+        } else {
+          dataToSubmit.producer = {
+            companyName: producerData.companyName
+          } as any
         }
-      } else {
-        // Si pas de producer existant, on n'inclut pas l'ID
-        dataToSubmit.producer = {
-          companyName: producerData.companyName
-        } as any // Utiliser 'as any' pour contourner temporairement la vérification de type
       }
+      
+      await onSubmit(dataToSubmit)
+    } finally {
+      setIsSubmitting(false)
     }
-    
-    await onSubmit(dataToSubmit)
-  } finally {
-    setIsSubmitting(false)
   }
-}
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>Modifier l'utilisateur</DialogTitle>
-          <DialogDescription>
+      <DialogContent className="sm:max-w-md bg-white border-2 border-black rounded-lg">
+        <DialogHeader className="border-b-2 border-black pb-4">
+          <DialogTitle className="text-2xl font-bold text-black">Modifier l'utilisateur</DialogTitle>
+          <DialogDescription className="text-gray-600">
             Modifiez les informations de l'utilisateur.
           </DialogDescription>
         </DialogHeader>
         
         <form onSubmit={handleSubmit} className="space-y-4 pt-4">
           <div>
-            <label htmlFor="name" className="form-label">
+            <label htmlFor="name" className="block text-sm font-bold text-black mb-2">
               Nom (optionnel)
             </label>
             <input
@@ -162,14 +155,14 @@ const handleSubmit = async (e: React.FormEvent) => {
               type="text"
               value={formData.name || ''}
               onChange={handleChange}
-              className="form-input"
+              className="w-full px-4 py-2.5 border-2 border-gray-300 rounded-md focus:border-black focus:outline-none"
               placeholder="Nom complet"
             />
           </div>
           
           <div>
-            <label htmlFor="email" className="form-label">
-              Email <span className="text-destructive">*</span>
+            <label htmlFor="email" className="block text-sm font-bold text-black mb-2">
+              Email <span className="text-red-600">*</span>
             </label>
             <input
               id="email"
@@ -177,19 +170,19 @@ const handleSubmit = async (e: React.FormEvent) => {
               type="email"
               value={formData.email || ''}
               onChange={handleChange}
-              className={`form-input ${
-                errors.email ? 'border-destructive' : ''
+              className={`w-full px-4 py-2.5 border-2 rounded-md focus:outline-none ${
+                errors.email ? 'border-red-600 focus:border-red-600' : 'border-gray-300 focus:border-black'
               }`}
               placeholder="email@exemple.com"
               required
             />
             {errors.email && (
-              <p className="form-error">{errors.email}</p>
+              <p className="text-xs text-red-600 mt-1 font-medium">{errors.email}</p>
             )}
           </div>
           
           <div>
-            <label htmlFor="phone" className="form-label">
+            <label htmlFor="phone" className="block text-sm font-bold text-black mb-2">
               Téléphone (optionnel)
             </label>
             <input
@@ -198,26 +191,26 @@ const handleSubmit = async (e: React.FormEvent) => {
               type="tel"
               value={formData.phone || ''}
               onChange={handleChange}
-              className={`form-input ${
-                errors.phone ? 'border-destructive' : ''
+              className={`w-full px-4 py-2.5 border-2 rounded-md focus:outline-none ${
+                errors.phone ? 'border-red-600 focus:border-red-600' : 'border-gray-300 focus:border-black'
               }`}
               placeholder="+41791234567"
             />
             {errors.phone && (
-              <p className="form-error">{errors.phone}</p>
+              <p className="text-xs text-red-600 mt-1 font-medium">{errors.phone}</p>
             )}
           </div>
           
           <div>
-            <label htmlFor="role" className="form-label">
-              Rôle <span className="text-destructive">*</span>
+            <label htmlFor="role" className="block text-sm font-bold text-black mb-2">
+              Rôle <span className="text-red-600">*</span>
             </label>
             <select
               id="role"
               name="role"
               value={formData.role}
               onChange={handleChange}
-              className="form-select"
+              className="w-full px-4 py-2.5 border-2 border-gray-300 rounded-md focus:border-black focus:outline-none bg-white"
               required
             >
               <option value="CLIENT">Client</option>
@@ -226,13 +219,15 @@ const handleSubmit = async (e: React.FormEvent) => {
             </select>
           </div>
           
-          {/* Champs pour les producteurs */}
           {showProducerFields && (
-            <div className="border border-input p-4 rounded-md bg-muted/20">
-              <h3 className="text-sm font-medium mb-3 text-foreground">Informations du producteur</h3>
+            <div className="border-2 border-gray-300 p-4 rounded-lg bg-gray-50">
+              <h3 className="text-sm font-bold mb-3 text-black flex items-center gap-2">
+                <Building className="h-4 w-4" />
+                Informations du producteur
+              </h3>
               
               <div>
-                <label htmlFor="companyName" className="form-label">
+                <label htmlFor="companyName" className="block text-sm font-bold text-black mb-2">
                   Nom de l'entreprise
                 </label>
                 <input
@@ -241,18 +236,26 @@ const handleSubmit = async (e: React.FormEvent) => {
                   type="text"
                   value={producerData.companyName}
                   onChange={handleProducerChange}
-                  className="form-input"
+                  className="w-full px-4 py-2.5 border-2 border-gray-300 rounded-md focus:border-black focus:outline-none bg-white"
                   placeholder="Nom de l'entreprise"
                 />
               </div>
             </div>
           )}
           
-          <DialogFooter className="mt-6">
-            <Button type="button" variant="outline" onClick={onClose}>
+          <DialogFooter className="mt-6 flex gap-3 pt-4 border-t-2 border-gray-200">
+            <button 
+              type="button" 
+              onClick={onClose}
+              className="flex-1 px-4 py-2.5 border-2 border-black rounded-md hover:bg-gray-100 transition-colors font-semibold"
+            >
               Annuler
-            </Button>
-            <LoadingButton type="submit" isLoading={isSubmitting}>
+            </button>
+            <LoadingButton 
+              type="submit" 
+              isLoading={isSubmitting}
+              className="flex-1 bg-black text-white hover:bg-gray-800 border-2 border-black px-4 py-2.5 rounded-md font-semibold"
+            >
               Enregistrer les modifications
             </LoadingButton>
           </DialogFooter>

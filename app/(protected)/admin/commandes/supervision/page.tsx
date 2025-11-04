@@ -1,4 +1,4 @@
-// app/(protected)/admin/orders/supervision/page.tsx
+// Chemin du fichier: app/(protected)/admin/commandes/supervision/page.tsx
 "use client"
 
 import OrdersSupervision from '@/components/admin/orders-supervision'

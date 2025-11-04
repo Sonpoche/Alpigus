@@ -1,4 +1,4 @@
-// app/(protected)/admin/products/[id]/edit/page.tsx
+// Chemin du fichier: app/(protected)/admin/produits/[id]/modifier/page.tsx
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
@@ -10,6 +10,7 @@ import { ImageSelector } from '@/components/ui/image-selector'
 import { cn } from '@/lib/utils'
 import { PRESET_IMAGES } from '@/types/images'
 import Link from 'next/link'
+import { ArrowLeft, Package } from 'lucide-react'
 
 interface Product {
   id: string
@@ -76,7 +77,6 @@ export default function AdminEditProductPage({ params }: PageProps) {
       try {
         setIsLoadingInitial(true)
         
-        // Charger le produit, les catégories et les producteurs en parallèle
         const [productRes, categoriesRes, producersRes] = await Promise.all([
           fetch(`/api/products/${params.id}`),
           fetch('/api/categories'),
@@ -92,14 +92,15 @@ export default function AdminEditProductPage({ params }: PageProps) {
         const producersData = await producersRes.json()
         
         setProduct(productData)
-        setCategories(categoriesData)
-        setProducers(producersData)
+        // CORRECTION : L'API /api/categories retourne { categories: [...] }
+        setCategories(categoriesData.categories || categoriesData)
+        // CORRECTION : L'API /api/producers retourne { producers: [...] }
+        setProducers(producersData.producers || producersData)
         setSelectedUnit(productData.unit)
         setSelectedProducer(productData.producer.id)
         setSelectedCategories(productData.categories.map((c: { id: string }) => c.id))
         setCurrentImage(productData.image)
         
-        // Gestion des images prédéfinies
         if (productData.image) {
           const preset = PRESET_IMAGES.find(p => p.src === productData.image)
           if (preset) {
@@ -113,7 +114,7 @@ export default function AdminEditProductPage({ params }: PageProps) {
           description: "Impossible de charger les données du produit",
           variant: "destructive"
         })
-        router.push('/admin/products')
+        router.push('/admin/produits')
       } finally {
         setIsLoadingInitial(false)
       }
@@ -169,7 +170,6 @@ export default function AdminEditProductPage({ params }: PageProps) {
       const quantity = parseFloat(formData.get('stock') as string)
       const available = (formData.get('available') as string) === 'true'
 
-      // Validations
       const errors: {[key: string]: boolean} = {}
       let hasErrors = false
 
@@ -208,7 +208,6 @@ export default function AdminEditProductPage({ params }: PageProps) {
         throw new Error('Veuillez remplir tous les champs requis correctement')
       }
 
-      // Mise à jour du produit
       const updateData = {
         name,
         description,
@@ -222,7 +221,6 @@ export default function AdminEditProductPage({ params }: PageProps) {
         imagePreset: selectedPreset
       }
 
-      // Mettre à jour le produit
       const response = await fetch(`/api/admin/products/${params.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
@@ -235,7 +233,6 @@ export default function AdminEditProductPage({ params }: PageProps) {
 
       const updatedProduct = await response.json()
 
-      // Upload de l'image personnalisée si sélectionnée
       if (imageFile) {
         const imageFormData = new FormData()
         imageFormData.append('image', imageFile)
@@ -260,7 +257,7 @@ export default function AdminEditProductPage({ params }: PageProps) {
         description: "Le produit a été mis à jour avec succès"
       })
 
-      router.push('/admin/products')
+      router.push('/admin/produits')
     } catch (error: any) {
       toast({
         title: "Erreur",
@@ -275,29 +272,40 @@ export default function AdminEditProductPage({ params }: PageProps) {
   if (isLoadingInitial || !product) {
     return (
       <div className="flex justify-center items-center min-h-screen">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-custom-accent" />
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-black" />
       </div>
     )
   }
 
   return (
-    <div className="container mx-auto p-6">
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-2xl font-bold">Modifier le produit</h1>
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold text-black flex items-center gap-3">
+            <Package className="h-8 w-8" />
+            Modifier le produit
+          </h1>
+          <p className="mt-2 text-gray-600">
+            Mettez à jour les informations du produit
+          </p>
+        </div>
         <Link
-          href="/admin/products"
-          className="text-custom-text hover:text-custom-accent transition-colors"
+          href="/admin/produits"
+          className="flex items-center gap-2 text-black hover:text-gray-600 transition-colors font-medium"
         >
-          Retour à la liste
+          <ArrowLeft className="h-4 w-4" />
+          Retour
         </Link>
       </div>
       
-      <div className="bg-background border border-foreground/10 rounded-lg p-6">
+      {/* Formulaire */}
+      <div className="bg-white border-2 border-black rounded-lg p-6">
         <form onSubmit={onSubmit} className="space-y-6">
           {/* Producteur */}
           <div>
-            <label htmlFor="producer" className="block text-sm font-medium text-custom-title">
-              Producteur <span className="text-custom-accent">*</span>
+            <label htmlFor="producer" className="block text-sm font-semibold text-black mb-2">
+              Producteur <span className="text-red-600">*</span>
             </label>
             <select
               id="producer"
@@ -305,8 +313,8 @@ export default function AdminEditProductPage({ params }: PageProps) {
               value={selectedProducer}
               onChange={(e) => setSelectedProducer(e.target.value)}
               className={cn(
-                "mt-1 block w-full rounded-md border border-foreground/10 bg-background px-3 py-2",
-                fieldErrors.producer && "border-destructive"
+                "block w-full rounded-md border-2 bg-white px-3 py-2 focus:outline-none",
+                fieldErrors.producer ? "border-red-500" : "border-gray-300 focus:border-black"
               )}
               required
             >
@@ -318,14 +326,14 @@ export default function AdminEditProductPage({ params }: PageProps) {
               ))}
             </select>
             {fieldErrors.producer && (
-              <p className="mt-1 text-sm text-destructive">Veuillez sélectionner un producteur</p>
+              <p className="mt-1 text-sm text-red-600">Veuillez sélectionner un producteur</p>
             )}
           </div>
           
           {/* Nom */}
           <div>
-            <label htmlFor="name" className="block text-sm font-medium text-custom-title">
-              Nom du produit <span className="text-custom-accent">*</span>
+            <label htmlFor="name" className="block text-sm font-semibold text-black mb-2">
+              Nom du produit <span className="text-red-600">*</span>
             </label>
             <input
               type="text"
@@ -333,19 +341,19 @@ export default function AdminEditProductPage({ params }: PageProps) {
               name="name"
               defaultValue={product.name}
               className={cn(
-                "mt-1 block w-full rounded-md border border-foreground/10 bg-background px-3 py-2",
-                fieldErrors.name && "border-destructive"
+                "block w-full rounded-md border-2 bg-white px-3 py-2 focus:outline-none",
+                fieldErrors.name ? "border-red-500" : "border-gray-300 focus:border-black"
               )}
               required
             />
             {fieldErrors.name && (
-              <p className="mt-1 text-sm text-destructive">Le nom doit contenir au moins 2 caractères</p>
+              <p className="mt-1 text-sm text-red-600">Le nom doit contenir au moins 2 caractères</p>
             )}
           </div>
 
           {/* Description */}
           <div>
-            <label htmlFor="description" className="block text-sm font-medium text-custom-title">
+            <label htmlFor="description" className="block text-sm font-semibold text-black mb-2">
               Description
             </label>
             <textarea
@@ -353,43 +361,43 @@ export default function AdminEditProductPage({ params }: PageProps) {
               name="description"
               defaultValue={product.description}
               rows={4}
-              className="mt-1 block w-full rounded-md border border-foreground/10 bg-background px-3 py-2"
+              className="block w-full rounded-md border-2 border-gray-300 bg-white px-3 py-2 focus:border-black focus:outline-none"
             />
           </div>
 
           {/* Prix et Unité */}
-          <div className="grid grid-cols-2 gap-4">
-          <div>
-            <label htmlFor="price" className="block text-sm font-medium text-custom-title">
-              Prix au kg (CHF) <span className="text-custom-accent">*</span>
-            </label>
-            <input
-              type="number"
-              id="price"
-              name="price"
-              defaultValue={product.price}
-              step="0.01"
-              min="0"
-              className={cn(
-                "mt-1 block w-full rounded-md border border-foreground/10 bg-background px-3 py-2",
-                fieldErrors.price && "border-destructive"
-              )}
-              required
-            />
-            {fieldErrors.price && (
-              <p className="mt-1 text-sm text-destructive">Le prix doit être supérieur à 0</p>
-            )}
-          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <label htmlFor="unit" className="block text-sm font-medium text-custom-title">
-                Unité <span className="text-custom-accent">*</span>
+              <label htmlFor="price" className="block text-sm font-semibold text-black mb-2">
+                Prix au kg (CHF) <span className="text-red-600">*</span>
+              </label>
+              <input
+                type="number"
+                id="price"
+                name="price"
+                defaultValue={product.price}
+                step="0.01"
+                min="0"
+                className={cn(
+                  "block w-full rounded-md border-2 bg-white px-3 py-2 focus:outline-none",
+                  fieldErrors.price ? "border-red-500" : "border-gray-300 focus:border-black"
+                )}
+                required
+              />
+              {fieldErrors.price && (
+                <p className="mt-1 text-sm text-red-600">Le prix doit être supérieur à 0</p>
+              )}
+            </div>
+            <div>
+              <label htmlFor="unit" className="block text-sm font-semibold text-black mb-2">
+                Unité <span className="text-red-600">*</span>
               </label>
               <select
                 id="unit"
                 name="unit"
                 value={selectedUnit}
                 onChange={(e) => setSelectedUnit(e.target.value as 'kg' | 'g')}
-                className="mt-1 block w-full rounded-md border border-foreground/10 bg-background px-3 py-2"
+                className="block w-full rounded-md border-2 border-gray-300 bg-white px-3 py-2 focus:border-black focus:outline-none"
                 required
               >
                 <option value="kg">Kilogramme (kg)</option>
@@ -400,21 +408,21 @@ export default function AdminEditProductPage({ params }: PageProps) {
 
           {/* Type de produit */}
           <div>
-            <label className="block text-sm font-medium text-custom-title mb-2">
-              Type de produit <span className="text-custom-accent">*</span>
+            <label className="block text-sm font-semibold text-black mb-3">
+              Type de produit <span className="text-red-600">*</span>
             </label>
             <div className="grid grid-cols-2 gap-4">
               {Object.values(ProductType).map((type) => (
-                <label key={type} className="flex items-center space-x-2">
+                <label key={type} className="flex items-center space-x-3 p-3 border-2 border-gray-300 rounded-md hover:border-black cursor-pointer transition-colors">
                   <input
                     type="radio"
                     name="type"
                     value={type}
                     defaultChecked={product.type === type}
-                    className="border-foreground/10 text-custom-accent focus:ring-custom-accent"
+                    className="w-4 h-4 text-black border-gray-300 focus:ring-black"
                     required
                   />
-                  <span className="text-custom-text">{type}</span>
+                  <span className="text-black font-medium">{type}</span>
                 </label>
               ))}
             </div>
@@ -422,36 +430,36 @@ export default function AdminEditProductPage({ params }: PageProps) {
 
           {/* Catégories */}
           <div>
-            <label className="block text-sm font-medium text-custom-title mb-2">
-              Catégories <span className="text-custom-accent">*</span>
+            <label className="block text-sm font-semibold text-black mb-3">
+              Catégories <span className="text-red-600">*</span>
             </label>
             <div className={cn(
-              "grid grid-cols-2 gap-4 p-4 border rounded-md",
-              fieldErrors.categories ? "border-destructive" : "border-foreground/10"
+              "grid grid-cols-2 gap-4 p-4 border-2 rounded-md",
+              fieldErrors.categories ? "border-red-500" : "border-gray-300"
             )}>
               {categories.map((category) => (
-                <label key={category.id} className="flex items-center space-x-2">
+                <label key={category.id} className="flex items-center space-x-3">
                   <input
                     type="checkbox"
                     checked={selectedCategories.includes(category.id)}
                     onChange={() => handleCategoryChange(category.id)}
-                    className="border-foreground/10 text-custom-accent focus:ring-custom-accent rounded"
+                    className="w-4 h-4 text-black border-gray-300 rounded focus:ring-black"
                   />
-                  <span className="text-custom-text">{category.name}</span>
+                  <span className="text-black">{category.name}</span>
                 </label>
               ))}
             </div>
             {fieldErrors.categories && (
-              <p className="mt-1 text-sm text-destructive">Sélectionnez au moins une catégorie</p>
+              <p className="mt-1 text-sm text-red-600">Sélectionnez au moins une catégorie</p>
             )}
           </div>
 
           {/* Stock */}
           <div>
-            <label htmlFor="stock" className="block text-sm font-medium text-custom-title">
-              Stock <span className="text-custom-accent">*</span>
+            <label htmlFor="stock" className="block text-sm font-semibold text-black mb-2">
+              Stock <span className="text-red-600">*</span>
             </label>
-            <div className="relative mt-1">
+            <div className="relative">
               <input
                 type="number"
                 id="stock"
@@ -460,57 +468,57 @@ export default function AdminEditProductPage({ params }: PageProps) {
                 min="0"
                 step={selectedUnit === 'kg' ? "0.01" : "1"}
                 className={cn(
-                  "block w-full rounded-md border border-foreground/10 bg-background px-3 py-2 pr-12",
-                  fieldErrors.stock && "border-destructive"
+                  "block w-full rounded-md border-2 bg-white px-3 py-2 pr-12 focus:outline-none",
+                  fieldErrors.stock ? "border-red-500" : "border-gray-300 focus:border-black"
                 )}
                 required
               />
-              <div className="absolute inset-y-0 right-0 flex items-center px-3 pointer-events-none text-foreground/60">
+              <div className="absolute inset-y-0 right-0 flex items-center px-3 pointer-events-none text-gray-600 font-medium">
                 {selectedUnit}
               </div>
             </div>
             {fieldErrors.stock && (
-              <p className="mt-1 text-sm text-destructive">Le stock ne peut pas être négatif</p>
+              <p className="mt-1 text-sm text-red-600">Le stock ne peut pas être négatif</p>
             )}
           </div>
 
           {/* Disponibilité */}
           <div>
-            <label className="block text-sm font-medium text-custom-title mb-2">
+            <label className="block text-sm font-semibold text-black mb-3">
               Disponibilité
             </label>
-            <div className="flex items-center gap-4">
-              <label className="flex items-center gap-2">
+            <div className="flex items-center gap-6">
+              <label className="flex items-center gap-3 p-3 border-2 border-gray-300 rounded-md hover:border-black cursor-pointer transition-colors">
                 <input
                   type="radio"
                   name="available"
                   value="true"
                   defaultChecked={product.available}
-                  className="border-foreground/10 text-custom-accent focus:ring-custom-accent"
+                  className="w-4 h-4 text-black border-gray-300 focus:ring-black"
                 />
-                <span>Disponible</span>
+                <span className="text-black font-medium">Disponible</span>
               </label>
-              <label className="flex items-center gap-2">
+              <label className="flex items-center gap-3 p-3 border-2 border-gray-300 rounded-md hover:border-black cursor-pointer transition-colors">
                 <input
                   type="radio"
                   name="available"
                   value="false"
                   defaultChecked={!product.available}
-                  className="border-foreground/10 text-custom-accent focus:ring-custom-accent"
+                  className="w-4 h-4 text-black border-gray-300 focus:ring-black"
                 />
-                <span>Indisponible</span>
+                <span className="text-black font-medium">Indisponible</span>
               </label>
             </div>
           </div>
 
           {/* Image */}
           <div>
-            <label className="block text-sm font-medium text-custom-title mb-2">
+            <label className="block text-sm font-semibold text-black mb-3">
               Image du produit
             </label>
-            <div className="mb-4">
+            <div className="space-y-4">
               {currentImage && (
-                <div className="mb-4 relative w-32 h-32 overflow-hidden rounded-md border border-foreground/10">
+                <div className="relative w-32 h-32 overflow-hidden rounded-md border-2 border-gray-300">
                   <img
                     ref={imageRef}
                     src={currentImage}
@@ -527,14 +535,18 @@ export default function AdminEditProductPage({ params }: PageProps) {
           </div>
 
           {/* Boutons */}
-          <div className="flex gap-4">
-            <LoadingButton type="submit" isLoading={isLoading}>
+          <div className="flex gap-4 pt-4 border-t-2 border-gray-200">
+            <LoadingButton 
+              type="submit" 
+              isLoading={isLoading}
+              className="bg-black text-white hover:bg-gray-800 border-2 border-black px-6 py-2 rounded-md font-semibold"
+            >
               Mettre à jour le produit
             </LoadingButton>
             <button
               type="button"
               onClick={() => router.back()}
-              className="px-4 py-2 border border-foreground/10 rounded-md hover:bg-foreground/5 transition-colors text-custom-text"
+              className="px-6 py-2 border-2 border-black rounded-md hover:bg-gray-100 transition-colors text-black font-semibold"
             >
               Annuler
             </button>

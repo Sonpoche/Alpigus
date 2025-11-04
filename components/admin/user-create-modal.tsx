@@ -1,4 +1,4 @@
-// components/admin/user-create-modal.tsx
+// Chemin du fichier: components/admin/user-create-modal.tsx
 'use client'
 
 import { useState } from 'react'
@@ -41,7 +41,6 @@ export function UserCreateModal({ isOpen, onClose, onSubmit }: UserCreateModalPr
     const { name, value } = e.target
     setFormData(prev => ({ ...prev, [name]: value }))
     
-    // Clear error when field is edited
     if (errors[name]) {
       setErrors(prev => {
         const newErrors = { ...prev }
@@ -54,27 +53,22 @@ export function UserCreateModal({ isOpen, onClose, onSubmit }: UserCreateModalPr
   const validateForm = () => {
     const newErrors: Record<string, string> = {}
     
-    // Email obligatoire
     if (!formData.email) {
       newErrors.email = "L'email est requis"
     } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
       newErrors.email = "Format d'email invalide"
     }
     
-    // Téléphone OBLIGATOIRE - Format international flexible
     if (!formData.phone || formData.phone.trim() === '') {
       newErrors.phone = "Le téléphone est requis"
     } else {
       const phone = formData.phone.trim()
-      // Validation très permissive - accepte tous formats avec ou sans indicatif
-      // Minimum 6 chiffres, maximum 20, accepte +, espaces, tirets, parenthèses
       const phoneRegex = /^[\+]?[0-9\s\-\(\)]{6,20}$/
       if (!phoneRegex.test(phone)) {
         newErrors.phone = "Format de téléphone invalide"
       }
     }
     
-    // Rôle obligatoire
     if (!formData.role) {
       newErrors.role = "Le rôle est requis"
     }
@@ -90,17 +84,15 @@ export function UserCreateModal({ isOpen, onClose, onSubmit }: UserCreateModalPr
     
     setIsSubmitting(true)
     try {
-      // Nettoyer les données avant envoi
       const cleanedData = {
         ...formData,
         name: formData.name?.trim() || null,
         email: formData.email?.trim(),
-        phone: formData.phone?.trim(), // Plus de fallback null - obligatoire
+        phone: formData.phone?.trim(),
       }
       
       await onSubmit(cleanedData)
       
-      // Reset du formulaire après succès
       setFormData({
         name: '',
         email: '',
@@ -110,7 +102,6 @@ export function UserCreateModal({ isOpen, onClose, onSubmit }: UserCreateModalPr
       setErrors({})
     } catch (error) {
       console.error('Erreur lors de la création:', error)
-      // L'erreur sera gérée par le composant parent
     } finally {
       setIsSubmitting(false)
     }
@@ -118,17 +109,17 @@ export function UserCreateModal({ isOpen, onClose, onSubmit }: UserCreateModalPr
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>Créer un nouvel utilisateur</DialogTitle>
-          <DialogDescription>
+      <DialogContent className="sm:max-w-md bg-white border-2 border-black rounded-lg">
+        <DialogHeader className="border-b-2 border-black pb-4">
+          <DialogTitle className="text-2xl font-bold text-black">Créer un nouvel utilisateur</DialogTitle>
+          <DialogDescription className="text-gray-600">
             Remplissez les informations pour créer un nouvel utilisateur dans le système.
           </DialogDescription>
         </DialogHeader>
         
         <form onSubmit={handleSubmit} className="space-y-4 pt-4">
           <div>
-            <label htmlFor="name" className="form-label">
+            <label htmlFor="name" className="block text-sm font-bold text-black mb-2">
               Nom (optionnel)
             </label>
             <input
@@ -137,14 +128,14 @@ export function UserCreateModal({ isOpen, onClose, onSubmit }: UserCreateModalPr
               type="text"
               value={formData.name || ''}
               onChange={handleChange}
-              className="form-input"
+              className="w-full px-4 py-2.5 border-2 border-gray-300 rounded-md focus:border-black focus:outline-none"
               placeholder="Nom complet"
             />
           </div>
           
           <div>
-            <label htmlFor="email" className="form-label">
-              Email <span className="text-destructive">*</span>
+            <label htmlFor="email" className="block text-sm font-bold text-black mb-2">
+              Email <span className="text-red-600">*</span>
             </label>
             <input
               id="email"
@@ -152,20 +143,20 @@ export function UserCreateModal({ isOpen, onClose, onSubmit }: UserCreateModalPr
               type="email"
               value={formData.email || ''}
               onChange={handleChange}
-              className={`form-input ${
-                errors.email ? 'border-destructive' : ''
+              className={`w-full px-4 py-2.5 border-2 rounded-md focus:outline-none ${
+                errors.email ? 'border-red-600 focus:border-red-600' : 'border-gray-300 focus:border-black'
               }`}
               placeholder="email@exemple.com"
               required
             />
             {errors.email && (
-              <p className="form-error">{errors.email}</p>
+              <p className="text-xs text-red-600 mt-1 font-medium">{errors.email}</p>
             )}
           </div>
           
           <div>
-            <label htmlFor="phone" className="form-label">
-              Téléphone <span className="text-destructive">*</span>
+            <label htmlFor="phone" className="block text-sm font-bold text-black mb-2">
+              Téléphone <span className="text-red-600">*</span>
             </label>
             <input
               id="phone"
@@ -173,30 +164,30 @@ export function UserCreateModal({ isOpen, onClose, onSubmit }: UserCreateModalPr
               type="tel"
               value={formData.phone || ''}
               onChange={handleChange}
-              className={`form-input ${
-                errors.phone ? 'border-destructive' : ''
+              className={`w-full px-4 py-2.5 border-2 rounded-md focus:outline-none ${
+                errors.phone ? 'border-red-600 focus:border-red-600' : 'border-gray-300 focus:border-black'
               }`}
               placeholder="+41791234567"
               required
             />
             {errors.phone && (
-              <p className="form-error">{errors.phone}</p>
+              <p className="text-xs text-red-600 mt-1 font-medium">{errors.phone}</p>
             )}
-            <p className="text-xs text-muted-foreground mt-1">
-              Tous formats acceptés : +41791234567 (Suisse), +33612345678 (France), +1234567890 (USA), etc.
+            <p className="text-xs text-gray-600 mt-1">
+              Tous formats acceptés : +41791234567 (Suisse), +33612345678 (France), etc.
             </p>
           </div>
           
           <div>
-            <label htmlFor="role" className="form-label">
-              Rôle <span className="text-destructive">*</span>
+            <label htmlFor="role" className="block text-sm font-bold text-black mb-2">
+              Rôle <span className="text-red-600">*</span>
             </label>
             <select
               id="role"
               name="role"
               value={formData.role}
               onChange={handleChange}
-              className="form-select"
+              className="w-full px-4 py-2.5 border-2 border-gray-300 rounded-md focus:border-black focus:outline-none bg-white"
               required
             >
               <option value="CLIENT">Client</option>
@@ -205,11 +196,19 @@ export function UserCreateModal({ isOpen, onClose, onSubmit }: UserCreateModalPr
             </select>
           </div>
           
-          <DialogFooter className="mt-6">
-            <Button type="button" variant="outline" onClick={onClose}>
+          <DialogFooter className="mt-6 flex gap-3 pt-4 border-t-2 border-gray-200">
+            <button 
+              type="button" 
+              onClick={onClose}
+              className="flex-1 px-4 py-2.5 border-2 border-black rounded-md hover:bg-gray-100 transition-colors font-semibold"
+            >
               Annuler
-            </Button>
-            <LoadingButton type="submit" isLoading={isSubmitting}>
+            </button>
+            <LoadingButton 
+              type="submit" 
+              isLoading={isSubmitting}
+              className="flex-1 bg-black text-white hover:bg-gray-800 border-2 border-black px-4 py-2.5 rounded-md font-semibold"
+            >
               Créer l'utilisateur
             </LoadingButton>
           </DialogFooter>

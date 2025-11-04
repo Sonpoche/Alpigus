@@ -1,4 +1,4 @@
-// Chemin du fichier: components/layout/header.tsx (Protected)
+// Chemin du fichier: components/layout/header.tsx
 'use client'
 
 import Link from 'next/link'
@@ -28,11 +28,13 @@ const producerNavItems = [
 ]
 
 const adminNavItems = [
-  { href: '/tableau-de-bord', label: 'Tableau de bord' },
   { href: '/admin', label: 'Administration' },
   { href: '/admin/utilisateurs', label: 'Utilisateurs' },
   { href: '/admin/produits', label: 'Produits' },
-  { href: '/admin/statistiques', label: 'Statistiques' },
+  { href: '/admin/categories', label: 'Catégories' },
+  { href: '/admin/portefeuilles', label: 'Portefeuilles' },
+  { href: '/admin/commandes/supervision', label: 'Supervision' },
+  { href: '/admin/stats', label: 'Statistiques' },
 ]
 
 export function Header() {
@@ -54,8 +56,10 @@ export function Header() {
   const navItems = getNavItems()
   
   const isActiveLink = (href: string) => {
-    if (href === '/tableau-de-bord') return pathname === '/tableau-de-bord'
-    return pathname === href || pathname.startsWith(`${href}/`)
+    if (href === '/tableau-de-bord' || href === '/admin') {
+      return pathname === href
+    }
+    return pathname.startsWith(href)
   }
 
   return (
@@ -65,8 +69,7 @@ export function Header() {
           <header className="border-t-2 border-b-2 border-black bg-white">
             <div className="flex h-12 items-center justify-between px-6">
               
-              {/* Logo Alpigus */}
-              <Link href="/tableau-de-bord" className="flex items-center">
+              <Link href={session?.user?.role === 'ADMIN' ? '/admin' : '/tableau-de-bord'} className="flex items-center">
                 <Image
                   src="/logo_alpigus.png"
                   alt="Alpigus"

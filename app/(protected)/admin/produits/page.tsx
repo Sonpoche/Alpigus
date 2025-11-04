@@ -1,4 +1,4 @@
-// app/(protected)/admin/products/page.tsx
+// Chemin du fichier: app/(protected)/admin/produits/page.tsx
 'use client'
 
 import { useState, useEffect } from 'react'
@@ -130,7 +130,7 @@ export default function AdminProductsPage() {
     try {
       setIsDeleting(true)
       
-      const response = await fetch(`/api/products/${selectedProductId}`, {
+      const response = await fetch(`/api/produits/${selectedProductId}`, {
         method: 'DELETE'
       })
       
@@ -162,7 +162,7 @@ export default function AdminProductsPage() {
 
   const handleUpdateAvailability = async (productId: string, newAvailability: boolean) => {
     try {
-      const response = await fetch(`/api/products/${productId}/availability`, {
+      const response = await fetch(`/api/produits/${productId}/availability`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ available: newAvailability })
@@ -216,37 +216,40 @@ export default function AdminProductsPage() {
 
   return (
     <div className="p-4 sm:p-6">
-      {/* En-tête responsive */}
-      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 mb-6">
-        <div>
-          <h1 className="text-xl sm:text-2xl font-bold">Gestion des produits</h1>
-          <p className="text-sm text-muted-foreground mt-1">
-            {totalProducts} produit{totalProducts > 1 ? 's' : ''} au total
-          </p>
+      {/* En-tête responsive - BOUTON MIS EN AVANT SUR MOBILE */}
+      <div className="mb-6 space-y-4">
+        <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3">
+          <div>
+            <h1 className="text-2xl md:text-3xl font-bold text-black">Gestion des produits</h1>
+            <p className="text-sm md:text-base text-gray-600 mt-1">
+              {totalProducts} produit{totalProducts > 1 ? 's' : ''} au total
+            </p>
+          </div>
         </div>
+        
+        {/* Bouton Ajouter - MIS EN AVANT */}
         <Link
-          href="/admin/products/new"
-          className="bg-custom-accent text-white px-4 py-2 rounded-md flex items-center justify-center gap-2 hover:opacity-90 transition-opacity text-sm sm:text-base"
+          href="/admin/produits/nouveau"
+          className="w-full sm:w-auto bg-black text-white hover:bg-gray-800 border-2 border-black px-6 py-3 rounded-md font-bold flex items-center justify-center gap-2 text-base shadow-lg transition-colors"
         >
-          <Plus className="h-4 w-4 sm:h-5 sm:w-5" /> 
-          <span className="hidden sm:inline">Ajouter un produit</span>
-          <span className="sm:hidden">Ajouter</span>
+          <Plus className="h-5 w-5" />
+          Ajouter un produit
         </Link>
       </div>
 
       {/* Filtres responsive */}
-      <div className="bg-background border border-foreground/10 rounded-lg p-4 mb-6">
-        <div className="space-y-4">
+      <div className="bg-white border-2 border-black rounded-lg p-4 mb-6">
+        <div className="space-y-3">
           {/* Barre de recherche */}
           <div className="w-full">
             <div className="relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-5 w-5" />
               <input
                 type="text"
                 placeholder="Rechercher un produit..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-10 pr-4 py-2 border border-foreground/10 rounded-md text-sm"
+                className="w-full pl-10 pr-4 py-2.5 border-2 border-gray-300 rounded-md focus:border-black focus:outline-none text-sm"
               />
             </div>
           </div>
@@ -254,37 +257,35 @@ export default function AdminProductsPage() {
           {/* Filtres en ligne sur desktop, empilés sur mobile */}
           <div className="flex flex-col sm:flex-row gap-3">
             {/* Filtre par type */}
-            <div className="relative flex-1 sm:flex-none sm:w-40">
+            <div className="relative flex-1">
               <select
                 value={typeFilter || ''}
                 onChange={(e) => setTypeFilter(e.target.value || null)}
-                className="w-full appearance-none border border-foreground/10 rounded-md px-3 py-2 pr-8 text-sm bg-background [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none [&::-ms-expand]:hidden"
-                style={{ backgroundImage: 'none' }}
+                className="w-full appearance-none border-2 border-gray-300 rounded-md px-4 py-2.5 pr-10 text-sm bg-white focus:border-black focus:outline-none"
               >
                 <option value="">Tous les types</option>
                 {Object.values(ProductType).map((type) => (
                   <option key={type} value={type}>{type}</option>
                 ))}
               </select>
-              <ChevronDown className="absolute right-2 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+              <ChevronDown className="absolute right-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-600 pointer-events-none" />
             </div>
             
             {/* Filtre par disponibilité */}
-            <div className="relative flex-1 sm:flex-none sm:w-44">
+            <div className="relative flex-1">
               <select
                 value={availabilityFilter === null ? '' : availabilityFilter}
                 onChange={(e) => {
                   const value = e.target.value;
                   setAvailabilityFilter(value === '' ? null : value);
                 }}
-                className="w-full appearance-none border border-foreground/10 rounded-md px-3 py-2 pr-8 text-sm bg-background [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none [&::-ms-expand]:hidden"
-                style={{ backgroundImage: 'none' }}
+                className="w-full appearance-none border-2 border-gray-300 rounded-md px-4 py-2.5 pr-10 text-sm bg-white focus:border-black focus:outline-none"
               >
                 <option value="">Toutes disponibilités</option>
                 <option value="true">Disponible</option>
                 <option value="false">Indisponible</option>
               </select>
-              <ChevronDown className="absolute right-2 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+              <ChevronDown className="absolute right-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-600 pointer-events-none" />
             </div>
             
             {/* Bouton reset */}
@@ -294,10 +295,10 @@ export default function AdminProductsPage() {
                 setAvailabilityFilter(null)
                 setSearchTerm('')
               }}
-              className="px-3 py-2 border border-foreground/10 rounded-md hover:bg-foreground/5 transition-colors flex items-center justify-center gap-2 text-sm"
+              className="w-full sm:w-auto px-4 py-2.5 border-2 border-gray-300 rounded-md hover:bg-gray-50 transition-colors flex items-center justify-center gap-2 text-sm font-semibold"
             >
-              <Filter className="h-4 w-4 text-muted-foreground" />
-              <span className="sm:hidden">Réinitialiser</span>
+              <Filter className="h-4 w-4" />
+              Réinitialiser
             </button>
           </div>
         </div>
@@ -306,107 +307,107 @@ export default function AdminProductsPage() {
       {/* Liste des produits */}
       {isLoading ? (
         <div className="flex justify-center items-center min-h-[400px]">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-custom-accent" />
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-black" />
         </div>
       ) : filteredProducts.length > 0 ? (
         <>
           {/* Version mobile - Cards */}
           <div className="lg:hidden space-y-4 mb-6">
             {filteredProducts.map((product) => (
-              <div key={product.id} className="bg-background border border-foreground/10 rounded-lg p-4">
+              <div key={product.id} className="bg-white border-2 border-black rounded-lg p-4">
                 <div className="flex items-start gap-3 mb-3">
-                  <div className="w-12 h-12 rounded-md overflow-hidden bg-foreground/5 flex-shrink-0">
+                  <div className="w-12 h-12 rounded-md overflow-hidden bg-gray-100 border-2 border-gray-200 flex-shrink-0">
                     {product.image ? (
                       <img src={product.image} alt={product.name} className="w-full h-full object-cover" />
                     ) : (
                       <div className="w-full h-full flex items-center justify-center">
-                        <Package className="h-6 w-6 text-foreground/50" />
+                        <Package className="h-6 w-6 text-gray-400" />
                       </div>
                     )}
                   </div>
                   <div className="flex-1 min-w-0">
-                    <h3 className="font-medium text-sm truncate">{product.name}</h3>
-                    <p className="text-xs text-muted-foreground line-clamp-2">
+                    <h3 className="font-bold text-sm truncate text-black">{product.name}</h3>
+                    <p className="text-xs text-gray-600 line-clamp-2">
                       {product.description || 'Aucune description'}
                     </p>
                   </div>
                   <div className="flex-shrink-0">
                     {product.available ? (
-                      <Badge variant="secondary" className="bg-green-100 text-green-800 border-green-200 text-xs">
+                      <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-bold bg-green-100 text-green-800 border-2 border-green-500">
                         Disponible
-                      </Badge>
+                      </span>
                     ) : (
-                      <Badge variant="secondary" className="bg-gray-100 text-gray-800 border-gray-200 text-xs">
+                      <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-bold bg-gray-100 text-gray-800 border-2 border-gray-500">
                         Indisponible
-                      </Badge>
+                      </span>
                     )}
                   </div>
                 </div>
                 
                 <div className="grid grid-cols-2 gap-3 mb-3">
                   <div className="flex items-center gap-2">
-                    <DollarSign className="h-4 w-4 text-muted-foreground" />
+                    <DollarSign className="h-4 w-4 text-gray-600" />
                     <div>
-                      <p className="text-sm font-medium">{product.price.toFixed(2)} CHF</p>
-                      <p className="text-xs text-muted-foreground">par {product.unit}</p>
+                      <p className="text-sm font-bold text-black">{product.price.toFixed(2)} CHF</p>
+                      <p className="text-xs text-gray-600">par {product.unit}</p>
                     </div>
                   </div>
                   
                   <div className="flex items-center gap-2">
-                    <Box className="h-4 w-4 text-muted-foreground" />
+                    <Box className="h-4 w-4 text-gray-600" />
                     <div>
-                      <p className="text-sm">
+                      <p className="text-sm font-bold text-black">
                         {product.stock ? `${product.stock.quantity.toFixed(2)} ${product.unit}` : 'N/A'}
                       </p>
-                      <p className="text-xs text-muted-foreground">Stock</p>
+                      <p className="text-xs text-gray-600">Stock</p>
                     </div>
                   </div>
                 </div>
                 
                 <div className="flex items-center gap-2 mb-3">
-                  <Building className="h-4 w-4 text-muted-foreground" />
+                  <Building className="h-4 w-4 text-gray-600" />
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm truncate">{product.producer.companyName || product.producer.user.name}</p>
-                    <p className="text-xs text-muted-foreground truncate">{product.producer.user.email}</p>
+                    <p className="text-sm font-semibold text-black truncate">{product.producer.companyName || product.producer.user.name}</p>
+                    <p className="text-xs text-gray-600 truncate">{product.producer.user.email}</p>
                   </div>
                   {renderProductTypeIcon(product.type)}
                 </div>
                 
-                <div className="flex items-center justify-between pt-3 border-t border-foreground/10">
+                <div className="flex items-center justify-between pt-3 border-t-2 border-gray-200">
                   <div className="flex gap-1">
                     <Link
-                      href={`/products/${product.id}`}
-                      className="p-2 text-foreground/60 hover:text-custom-accent transition-colors"
+                      href={`/produits/${product.id}`}
+                      className="p-2 border-2 border-black rounded-md hover:bg-gray-100 transition-colors"
                       title="Voir"
                     >
-                      <Eye className="h-4 w-4" />
+                      <Eye className="h-4 w-4 text-black" />
                     </Link>
                     <Link
-                      href={`/admin/products/${product.id}/edit`}
-                      className="p-2 text-foreground/60 hover:text-custom-accent transition-colors"
+                      href={`/admin/produits/${product.id}/modifier`}
+                      className="p-2 border-2 border-black rounded-md hover:bg-gray-100 transition-colors"
                       title="Modifier"
                     >
-                      <Edit className="h-4 w-4" />
+                      <Edit className="h-4 w-4 text-black" />
                     </Link>
                     <button
                       onClick={() => {
                         setSelectedProductId(product.id)
                         setIsDeleteModalOpen(true)
                       }}
-                      className="p-2 text-foreground/60 hover:text-destructive transition-colors"
+                      className="p-2 border-2 border-red-600 rounded-md hover:bg-red-50 transition-colors"
                       title="Supprimer"
                     >
-                      <Trash2 className="h-4 w-4" />
+                      <Trash2 className="h-4 w-4 text-red-600" />
                     </button>
                   </div>
                   
                   <button
                     onClick={() => handleUpdateAvailability(product.id, !product.available)}
                     className={cn(
-                      "px-3 py-1.5 rounded-md text-xs font-medium transition-colors",
+                      "px-3 py-1.5 rounded-md text-xs font-bold transition-colors border-2",
                       product.available 
-                        ? "bg-red-100 text-red-800 hover:bg-red-200" 
-                        : "bg-green-100 text-green-800 hover:bg-green-200"
+                        ? "bg-red-100 text-red-800 border-red-500 hover:bg-red-200" 
+                        : "bg-green-100 text-green-800 border-green-500 hover:bg-green-200"
                     )}
                   >
                     {product.available ? "Désactiver" : "Activer"}
@@ -417,108 +418,108 @@ export default function AdminProductsPage() {
           </div>
           
           {/* Version desktop - Tableau */}
-          <div className="hidden lg:block bg-background border border-foreground/10 rounded-lg overflow-hidden">
+          <div className="hidden lg:block bg-white border-2 border-black rounded-lg overflow-hidden">
             <div className="overflow-x-auto">
               <table className="w-full">
                 <thead>
-                  <tr className="bg-foreground/5">
-                    <th className="py-3 px-4 text-left text-sm font-medium">Produit</th>
-                    <th className="py-3 px-4 text-left text-sm font-medium">Type</th>
-                    <th className="py-3 px-4 text-left text-sm font-medium">Prix</th>
-                    <th className="py-3 px-4 text-left text-sm font-medium">Stock</th>
-                    <th className="py-3 px-4 text-left text-sm font-medium">Producteur</th>
-                    <th className="py-3 px-4 text-center text-sm font-medium">Statut</th>
-                    <th className="py-3 px-4 text-right text-sm font-medium">Actions</th>
+                  <tr className="border-b-2 border-black bg-gray-50">
+                    <th className="py-4 px-6 text-left text-sm font-bold text-black">Produit</th>
+                    <th className="py-4 px-6 text-left text-sm font-bold text-black">Type</th>
+                    <th className="py-4 px-6 text-left text-sm font-bold text-black">Prix</th>
+                    <th className="py-4 px-6 text-left text-sm font-bold text-black">Stock</th>
+                    <th className="py-4 px-6 text-left text-sm font-bold text-black">Producteur</th>
+                    <th className="py-4 px-6 text-center text-sm font-bold text-black">Statut</th>
+                    <th className="py-4 px-6 text-right text-sm font-bold text-black">Actions</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-foreground/10">
+                <tbody className="divide-y divide-gray-200">
                   {filteredProducts.map((product) => (
-                    <tr key={product.id} className="hover:bg-foreground/5 transition-colors">
-                      <td className="py-3 px-4">
-                        <div className="flex items-center">
-                          <div className="w-10 h-10 rounded-md overflow-hidden bg-foreground/5 mr-3 flex-shrink-0">
+                    <tr key={product.id} className="hover:bg-gray-50 transition-colors">
+                      <td className="py-4 px-6">
+                        <div className="flex items-center gap-3">
+                          <div className="w-12 h-12 rounded-md overflow-hidden bg-gray-100 border-2 border-gray-200 flex-shrink-0">
                             {product.image ? (
                               <img src={product.image} alt={product.name} className="w-full h-full object-cover" />
                             ) : (
                               <div className="w-full h-full flex items-center justify-center">
-                                <Package className="h-5 w-5 text-foreground/50" />
+                                <Package className="h-6 w-6 text-gray-400" />
                               </div>
                             )}
                           </div>
                           <div className="min-w-0">
-                            <div className="font-medium">{product.name}</div>
-                            <div className="text-xs text-muted-foreground truncate max-w-[200px]">
+                            <div className="font-bold text-black">{product.name}</div>
+                            <div className="text-xs text-gray-600 truncate max-w-[200px]">
                               {product.description || 'Aucune description'}
                             </div>
                           </div>
                         </div>
                       </td>
-                      <td className="py-3 px-4">
+                      <td className="py-4 px-6">
                         {renderProductTypeIcon(product.type)}
                       </td>
-                      <td className="py-3 px-4">
+                      <td className="py-4 px-6 font-bold text-black">
                         {product.price.toFixed(2)} CHF
-                        <div className="text-xs text-muted-foreground">
+                        <div className="text-xs text-gray-600 font-normal">
                           par {product.unit}
                         </div>
                       </td>
-                      <td className="py-3 px-4">
+                      <td className="py-4 px-6 font-semibold text-black">
                         {product.stock ? (
                           <span>{product.stock.quantity.toFixed(2)} {product.unit}</span>
                         ) : (
-                          <span className="text-muted-foreground">N/A</span>
+                          <span className="text-gray-400">N/A</span>
                         )}
                       </td>
-                      <td className="py-3 px-4">
+                      <td className="py-4 px-6">
                         <div className="min-w-0">
-                          <div className="truncate">{product.producer.companyName || product.producer.user.name}</div>
-                          <div className="text-xs text-muted-foreground truncate">{product.producer.user.email}</div>
+                          <div className="truncate font-semibold text-black">{product.producer.companyName || product.producer.user.name}</div>
+                          <div className="text-xs text-gray-600 truncate">{product.producer.user.email}</div>
                         </div>
                       </td>
-                      <td className="py-3 px-4 text-center">
+                      <td className="py-4 px-6 text-center">
                         {product.available ? (
-                          <Badge variant="secondary" className="bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-300">
+                          <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-bold bg-green-100 text-green-800 border-2 border-green-500">
                             Disponible
-                          </Badge>
+                          </span>
                         ) : (
-                          <Badge variant="secondary" className="bg-gray-100 text-gray-800 dark:bg-gray-900/20 dark:text-gray-300">
+                          <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-bold bg-gray-100 text-gray-800 border-2 border-gray-500">
                             Indisponible
-                          </Badge>
+                          </span>
                         )}
                       </td>
-                      <td className="py-3 px-4">
+                      <td className="py-4 px-6">
                         <div className="flex items-center justify-end gap-2">
                           <Link
-                            href={`/products/${product.id}`}
-                            className="p-2 text-foreground/60 hover:text-custom-accent transition-colors"
+                            href={`/produits/${product.id}`}
+                            className="p-2 border-2 border-black rounded-md hover:bg-gray-100 transition-colors"
                             title="Voir le produit"
                           >
-                            <Eye className="h-4 w-4" />
+                            <Eye className="h-4 w-4 text-black" />
                           </Link>
                           <Link
-                            href={`/admin/products/${product.id}/edit`}
-                            className="p-2 text-foreground/60 hover:text-custom-accent transition-colors"
+                            href={`/admin/produits/${product.id}/modifier`}
+                            className="p-2 border-2 border-black rounded-md hover:bg-gray-100 transition-colors"
                             title="Modifier"
                           >
-                            <Edit className="h-4 w-4" />
+                            <Edit className="h-4 w-4 text-black" />
                           </Link>
                           <button
                             onClick={() => {
                               setSelectedProductId(product.id)
                               setIsDeleteModalOpen(true)
                             }}
-                            className="p-2 text-foreground/60 hover:text-destructive transition-colors"
+                            className="p-2 border-2 border-red-600 rounded-md hover:bg-red-50 transition-colors"
                             title="Supprimer"
                           >
-                            <Trash2 className="h-4 w-4" />
+                            <Trash2 className="h-4 w-4 text-red-600" />
                           </button>
                           <button
                             onClick={() => handleUpdateAvailability(product.id, !product.available)}
                             className={cn(
-                              "p-2 transition-colors",
+                              "p-2 border-2 rounded-md transition-colors",
                               product.available 
-                                ? "text-green-600 hover:text-gray-500" 
-                                : "text-gray-500 hover:text-green-600"
+                                ? "text-red-600 border-red-600 hover:bg-red-50" 
+                                : "text-green-600 border-green-600 hover:bg-green-50"
                             )}
                             title={product.available ? "Marquer comme indisponible" : "Marquer comme disponible"}
                           >
@@ -539,21 +540,20 @@ export default function AdminProductsPage() {
           
           {/* Pagination responsive */}
           {totalPages > 1 && (
-            <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 px-4 py-3 bg-background border border-foreground/10 rounded-lg mt-4">
-              <div className="text-xs sm:text-sm text-muted-foreground text-center sm:text-left">
+            <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 px-4 py-4 bg-white border-2 border-black rounded-lg mt-6">
+              <div className="text-xs sm:text-sm text-gray-600 text-center sm:text-left">
                 Affichage de {(currentPage - 1) * productsPerPage + 1} à {Math.min(currentPage * productsPerPage, totalProducts)} sur {totalProducts} produits
               </div>
-              <div className="flex justify-center gap-1">
+              <div className="flex justify-center gap-2">
                 <button
                   onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
                   disabled={currentPage === 1}
-                  className="px-2 sm:px-3 py-1 rounded-md border border-foreground/10 disabled:opacity-50 text-xs sm:text-sm"
+                  className="px-3 md:px-4 py-2 border-2 border-black rounded-md hover:bg-gray-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-semibold text-xs md:text-sm"
                 >
-                  <span className="hidden sm:inline">Précédent</span>
-                  <span className="sm:hidden">Préc.</span>
+                  Précédent
                 </button>
                 
-                {/* Pages - montrer moins sur mobile */}
+                {/* Pages */}
                 {Array.from({ length: Math.min(totalPages, 5) }, (_, i) => {
                   let page: number;
                   if (totalPages <= 5) {
@@ -571,10 +571,10 @@ export default function AdminProductsPage() {
                       key={page}
                       onClick={() => setCurrentPage(page)}
                       className={cn(
-                        "px-2 sm:px-3 py-1 rounded-md text-xs sm:text-sm",
+                        "px-3 py-2 rounded-md text-xs md:text-sm font-semibold transition-colors",
                         currentPage === page
-                          ? "bg-custom-accent text-white"
-                          : "border border-foreground/10 hover:bg-foreground/5"
+                          ? "bg-black text-white"
+                          : "border-2 border-black hover:bg-gray-100"
                       )}
                     >
                       {page}
@@ -585,28 +585,28 @@ export default function AdminProductsPage() {
                 <button
                   onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
                   disabled={currentPage === totalPages}
-                  className="px-2 sm:px-3 py-1 rounded-md border border-foreground/10 disabled:opacity-50 text-xs sm:text-sm"
+                  className="px-3 md:px-4 py-2 bg-black text-white border-2 border-black rounded-md hover:bg-gray-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-semibold text-xs md:text-sm"
                 >
-                  <span className="hidden sm:inline">Suivant</span>
-                  <span className="sm:hidden">Suiv.</span>
+                  Suivant
                 </button>
               </div>
             </div>
           )}
         </>
       ) : (
-        <div className="bg-background border border-foreground/10 rounded-lg p-8 text-center">
-          <Package className="h-12 sm:h-16 w-12 sm:w-16 mx-auto text-muted-foreground mb-4" />
-          <h2 className="text-lg sm:text-xl font-semibold mb-2">Aucun produit trouvé</h2>
-          <p className="text-sm sm:text-base text-muted-foreground mb-6">
+        <div className="bg-white border-2 border-black rounded-lg p-8 md:p-12 text-center">
+          <Package className="h-12 md:h-16 w-12 md:w-16 mx-auto text-gray-400 mb-4" />
+          <h2 className="text-lg md:text-xl font-bold text-black mb-2">Aucun produit trouvé</h2>
+          <p className="text-sm md:text-base text-gray-600 mb-6">
             {searchTerm || typeFilter || availabilityFilter !== null
               ? "Aucun produit ne correspond à vos critères de recherche."
               : "Aucun produit n'est disponible dans la plateforme."}
           </p>
           <Link
-            href="/admin/products/new"
-            className="bg-custom-accent text-white px-4 py-2 rounded-md hover:opacity-90 transition-opacity text-sm sm:text-base"
+            href="/admin/produits/nouveau"
+            className="inline-flex items-center justify-center gap-2 bg-black text-white hover:bg-gray-800 border-2 border-black px-6 py-3 rounded-md font-bold transition-colors"
           >
+            <Plus className="h-5 w-5" />
             Ajouter un produit
           </Link>
         </div>

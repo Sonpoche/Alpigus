@@ -1,5 +1,5 @@
-// app/admin/categories/page.tsx
-"use client"
+// Chemin du fichier: app/(protected)/admin/categories/page.tsx
+'use client'
 
 import CategoryManagement from '@/components/admin/category-management'
 

@@ -1,4 +1,4 @@
-// components/layout/user-menu.tsx
+// Chemin du fichier: components/layout/user-menu.tsx
 'use client'
 
 import { useSession, signOut } from 'next-auth/react'
@@ -28,8 +28,8 @@ export function UserMenu() {
   return (
     <DropdownMenu open={isOpen} onOpenChange={setIsOpen}>
       <DropdownMenuTrigger className="outline-none focus:ring-0">
-        {/* Avatar minimaliste - cercle avec initiales */}
-        <div className="w-8 h-8 rounded-full bg-foreground text-background flex items-center justify-center text-sm font-medium hover:bg-foreground/90 transition-colors">
+        {/* Avatar minimaliste - cercle avec initiales et bordure noire */}
+        <div className="w-8 h-8 rounded-full bg-white border-2 border-black text-black flex items-center justify-center text-sm font-medium hover:bg-gray-50 transition-colors">
           {session?.user?.image ? (
             <img
               src={session.user.image}
@@ -44,25 +44,25 @@ export function UserMenu() {
       
       <DropdownMenuContent 
         align="end" 
-        className="w-56 p-2"
+        className="w-56 p-2 bg-white border-2 border-black"
         sideOffset={8}
       >
         {/* Info utilisateur */}
-        <div className="px-2 py-3 border-b border-border">
-          <p className="text-sm font-medium text-foreground truncate">
+        <div className="px-2 py-3 border-b border-black">
+          <p className="text-sm font-medium text-black truncate">
             {session?.user?.name || 'Utilisateur'}
           </p>
-          <p className="text-xs text-muted-foreground truncate">
+          <p className="text-xs text-gray-600 truncate">
             {session?.user?.email || ''}
           </p>
-          <p className="text-xs text-muted-foreground mt-1">
+          <p className="text-xs text-gray-600 mt-1">
             {session?.user?.role || 'CLIENT'}
           </p>
         </div>
         
         {/* Actions */}
         <DropdownMenuItem 
-          className="cursor-pointer"
+          className="cursor-pointer hover:bg-gray-100 text-black"
           onClick={() => {
             setIsOpen(false)
             router.push('/profile')
@@ -73,7 +73,7 @@ export function UserMenu() {
         </DropdownMenuItem>
         
         <DropdownMenuItem 
-          className="cursor-pointer"
+          className="cursor-pointer hover:bg-gray-100 text-black"
           onClick={() => {
             setIsOpen(false)
             router.push('/dashboard')
@@ -84,7 +84,7 @@ export function UserMenu() {
         </DropdownMenuItem>
         
         <DropdownMenuItem
-          className="cursor-pointer"
+          className="cursor-pointer hover:bg-gray-100 text-black"
           onClick={() => {
             setIsOpen(false)
             router.push('/help')
@@ -94,10 +94,10 @@ export function UserMenu() {
           <span>Aide</span>
         </DropdownMenuItem>
         
-        <DropdownMenuSeparator />
+        <DropdownMenuSeparator className="bg-gray-300" />
         
         <DropdownMenuItem 
-          className="cursor-pointer text-muted-foreground hover:text-foreground focus:text-foreground"
+          className="cursor-pointer text-gray-600 hover:text-black hover:bg-gray-100"
           onClick={handleSignOut}
         >
           <LogOut className="mr-2 h-4 w-4" />
