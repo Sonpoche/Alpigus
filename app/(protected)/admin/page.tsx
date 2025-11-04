@@ -62,38 +62,43 @@ export default function AdminPage() {
   ]
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-8 p-4 md:p-8">
       <div>
-        <h1 className="text-3xl font-bold text-black">Administration</h1>
-        <p className="mt-2 text-gray-600">
+        <h1 className="text-2xl md:text-3xl font-bold text-black">Administration</h1>
+        <p className="mt-2 text-sm md:text-base text-gray-600">
           Gérez tous les aspects de la plateforme Alpigus
         </p>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
         {adminCards.map((card) => {
           const Icon = card.icon
           return (
             <Link
               key={card.href}
               href={card.href}
-              className="group relative bg-white border-2 border-black rounded-lg p-6 hover:shadow-lg transition-all duration-200 hover:-translate-y-1"
+              className="group relative bg-white border-2 border-black rounded-lg p-6 hover:shadow-lg transition-all duration-200 hover:-translate-y-1 flex flex-col h-full"
             >
-              <div className={`inline-flex p-3 rounded-lg border-2 ${card.color} mb-4`}>
+              {/* Icône */}
+              <div className={`inline-flex p-3 rounded-lg border-2 ${card.color} mb-4 self-start`}>
                 <Icon className="h-6 w-6" />
               </div>
               
-              <h2 className="text-xl font-semibold text-black mb-2 group-hover:text-gray-800">
-                {card.title}
-              </h2>
+              {/* Contenu principal qui prend l'espace disponible */}
+              <div className="flex-1 flex flex-col">
+                <h2 className="text-xl font-semibold text-black mb-2 group-hover:text-gray-800">
+                  {card.title}
+                </h2>
+                
+                <p className="text-gray-600 text-sm mb-4 flex-1">
+                  {card.description}
+                </p>
+              </div>
               
-              <p className="text-gray-600 text-sm mb-4">
-                {card.description}
-              </p>
-              
-              <div className="flex items-center justify-between">
-                <span className="text-sm text-gray-500">{card.stats}</span>
-                <div className="flex items-center text-black font-medium text-sm group-hover:gap-2 transition-all">
+              {/* Footer toujours en bas */}
+              <div className="flex items-center justify-between pt-4 border-t-2 border-gray-100 mt-auto">
+                <span className="text-sm text-gray-500 font-medium">{card.stats}</span>
+                <div className="flex items-center text-black font-bold text-sm group-hover:gap-2 transition-all">
                   <span>Accéder</span>
                   <span className="ml-1 group-hover:ml-2 transition-all">→</span>
                 </div>

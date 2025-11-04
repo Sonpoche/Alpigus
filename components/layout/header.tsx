@@ -3,9 +3,9 @@
 
 import Link from 'next/link'
 import Image from 'next/image'
-import { useSession } from 'next-auth/react'
-import { usePathname } from 'next/navigation'
-import { Menu, X } from 'lucide-react'
+import { useSession, signOut } from 'next-auth/react'
+import { usePathname, useRouter } from 'next/navigation'
+import { Menu, X, User, Home, LogOut } from 'lucide-react'
 import { useState } from 'react'
 import { UserMenu } from './user-menu'
 import { motion, AnimatePresence } from 'framer-motion'
@@ -40,6 +40,7 @@ const adminNavItems = [
 export function Header() {
   const { data: session } = useSession()
   const pathname = usePathname()
+  const router = useRouter()
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
   
   const getNavItems = () => {
@@ -60,6 +61,11 @@ export function Header() {
       return pathname === href
     }
     return pathname.startsWith(href)
+  }
+
+  const handleSignOut = async () => {
+    setIsMobileMenuOpen(false)
+    await signOut({ callbackUrl: '/' })
   }
 
   return (
@@ -146,9 +152,9 @@ export function Header() {
               animate={{ x: 0 }}
               exit={{ x: '100%' }}
               transition={{ type: 'spring', damping: 20 }}
-              className="fixed right-0 top-0 h-full w-3/4 max-w-sm bg-white z-50 lg:hidden"
+              className="fixed right-0 top-0 h-full w-3/4 max-w-sm bg-white z-50 lg:hidden overflow-y-auto"
             >
-              <div className="flex items-center justify-between p-6 border-b border-black">
+              <div className="flex items-center justify-between p-6 border-b-2 border-black">
                 <Image
                   src="/logo_alpigus.png"
                   alt="Alpigus"
@@ -165,15 +171,16 @@ export function Header() {
               </div>
 
               <nav className="p-6">
-                <ul className="space-y-6">
+                {/* Navigation principale */}
+                <ul className="space-y-4">
                   {navItems.map((item) => (
                     <li key={item.href}>
                       <Link
                         href={item.href}
                         className={cn(
-                          "block text-lg transition-opacity duration-200",
+                          "block text-base py-2 transition-opacity duration-200",
                           isActiveLink(item.href)
-                            ? 'text-black font-semibold'
+                            ? 'text-black font-bold'
                             : 'text-black font-normal hover:opacity-60'
                         )}
                         onClick={() => setIsMobileMenuOpen(false)}
@@ -184,23 +191,51 @@ export function Header() {
                   ))}
                 </ul>
 
-                <div className="mt-8 pt-8 border-t border-gray-200">
+                {/* Section utilisateur */}
+                <div className="mt-8 pt-8 border-t-2 border-gray-200">
                   {session ? (
-                    <div className="text-black">
-                      <p className="text-sm text-gray-600 mb-2">Connecté en tant que</p>
-                      <p className="font-medium">{session.user?.email}</p>
-                      <Link
-                        href="/compte"
-                        className="block mt-4 text-black hover:opacity-60 transition-opacity"
-                        onClick={() => setIsMobileMenuOpen(false)}
-                      >
-                        Mon compte
-                      </Link>
+                    <div className="space-y-4">
+                      <div className="pb-4 border-b border-gray-200">
+                        <p className="text-xs text-gray-500 mb-1">Connecté en tant que</p>
+                        <p className="font-bold text-black text-sm">{session.user?.email}</p>
+                      </div>
+
+                      {/* Menu utilisateur mobile */}
+                      <div className="space-y-3">
+                        {/* Accueil du site */}
+                        <Link
+                          href="/"
+                          className="flex items-center gap-3 py-2 text-black hover:opacity-60 transition-opacity"
+                          onClick={() => setIsMobileMenuOpen(false)}
+                        >
+                          <Home className="h-5 w-5" />
+                          <span className="font-medium">Accueil du site</span>
+                        </Link>
+
+                        {/* Mon profil */}
+                        <Link
+                          href="/profil"
+                          className="flex items-center gap-3 py-2 text-black hover:opacity-60 transition-opacity"
+                          onClick={() => setIsMobileMenuOpen(false)}
+                        >
+                          <User className="h-5 w-5" />
+                          <span className="font-medium">Mon profil</span>
+                        </Link>
+
+                        {/* Déconnexion */}
+                        <button
+                          onClick={handleSignOut}
+                          className="flex items-center gap-3 py-2 text-red-600 hover:opacity-60 transition-opacity w-full text-left"
+                        >
+                          <LogOut className="h-5 w-5" />
+                          <span className="font-medium">Déconnexion</span>
+                        </button>
+                      </div>
                     </div>
                   ) : (
                     <Link
                       href="/connexion"
-                      className="block text-lg text-black font-normal hover:opacity-60 transition-opacity"
+                      className="block text-base text-black font-normal hover:opacity-60 transition-opacity py-2"
                       onClick={() => setIsMobileMenuOpen(false)}
                     >
                       Se connecter
