@@ -1,4 +1,4 @@
-// app/(protected)/producer/orders/page.tsx
+// app/(protected)/producteur/commandes/page.tsx
 'use client'
 
 import { useState, useEffect } from 'react'
@@ -40,13 +40,11 @@ export default function ProducerOrdersPage() {
   const [isDetailOpen, setIsDetailOpen] = useState(false)
   const [isUpdating, setIsUpdating] = useState(false)
 
-  // Charger les commandes du producteur
   useEffect(() => {
     const fetchOrders = async () => {
       try {
         setIsLoading(true)
         
-        // Construction de l'URL avec les filtres
         const url = new URL('/api/orders/producer', window.location.origin)
         if (activeStatus) {
           url.searchParams.set('status', activeStatus)
@@ -60,7 +58,6 @@ export default function ProducerOrdersPage() {
         
         const data = await response.json()
         
-        // Trier les commandes par date (plus récentes en premier)
         const sortedOrders = data.sort((a: Order, b: Order) => {
           return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
         })
@@ -81,7 +78,6 @@ export default function ProducerOrdersPage() {
     fetchOrders()
   }, [activeStatus, toast])
 
-  // Vérifier les paramètres d'URL pour ouvrir automatiquement une modal
   useEffect(() => {
     if (!isLoading && orders.length > 0) {
       const params = new URLSearchParams(window.location.search);
@@ -97,12 +93,10 @@ export default function ProducerOrdersPage() {
     }
   }, [orders, isLoading]);
 
-  // Mettre à jour le statut d'une commande avec événements
   const handleUpdateStatus = async (orderId: string, newStatus: OrderStatus) => {
     try {
       setIsUpdating(true)
       
-      // Garder l'ancien statut pour l'événement
       const currentOrder = orders.find(order => order.id === orderId)
       const oldStatus = currentOrder?.status
       
@@ -117,14 +111,12 @@ export default function ProducerOrdersPage() {
         throw new Error(errorText || 'Erreur lors de la mise à jour du statut')
       }
       
-      // Mettre à jour l'état local
       setOrders(prevOrders => 
         prevOrders.map(order => 
           order.id === orderId ? { ...order, status: newStatus } : order
         )
       )
       
-      // Déclencher les événements de notification
       setTimeout(() => {
         window.dispatchEvent(new CustomEvent('order:status-changed', {
           detail: { 
@@ -161,7 +153,6 @@ export default function ProducerOrdersPage() {
     }
   }
 
-  // Obtenir le libellé du statut en français
   const getStatusLabel = (status: OrderStatus): string => {
     const statusLabels: Record<OrderStatus, string> = {
       [OrderStatus.DRAFT]: 'brouillon',
@@ -177,36 +168,27 @@ export default function ProducerOrdersPage() {
     return statusLabels[status] || status
   }
 
-  // Filtrer les commandes
   const filteredOrders = orders.filter(order => {
     if (!searchTerm) return true
     
     const searchLower = searchTerm.toLowerCase()
     
-    // Recherche par ID de commande
     if (order.id.toLowerCase().includes(searchLower)) return true
-    
-    // Recherche par nom du client
     if (order.user?.name?.toLowerCase().includes(searchLower)) return true
-    
-    // Recherche par email du client
     if (order.user?.email?.toLowerCase().includes(searchLower)) return true
     
-    // Recherche par nom de produit
     const hasMatchingProduct = order.items?.some(item => 
       item.product.name.toLowerCase().includes(searchLower)
     )
     
     if (hasMatchingProduct) return true
     
-    // Recherche par statut
     const statusLabel = getStatusLabel(order.status as OrderStatus)
     if (statusLabel.includes(searchLower)) return true
     
     return false
   })
 
-  // Gérer l'ouverture des détails de commande
   const handleViewDetails = (order: Order) => {
     setSelectedOrder(order)
     setIsDetailOpen(true)
@@ -214,63 +196,75 @@ export default function ProducerOrdersPage() {
 
   if (isLoading) {
     return (
-      <div className="flex justify-center items-center min-h-[400px]">
+      <div className="flex justify-center items-center min-h-screen">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-custom-accent" />
       </div>
     )
   }
 
   return (
-    <div className="container mx-auto p-6">
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold mb-2">Mes commandes</h1>
-        <p className="text-muted-foreground">
-          Gérez vos commandes et leur statut
-        </p>
+    <div className="min-h-screen bg-background p-4 sm:p-6 lg:p-8">
+      <div className="max-w-7xl mx-auto space-y-6 sm:space-y-8">
+        <div className="flex flex-col gap-4 sm:flex-row sm:justify-between sm:items-start">
+          <div>
+            <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold font-montserrat text-custom-title mb-2">
+              Mes Commandes
+            </h1>
+            <p className="text-sm sm:text-base text-muted-foreground">
+              Gérez vos commandes et suivez leur statut
+            </p>
+          </div>
+        </div>
+
+        <OrderStats orders={orders} />
+
+        <OrderFilterBar
+          searchTerm={searchTerm}
+          onSearchChange={setSearchTerm}
+          activeStatus={activeStatus}
+          onStatusChange={setActiveStatus}
+        />
+
+        {filteredOrders.length === 0 ? (
+          <EmptyOrdersView
+            searchTerm={searchTerm}
+            activeStatus={activeStatus}
+          />
+        ) : (
+          <div className="space-y-4">
+            <AnimatePresence>
+              {filteredOrders.map((order) => (
+                <motion.div
+                  key={order.id}
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -20 }}
+                >
+                  <OrderItem
+                    order={order}
+                    onViewDetails={handleViewDetails}
+                    onUpdateStatus={handleUpdateStatus}
+                    isUpdating={isUpdating}
+                  />
+                </motion.div>
+              ))}
+            </AnimatePresence>
+          </div>
+        )}
       </div>
 
-      {/* Statistiques */}
-      <OrderStats orders={orders} />
-
-      {/* Barre de filtres */}
-      <OrderFilterBar
-        searchTerm={searchTerm}
-        onSearchChange={setSearchTerm}
-        activeStatus={activeStatus}
-        onStatusChange={setActiveStatus}
-      />
-
-      {/* Liste des commandes */}
-      {filteredOrders.length === 0 ? (
-        <EmptyOrdersView searchTerm={searchTerm} activeStatus={activeStatus} />
-      ) : (
-        <div className="space-y-4">
-          <AnimatePresence>
-            {filteredOrders.map((order) => (
-              <OrderItem
-                key={order.id}
-                order={order}
-                onViewDetails={handleViewDetails}
-                onUpdateStatus={handleUpdateStatus}
-                isUpdating={isUpdating}
-              />
-            ))}
-          </AnimatePresence>
-        </div>
+      {selectedOrder && (
+        <OrderDetailModal
+          order={selectedOrder}
+          isOpen={isDetailOpen}
+          onClose={() => {
+            setIsDetailOpen(false)
+            setSelectedOrder(null)
+          }}
+          onUpdateStatus={handleUpdateStatus}
+          isUpdating={isUpdating}
+        />
       )}
-
-      {/* Modal de détail de commande */}
-      <AnimatePresence>
-        {selectedOrder && isDetailOpen && (
-          <OrderDetailModal
-            order={selectedOrder}
-            isOpen={isDetailOpen}
-            onClose={() => setIsDetailOpen(false)}
-            onUpdateStatus={handleUpdateStatus}
-            isUpdating={isUpdating}
-          />
-        )}
-      </AnimatePresence>
     </div>
   )
 }

@@ -1,4 +1,4 @@
-// app/(protected)/producer/[id]/edit/page.tsx
+// app/(protected)/producteur/[id]/modifier/page.tsx
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
@@ -76,7 +76,6 @@ export default function EditProductPage({ params }: PageProps) {
         setSelectedCategories(data.categories.map((c: { id: string }) => c.id))
         setCurrentImage(data.image)
         
-        // Gestion des images prédéfinies
         if (data.image) {
           const preset = PRESET_IMAGES.find(p => p.src === data.image)
           if (preset) {
@@ -162,7 +161,6 @@ export default function EditProductPage({ params }: PageProps) {
       const minOrderQuantityStr = formData.get('minOrderQuantity') as string || '0'
       const minOrderQuantity = parseToTwoDecimals(parseFloat(minOrderQuantityStr))
 
-      // Validations
       const errors: FieldErrors = {}
       let hasErrors = false
 
@@ -196,7 +194,6 @@ export default function EditProductPage({ params }: PageProps) {
         throw new Error('Veuillez remplir tous les champs requis correctement')
       }
 
-      // Mise à jour du produit
       const updateData = {
         name,
         description,
@@ -211,7 +208,6 @@ export default function EditProductPage({ params }: PageProps) {
         minOrderQuantity
       }
 
-      // Mettre à jour le produit principal
       const response = await fetch(`/api/products/${params.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
@@ -224,37 +220,27 @@ export default function EditProductPage({ params }: PageProps) {
 
       const updatedProduct = await response.json()
 
-      // Upload de l'image personnalisée si sélectionnée
       if (imageFile) {
         const imageFormData = new FormData()
-        imageFormData.append('image', imageFile)
-        
-        const uploadResponse = await fetch(`/api/products/${params.id}/image`, {
+        imageFormData.append('file', imageFile)
+        imageFormData.append('productId', updatedProduct.id)
+
+        const uploadResponse = await fetch('/api/upload', {
           method: 'POST',
           body: imageFormData
         })
 
         if (!uploadResponse.ok) {
-          throw new Error("Erreur lors de l'upload de l'image")
+          console.error('Erreur lors de l\'upload de l\'image')
         }
-
-        const productWithImage = await uploadResponse.json()
-        setProduct(productWithImage)
-        if (imageRef.current) {
-          imageRef.current.src = productWithImage.image
-        }
-      } else {
-        setProduct(updatedProduct)
       }
 
       toast({
         title: "Succès",
-        description: "Le produit a été mis à jour avec succès"
+        description: "Le produit a été mis à jour avec succès",
       })
 
-      router.push('/producer')
-      router.refresh()
-
+      router.push('/producteur')
     } catch (error: any) {
       toast({
         title: "Erreur",
@@ -275,12 +261,18 @@ export default function EditProductPage({ params }: PageProps) {
   }
 
   return (
-    <div className="min-h-screen p-6">
-      <div className="max-w-2xl mx-auto bg-background border border-foreground/10 rounded-lg p-6 shadow-sm">
-        <h1 className="text-2xl font-bold text-custom-title mb-6">Modifier le produit</h1>
+    <div className="min-h-screen bg-background p-4 sm:p-6 lg:p-8">
+      <div className="max-w-3xl mx-auto">
+        <div className="mb-6 sm:mb-8">
+          <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold font-montserrat text-custom-title mb-2">
+            Modifier le produit
+          </h1>
+          <p className="text-sm sm:text-base text-muted-foreground">
+            Mettez à jour les informations de votre produit
+          </p>
+        </div>
 
-        <form onSubmit={onSubmit} className="space-y-6">
-          {/* Nom */}
+        <form onSubmit={onSubmit} className="bg-background border border-foreground/10 rounded-lg p-6 shadow-sm space-y-6">
           <div>
             <label htmlFor="name" className="block text-sm font-medium text-custom-title">
               Nom du produit <span className="text-custom-accent">*</span>
@@ -298,7 +290,6 @@ export default function EditProductPage({ params }: PageProps) {
             />
           </div>
 
-          {/* Description */}
           <div>
             <label htmlFor="description" className="block text-sm font-medium text-custom-title">
               Description
@@ -306,43 +297,42 @@ export default function EditProductPage({ params }: PageProps) {
             <textarea
               id="description"
               name="description"
-              defaultValue={product.description}
               rows={4}
+              defaultValue={product.description}
               className="mt-1 block w-full rounded-md border border-foreground/10 bg-background px-3 py-2"
             />
           </div>
 
-          {/* Prix et Unité */}
-          <div className="grid grid-cols-2 gap-4">
-          <div>
-            <label htmlFor="price" className="block text-sm font-medium text-custom-title">
-              Prix par {selectedUnit} (CHF) <span className="text-custom-accent">*</span>
-            </label>
-            <input
-              type="number"
-              id="price"
-              name="price"
-              defaultValue={formatNumber(product.price)}
-              step="0.01"
-              min="0"
-              max="999999.99"
-              onChange={(e) => {
-                const formatted = formatInputValue(e.target.value)
-                e.target.value = formatted
-              }}
-              onBlur={(e) => {
-                if (e.target.value) {
-                  const parsed = parseToTwoDecimals(parseFloat(e.target.value))
-                  e.target.value = formatNumber(parsed)
-                }
-              }}
-              className={cn(
-                "mt-1 block w-full rounded-md border border-foreground/10 bg-background px-3 py-2",
-                fieldErrors.price && "border-destructive"
-              )}
-              required
-            />
-          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label htmlFor="price" className="block text-sm font-medium text-custom-title">
+                Prix (CHF) <span className="text-custom-accent">*</span>
+              </label>
+              <input
+                type="number"
+                id="price"
+                name="price"
+                defaultValue={formatNumber(product.price)}
+                min="0"
+                max="999999.99"
+                step="0.01"
+                onChange={(e) => {
+                  const formatted = formatInputValue(e.target.value)
+                  e.target.value = formatted
+                }}
+                onBlur={(e) => {
+                  if (e.target.value) {
+                    const parsed = parseToTwoDecimals(parseFloat(e.target.value))
+                    e.target.value = formatNumber(parsed)
+                  }
+                }}
+                className={cn(
+                  "mt-1 block w-full rounded-md border border-foreground/10 bg-background px-3 py-2",
+                  fieldErrors.price && "border-destructive"
+                )}
+                required
+              />
+            </div>
             <div>
               <label htmlFor="unit" className="block text-sm font-medium text-custom-title">
                 Unité <span className="text-custom-accent">*</span>
@@ -364,7 +354,6 @@ export default function EditProductPage({ params }: PageProps) {
             </div>
           </div>
 
-          {/* Type de produit */}
           <div>
             <label className="block text-sm font-medium text-custom-title mb-2">
               Type de produit <span className="text-custom-accent">*</span>
@@ -386,7 +375,6 @@ export default function EditProductPage({ params }: PageProps) {
             </div>
           </div>
 
-          {/* Catégories */}
           <div>
             <label className="block text-sm font-medium text-custom-title mb-2">
               Catégories <span className="text-custom-accent">*</span>
@@ -409,7 +397,6 @@ export default function EditProductPage({ params }: PageProps) {
             </div>
           </div>
 
-          {/* Stock */}
           <div>
             <label htmlFor="stock" className="block text-sm font-medium text-custom-title">
               Stock <span className="text-custom-accent">*</span>
@@ -445,7 +432,6 @@ export default function EditProductPage({ params }: PageProps) {
             </div>
           </div>
 
-          {/* Quantité minimale */}
           <div>
             <label htmlFor="minOrderQuantity" className="block text-sm font-medium text-custom-title">
               Quantité minimale de commande ({selectedUnit})
@@ -483,7 +469,6 @@ export default function EditProductPage({ params }: PageProps) {
             </p>
           </div>
 
-          {/* Paiement différé */}
           <div className="mt-4">
             <div className="flex items-center gap-2">
               <input
@@ -502,7 +487,6 @@ export default function EditProductPage({ params }: PageProps) {
             </p>
           </div>
 
-          {/* Disponibilité */}
           <div className="flex items-center gap-2">
             <input
               type="radio"
@@ -525,7 +509,6 @@ export default function EditProductPage({ params }: PageProps) {
             <label htmlFor="available-false" className="text-custom-text">Indisponible</label>
           </div>
 
-          {/* Image */}
           <div>
             <label className="block text-sm font-medium text-custom-title mb-2">
               Image du produit
@@ -535,12 +518,10 @@ export default function EditProductPage({ params }: PageProps) {
               selectedPreset={selectedPreset}
               className="mb-4"
             />
-            
           </div>
 
-          {/* Boutons */}
-          <div className="flex gap-4">
-            <LoadingButton type="submit" isLoading={isLoading}>
+          <div className="flex flex-col sm:flex-row gap-4">
+            <LoadingButton type="submit" isLoading={isLoading} className="flex-1">
               Mettre à jour le produit
             </LoadingButton>
             <button

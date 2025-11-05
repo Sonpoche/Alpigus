@@ -12,7 +12,7 @@ import { cn, containerClasses, gridClasses, cardClasses, spacingClasses } from '
 import SlotsCalendar from '@/components/ui/slots-calendar'
 import { UserRole, ProductType } from '@prisma/client'
 import { motion } from 'framer-motion'
-import { formatNumber } from '@/lib/number-utils' // Ajout de l'import
+import { formatNumber } from '@/lib/number-utils'
 
 interface Product {
   id: string
@@ -52,12 +52,10 @@ export default function DeliverySlotsOverview() {
   const [isLoading, setIsLoading] = useState(true)
   const [freshProductsWithoutSlots, setFreshProductsWithoutSlots] = useState<Product[]>([])
 
-  // Fonction pour formater une date en chaîne YYYY-MM-DD
   const formatDateToYYYYMMDD = (date: Date): string => {
     return format(date, 'yyyy-MM-dd');
   }
 
-  // Fonction pour vérifier si une date est aujourd'hui ou dans le futur (ignorant l'heure)
   const isDateTodayOrFuture = (date: Date): boolean => {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
@@ -68,7 +66,6 @@ export default function DeliverySlotsOverview() {
     return checkDate >= today;
   }
 
-  // Fonction pour vérifier si une date est antérieure à la date d'aujourd'hui (sans considérer l'heure)
   const isDateBeforeToday = (date: Date) => {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
@@ -82,23 +79,18 @@ export default function DeliverySlotsOverview() {
       if (!session?.user?.id) return;
     
       try {
-        // Nettoyer les créneaux expirés avant de charger les données
         await fetch('/api/delivery-slots/cleanup', { method: 'POST' });
 
-        // Récupérer d'abord les produits du producteur
         const productsResponse = await fetch('/api/products');
         if (!productsResponse.ok) throw new Error('Erreur lors du chargement des produits');
         const productsData = await productsResponse.json();
         
-        // On prend tous les produits car l'API est déjà filtrée côté serveur
         const producerProducts = productsData.products as Product[];
         
-        // Charger les créneaux du producteur
         const slotsResponse = await fetch('/api/delivery-slots');
         if (!slotsResponse.ok) throw new Error('Erreur lors du chargement des créneaux');
         const slotsData = await slotsResponse.json();
         
-        // Convertir toutes les dates en objets Date
         const formattedSlots = slotsData.slots.map((slot: any) => ({
           ...slot,
           date: new Date(slot.date)
@@ -106,7 +98,6 @@ export default function DeliverySlotsOverview() {
         
         setSlots(formattedSlots);
     
-        // Grouper les créneaux par date
         const grouped = formattedSlots.reduce((acc: GroupedSlots, slot: DeliverySlot) => {
           const dateStr = formatDateToYYYYMMDD(slot.date);
           if (!acc[dateStr]) {
@@ -118,7 +109,6 @@ export default function DeliverySlotsOverview() {
         
         setGroupedSlots(grouped);
         
-        // Créer un dictionnaire de produits avec leurs créneaux
         const productsWithSlotsMap = producerProducts.reduce<Record<string, Product>>((acc, product) => {
           acc[product.id] = {
             ...product,
@@ -127,7 +117,6 @@ export default function DeliverySlotsOverview() {
           return acc;
         }, {});
         
-        // Associer les créneaux à leurs produits respectifs
         formattedSlots.forEach((slot: DeliverySlot) => {
           if (productsWithSlotsMap[slot.productId]) {
             if (!productsWithSlotsMap[slot.productId].deliverySlots) {
@@ -137,71 +126,59 @@ export default function DeliverySlotsOverview() {
           }
         });
         
-        // Convertir le dictionnaire en tableau
         const productsWithSlots = Object.values(productsWithSlotsMap);
         setProducts(productsWithSlots);
         
-        // Filtrer les produits frais sans créneaux valides (présents ou futurs)
         const productsWithoutValidSlots = productsWithSlots.filter((product: Product) => {
-          // Si ce n'est pas un produit frais, on l'ignore
           if (product.type !== ProductType.FRESH) return false;
           
-          // Vérifier si le produit a des créneaux valides (aujourd'hui ou ultérieurs)
           const hasValidSlots = product.deliverySlots?.some(slot => 
             isDateTodayOrFuture(slot.date)
           );
           
-          // Si le produit n'a pas de créneaux valides, on le garde dans la liste
           return !hasValidSlots;
         });
         
         setFreshProductsWithoutSlots(productsWithoutValidSlots);
         
         console.log("Produits frais sans créneaux valides:", productsWithoutValidSlots.map(p => p.name));
-        console.log("Tous les créneaux:", formattedSlots);
-    
+        
       } catch (error) {
-        console.error("Erreur:", error);
+        console.error('Erreur:', error);
         toast({
           title: "Erreur",
-          description: "Impossible de charger les créneaux de livraison",
+          description: "Impossible de charger les données",
           variant: "destructive"
         });
       } finally {
         setIsLoading(false);
       }
     };
-
+    
     fetchData();
-  }, [session, toast]);
+  }, [session, toast, isDateTodayOrFuture]);
+
+  const selectedSlots = selectedDate 
+    ? groupedSlots[formatDateToYYYYMMDD(selectedDate)] || []
+    : [];
 
   const getDateStyle = (date: Date) => {
     const dateStr = formatDateToYYYYMMDD(date);
     const slotsForDate = groupedSlots[dateStr] || [];
     
-    if (slotsForDate.length === 0) return {};
-
-    if (selectedProduct) {
-      const hasSelectedProduct = slotsForDate.some(slot => slot.productId === selectedProduct);
-      if (!hasSelectedProduct) return {};
+    if (slotsForDate.length === 0) return { backgroundColor: 'transparent' };
+    
+    const totalCapacity = slotsForDate.reduce((sum, slot) => sum + slot.maxCapacity, 0);
+    const totalReserved = slotsForDate.reduce((sum, slot) => sum + slot.reserved, 0);
+    const availabilityRatio = totalReserved / totalCapacity;
+    
+    if (availabilityRatio < 0.33) {
+      return { backgroundColor: 'rgb(var(--custom-accent) / 0.2)' };
+    } else if (availabilityRatio < 0.66) {
+      return { backgroundColor: 'rgb(var(--custom-accent) / 0.5)' };
+    } else {
+      return { backgroundColor: 'rgb(var(--custom-accent) / 0.8)' };
     }
-
-    const totalCapacity = slotsForDate.reduce((acc, slot) => acc + slot.maxCapacity, 0);
-    const totalReserved = slotsForDate.reduce((acc, slot) => acc + slot.reserved, 0);
-    const occupancyRate = totalReserved / totalCapacity;
-
-    // Si la date est passée, on applique une opacité réduite
-    if (isDateBeforeToday(date)) {
-      return {
-        backgroundColor: 'rgb(var(--custom-accent))',
-        opacity: 0.3
-      };
-    }
-
-    return {
-      backgroundColor: 'rgb(var(--custom-accent))',
-      opacity: 0.1 + (occupancyRate * 0.6)
-    };
   }
 
   if (isLoading) {
@@ -209,43 +186,41 @@ export default function DeliverySlotsOverview() {
       <div className="flex justify-center items-center min-h-[400px]">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-custom-accent" />
       </div>
-    );
+    )
   }
 
-  const selectedDateStr = selectedDate ? formatDateToYYYYMMDD(selectedDate) : null;
-  const selectedSlots = selectedDateStr ? groupedSlots[selectedDateStr] || [] : [];
-
   return (
-    <div className={containerClasses("py-8")}>
-      {/* Alerte pour les produits frais sans créneaux */}
+    <div className={containerClasses()}>
       {freshProductsWithoutSlots.length > 0 && (
         <motion.div
-          initial={{ opacity: 0, y: -10 }}
+          initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="mb-6 p-4 bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-800 rounded-lg"
+          className="mb-6 sm:mb-8"
         >
-          <div className="flex items-start gap-3">
-            <AlertCircle className="h-5 w-5 text-orange-600 dark:text-orange-500 mt-0.5 flex-shrink-0" />
-            <div className="min-w-0 flex-1">
-              <h3 className="font-medium text-orange-800 dark:text-orange-200 text-sm sm:text-base">
-                Configuration des créneaux de livraison requise
-              </h3>
-              <p className="mt-1 text-xs sm:text-sm text-orange-700 dark:text-orange-300">
-                Les produits frais suivants n'ont pas de créneaux de livraison configurés :
-              </p>
-              <ul className="mt-2 text-xs sm:text-sm text-orange-700 dark:text-orange-300 space-y-1">
-                {freshProductsWithoutSlots.map(product => (
-                  <li key={product.id} className="flex items-center gap-2">
-                    <span>•</span>
-                    <Link 
-                      href={`/producer/delivery-slots/product/${product.id}`}
-                      className="underline hover:text-orange-800 dark:hover:text-orange-200 truncate"
-                    >
-                      {product.name}
-                    </Link>
-                  </li>
-                ))}
-              </ul>
+          <div className="bg-orange-50 dark:bg-orange-900/20 border-2 border-orange-200 dark:border-orange-800 rounded-lg p-4 sm:p-6">
+            <div className="flex items-start gap-3 sm:gap-4">
+              <AlertCircle className="h-5 w-5 sm:h-6 sm:w-6 text-orange-600 dark:text-orange-400 flex-shrink-0 mt-0.5" />
+              <div className="flex-1 min-w-0">
+                <h3 className="font-medium text-orange-800 dark:text-orange-200 text-sm sm:text-base">
+                  Configuration des créneaux de livraison requise
+                </h3>
+                <p className="mt-1 text-xs sm:text-sm text-orange-700 dark:text-orange-300">
+                  Les produits frais suivants n'ont pas de créneaux de livraison configurés :
+                </p>
+                <ul className="mt-2 text-xs sm:text-sm text-orange-700 dark:text-orange-300 space-y-1">
+                  {freshProductsWithoutSlots.map(product => (
+                    <li key={product.id} className="flex items-center gap-2">
+                      <span>•</span>
+                      <Link 
+                        href={`/producteur/creneaux-livraison/produit/${product.id}`}
+                        className="underline hover:text-orange-800 dark:hover:text-orange-200 truncate"
+                      >
+                        {product.name}
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              </div>
             </div>
           </div>
         </motion.div>
@@ -261,7 +236,6 @@ export default function DeliverySlotsOverview() {
           </p>
         </div>
         
-        {/* Filtre par produit */}
         <div className="flex items-center gap-4">
           <select
             value={selectedProduct}
@@ -279,7 +253,6 @@ export default function DeliverySlotsOverview() {
       </div>
 
       <div className={gridClasses({ default: 1, lg: 2 }, "gap-6 lg:gap-8")}>
-        {/* Calendrier */}
         <motion.div
           initial={{ opacity: 0, x: -20 }}
           animate={{ opacity: 1, x: 0 }}
@@ -311,7 +284,6 @@ export default function DeliverySlotsOverview() {
           </div>
         </motion.div>
 
-        {/* Liste des créneaux pour la date sélectionnée */}
         <motion.div
           initial={{ opacity: 0, x: 20 }}
           animate={{ opacity: 1, x: 0 }}
@@ -356,7 +328,7 @@ export default function DeliverySlotsOverview() {
                           </div>
                           
                           <div className="flex-1 min-w-0">
-                            <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-2">
+                            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-2">
                               <div className="min-w-0 flex-1">
                                 <h3 className="font-medium text-custom-title text-sm sm:text-base truncate">
                                   {slot.product.name}
@@ -367,7 +339,7 @@ export default function DeliverySlotsOverview() {
                               </div>
                               {!isPastSlot && (
                                 <Link
-                                  href={`/producer/delivery-slots/product/${slot.productId}`}
+                                  href={`/producteur/creneaux-livraison/produit/${slot.productId}`}
                                   className="text-custom-accent hover:opacity-80 text-xs sm:text-sm font-medium whitespace-nowrap"
                                 >
                                   Gérer
@@ -375,7 +347,6 @@ export default function DeliverySlotsOverview() {
                               )}
                             </div>
 
-                            {/* Barre de progression */}
                             <div className="mt-2 h-1.5 sm:h-2 bg-foreground/5 rounded-full overflow-hidden">
                               <div
                                 className="h-full bg-custom-accent transition-all"
@@ -385,31 +356,40 @@ export default function DeliverySlotsOverview() {
                               />
                             </div>
                             
-                            {/* Alerte si presque plein */}
-                            {(slot.reserved / slot.maxCapacity) > 0.8 && (
-                              <div className="flex items-center gap-1 mt-2 text-orange-600">
-                                <AlertCircle className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
-                                <span className="text-xs">Presque complet</span>
-                              </div>
-                            )}
+                            <div className="mt-1 flex items-center justify-between text-xs text-muted-foreground">
+                              <span>{formatNumber(slot.reserved)} {slot.product.unit} réservé</span>
+                              <span>{formatNumber(slot.maxCapacity)} {slot.product.unit} max</span>
+                            </div>
                           </div>
                         </div>
-                      );
+                      )
                     })}
                 </div>
               ) : (
-                <p className="text-center text-muted-foreground py-8 text-sm">
-                  Aucun créneau de livraison pour cette date
-                </p>
+                <div className="flex flex-col items-center justify-center py-8 sm:py-12 text-center px-4">
+                  <CalendarIcon className="h-10 w-10 sm:h-12 sm:w-12 text-foreground/20 mb-3 sm:mb-4" />
+                  <p className="text-sm sm:text-base font-medium text-custom-title mb-1 sm:mb-2">
+                    Aucun créneau pour cette date
+                  </p>
+                  <p className="text-xs sm:text-sm text-muted-foreground max-w-sm">
+                    Vous n'avez pas encore configuré de créneaux de livraison pour cette date
+                  </p>
+                </div>
               )
             ) : (
-              <p className="text-center text-muted-foreground py-8 text-sm">
-                Sélectionnez une date pour voir les créneaux disponibles
-              </p>
+              <div className="flex flex-col items-center justify-center py-8 sm:py-12 text-center px-4">
+                <CalendarIcon className="h-10 w-10 sm:h-12 sm:w-12 text-foreground/20 mb-3 sm:mb-4" />
+                <p className="text-sm sm:text-base font-medium text-custom-title mb-1 sm:mb-2">
+                  Sélectionnez une date
+                </p>
+                <p className="text-xs sm:text-sm text-muted-foreground max-w-sm">
+                  Cliquez sur une date dans le calendrier pour voir les créneaux de livraison
+                </p>
+              </div>
             )}
           </div>
         </motion.div>
       </div>
     </div>
-  );
+  )
 }

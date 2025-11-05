@@ -1,4 +1,4 @@
-// app/(protected)/producer/inventory/[productId]/page.tsx
+// app/(protected)/producteur/inventaire/[productId]/page.tsx
 'use client'
 
 import { useState, useEffect } from 'react'
@@ -44,7 +44,7 @@ export default function ProductInventoryPage({ params }: PageProps) {
         
         if (!response.ok) {
           if (response.status === 404) {
-            router.push('/producer')
+            router.push('/producteur')
             return
           }
           throw new Error('Erreur lors du chargement du produit')
@@ -109,7 +109,6 @@ export default function ProductInventoryPage({ params }: PageProps) {
   return (
     <div className={containerClasses("py-4 sm:py-6 lg:py-8")}>
       <div className="w-full max-w-6xl mx-auto">
-        {/* En-tête responsive */}
         <div className="flex flex-col sm:flex-row sm:items-center gap-4 mb-6 sm:mb-8">
           <button
             onClick={() => router.back()}
@@ -127,7 +126,6 @@ export default function ProductInventoryPage({ params }: PageProps) {
           </div>
         </div>
         
-        {/* Aperçu du stock actuel - Responsive */}
         <motion.div 
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -148,7 +146,7 @@ export default function ProductInventoryPage({ params }: PageProps) {
               </div>
               <div className="sm:ml-auto">
                 <Link
-                  href={`/producer/${product.id}/edit`}
+                  href={`/producteur/${product.id}/modifier`}
                   className="inline-flex items-center justify-center bg-custom-accent text-white px-3 sm:px-4 py-2 rounded-md hover:opacity-90 transition-opacity text-sm sm:text-base w-full sm:w-auto"
                 >
                   Ajuster le stock
@@ -158,7 +156,6 @@ export default function ProductInventoryPage({ params }: PageProps) {
           </div>
         </motion.div>
         
-        {/* Menu de navigation sous forme de carte */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -192,7 +189,6 @@ export default function ProductInventoryPage({ params }: PageProps) {
           </div>
         </motion.div>
         
-        {/* Contenu des onglets */}
         <motion.div
           key={activeTab}
           initial={{ opacity: 0, y: 20 }}
@@ -216,7 +212,6 @@ export default function ProductInventoryPage({ params }: PageProps) {
           
           {activeTab === 'alerts' && (
             <div className={gridClasses({ default: 1, lg: 2 }, "gap-4 sm:gap-6")}>
-              {/* Dashboard dans la colonne de gauche */}
               <motion.div
                 initial={{ opacity: 0, x: -20 }}
                 animate={{ opacity: 1, x: 0 }}
@@ -234,7 +229,6 @@ export default function ProductInventoryPage({ params }: PageProps) {
                 </div>
               </motion.div>
 
-              {/* Alertes dans la colonne de droite */}
               <motion.div
                 initial={{ opacity: 0, x: 20 }}
                 animate={{ opacity: 1, x: 0 }}
